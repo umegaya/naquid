@@ -1,0 +1,38 @@
+set(mac_src	
+	./ext/chromium/base/debug/debugger_posix.cc
+	./ext/chromium/base/debug/stack_trace_posix.cc
+	./ext/chromium/base/mac/mach_logging.cc
+	./ext/chromium/base/mac/scoped_mach_port.cc
+	./ext/chromium/base/posix/safe_strerror.cc
+	./ext/chromium/base/rand_util_posix.cc
+	./ext/chromium/base/strings/sys_string_conversions_mac.mm	
+	./ext/chromium/base/synchronization/lock_impl_posix.cc
+	./ext/chromium/base/time/time_conversion_posix.cc
+	./ext/chromium/base/time/time_mac.cc
+	./ext/chromium/base/threading/platform_thread_posix.cc
+	./ext/chromium/base/threading/platform_thread_mac.mm
+	./ext/chromium/base/threading/thread_local_storage_posix.cc
+)
+
+set(mac_src_bk
+	./ext/chromium/base/base_paths_mac.mm
+	./ext/chromium/base/ios/ios_util.mm
+	./ext/chromium/base/mac/bundle_locations.mm
+	./ext/chromium/base/mac/foundation_util.mm
+	./ext/chromium/base/mac/mac_logging.mm
+	./ext/chromium/base/mac/mac_util.mm
+	./ext/chromium/base/mac/scoped_nsautorelease_pool.mm
+	./ext/chromium/base/mac/scoped_nsobject.mm
+	./ext/chromium/base/mac/sdk_forward_declarations.mm
+	./ext/chromium/base/memory/shared_memory_handle_mac.cc
+	./ext/chromium/base/memory/shared_memory_mac.cc
+	./ext/chromium/base/process/kill_mac.cc
+	./ext/chromium/base/process/launch_mac.cc
+	./ext/chromium/base/process/port_provider_mac.cc
+	./ext/chromium/base/process/process_handle_mac.cc
+	./ext/chromium/base/process/process_info_mac.cc
+	./ext/chromium/base/process/process_iterator_mac.cc
+	./ext/chromium/base/process/process_mac.cc
+	./ext/chromium/base/process/process_metrics_mac.cc
+	./ext/chromium/base/synchronization/waitable_event_mac.cc
+)

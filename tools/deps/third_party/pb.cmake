@@ -1,0 +1,20 @@
+set(pb_src
+	./ext/chromium/third_party/protobuf/src/google/protobuf/arena.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/arenastring.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/extension_set.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/generated_message_util.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/io/coded_stream.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/io/zero_copy_stream.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/io/zero_copy_stream_impl_lite.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/message_lite.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/repeated_field.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/atomicops_internals_x86_gcc.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/atomicops_internals_x86_msvc.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/common.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/structurally_valid.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/once.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/status.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/int128.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/stubs/stringprintf.cc
+	./ext/chromium/third_party/protobuf/src/google/protobuf/wire_format_lite.cc
+)
