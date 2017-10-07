@@ -203,9 +203,37 @@ def load_exclude_file(excludes, file):
 
     return excludes
 
-class TreeVisitor(object):
-    def __init__(self, categorizer):
-        self.categorizer = categorizer
+class GenListFileVisitor(object):
+    def __init__(self):
+        self.categorizer = collections.OrderedDict([
+            (lambda f: f.endswith(".mm"), "mac"), 
+            (lambda f: f.endswith("_mac.cc"), "mac"),
+            (lambda f: f.endswith(".cc") and ("/mac/" in f), "mac"), 
+
+
+            (lambda f: f.endswith("_posix.cc"), "posix"), 
+
+            (lambda f: f.endswith("_linux.cc"), "linux"), 
+
+            (lambda f: f.endswith("_fuchsia.cc"), "fuchsia"), 
+            (lambda f: f.endswith(".cc") and ("/fuchsia/" in f), "fuchsia"), 
+
+            (lambda f: f.endswith("_win.cc"), "win"), 
+            (lambda f: f.endswith(".cc") and ("/win/" in f), "win"), 
+            (lambda f: f.endswith(".cc") and ("winsock" in f), "win"), 
+
+            (lambda f: f.endswith("_android.cc"), "android"),
+            (lambda f: f.endswith(".cc") and ("/android/" in f), "android"), 
+
+            (lambda f: f.endswith("_aix.cc"), "aix"),
+            (lambda f: f.endswith(".cc") and ("/aix/" in f), "aix"), 
+
+            (lambda f: f.endswith("_glib.cc"), "glib"),
+            (lambda f: f.endswith(".cc") and ("/glib/" in f), "glib"), 
+
+            (lambda f: f.endswith(".cpp"), "common"), 
+            (lambda f: f.endswith(".cc"), "common"), 
+        ])
         self.lists = {}
         for k in self.categorizer.keys():
             t = self.categorizer[k]
@@ -229,11 +257,16 @@ class TreeVisitor(object):
                 text += ")"
                 f.write(text)
 
+class CopyFilesVisitor(object):
+    def visit(self, file):
+
+
 def main():
     parser = argparse.ArgumentParser(description="C++ Dependency Tracker for chromium")
     parser.add_argument("srcroot", type=str)
     parser.add_argument("--exclude", action="append")
     parser.add_argument("--exclude_file", type=str)
+    parser.add_argument("--action", type=str)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--dir", action="append")
     parser.add_argument("--outdir", type=str)
@@ -246,35 +279,6 @@ def main():
     tree = DependencyTree(args.exclude, args.dir, exts, args.debug)
     tree.scan_from(args.srcroot)
 
-    categorizer = collections.OrderedDict([
-        (lambda f: f.endswith(".mm"), "mac"), 
-        (lambda f: f.endswith("_mac.cc"), "mac"),
-        (lambda f: f.endswith(".cc") and ("/mac/" in f), "mac"), 
-
-
-        (lambda f: f.endswith("_posix.cc"), "posix"), 
-
-        (lambda f: f.endswith("_linux.cc"), "linux"), 
-
-        (lambda f: f.endswith("_fuchsia.cc"), "fuchsia"), 
-        (lambda f: f.endswith(".cc") and ("/fuchsia/" in f), "fuchsia"), 
-
-        (lambda f: f.endswith("_win.cc"), "win"), 
-        (lambda f: f.endswith(".cc") and ("/win/" in f), "win"), 
-        (lambda f: f.endswith(".cc") and ("winsock" in f), "win"), 
-
-        (lambda f: f.endswith("_android.cc"), "android"),
-        (lambda f: f.endswith(".cc") and ("/android/" in f), "android"), 
-
-        (lambda f: f.endswith("_aix.cc"), "aix"),
-        (lambda f: f.endswith(".cc") and ("/aix/" in f), "aix"), 
-
-        (lambda f: f.endswith("_glib.cc"), "glib"),
-        (lambda f: f.endswith(".cc") and ("/glib/" in f), "glib"), 
-
-        (lambda f: f.endswith(".cpp"), "common"), 
-        (lambda f: f.endswith(".cc"), "common"), 
-    ])
     visitor = TreeVisitor(categorizer)
     tree.traverse(visitor.visit)
     visitor.put_to(args.outdir)

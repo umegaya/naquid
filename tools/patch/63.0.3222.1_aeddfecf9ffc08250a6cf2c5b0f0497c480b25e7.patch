@@ -1,0 +1,140 @@
+diff --git a/base/logging.cc b/base/logging.cc
+index c0f318c29bcb..71a1eb1072b0 100644
+--- a/base/logging.cc
++++ b/base/logging.cc
+@@ -374,7 +374,7 @@ bool BaseInitLoggingImpl(const LoggingSettings& settings) {
+   // Can log only to the system debug log.
+   CHECK_EQ(settings.logging_dest & ~LOG_TO_SYSTEM_DEBUG_LOG, 0);
+ #endif
+-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
++  /* base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+   // Don't bother initializing |g_vlog_info| unless we use one of the
+   // vlog switches.
+   if (command_line->HasSwitch(switches::kV) ||
+@@ -389,7 +389,7 @@ bool BaseInitLoggingImpl(const LoggingSettings& settings) {
+         new VlogInfo(command_line->GetSwitchValueASCII(switches::kV),
+                      command_line->GetSwitchValueASCII(switches::kVModule),
+                      &g_min_log_level);
+-  }
++  } */
+ 
+   g_logging_destination = settings.logging_dest;
+ 
+@@ -439,13 +439,14 @@ int GetVlogVerbosity() {
+ }
+ 
+ int GetVlogLevelHelper(const char* file, size_t N) {
+-  DCHECK_GT(N, 0U);
++  /*DCHECK_GT(N, 0U);
+   // Note: |g_vlog_info| may change on a different thread during startup
+   // (but will always be valid or nullptr).
+   VlogInfo* vlog_info = g_vlog_info;
+   return vlog_info ?
+       vlog_info->GetVlogLevel(base::StringPiece(file, N - 1)) :
+-      GetVlogVerbosity();
++      GetVlogVerbosity(); */
++  return GetVlogVerbosity();
+ }
+ 
+ void SetLogItems(bool enable_process_id, bool enable_thread_id,
+@@ -751,10 +752,10 @@ LogMessage::~LogMessage() {
+ 
+   if (severity_ == LOG_FATAL) {
+     // Write the log message to the global activity tracker, if running.
+-    base::debug::GlobalActivityTracker* tracker =
++    /* base::debug::GlobalActivityTracker* tracker =
+         base::debug::GlobalActivityTracker::Get();
+     if (tracker)
+-      tracker->RecordLogMessage(str_newline);
++      tracker->RecordLogMessage(str_newline); */
+ 
+     // Ensure the first characters of the string are on the stack so they
+     // are contained in minidumps for diagnostic purposes.
+diff --git a/base/metrics/histogram_macros_internal.h b/base/metrics/histogram_macros_internal.h
+index 3a7212c6f8cc..063b869ba194 100644
+--- a/base/metrics/histogram_macros_internal.h
++++ b/base/metrics/histogram_macros_internal.h
+@@ -37,6 +37,7 @@
+ // define HISTOGRAM_POINTER_USE, which uses an |atomic_histogram_pointer|, and
+ // STATIC_HISTOGRAM_POINTER_BLOCK, which defines an |atomic_histogram_pointer|
+ // and forwards to HISTOGRAM_POINTER_USE.
++#if !defined(DISABLE_HISTOGRAM)
+ #define HISTOGRAM_POINTER_USE(atomic_histogram_pointer,                        \
+                               constant_histogram_name,                         \
+                               histogram_add_method_invocation,                 \
+@@ -93,6 +94,17 @@
+                           histogram_factory_get_invocation);                   \
+   } while (0)
+ 
++#else //TODO(iyatomi) somehow invent a way to give histogram information to custom logger
++#define HISTOGRAM_POINTER_USE(atomic_histogram_pointer,                        \
++                              constant_histogram_name,                         \
++                              histogram_add_method_invocation,                 \
++                              histogram_factory_get_invocation)                
++#define STATIC_HISTOGRAM_POINTER_BLOCK(constant_histogram_name,                \
++                                       histogram_add_method_invocation,        \
++                                       histogram_factory_get_invocation)       
++#endif // !DISABLE_HISTORGRAM
++
++
+ // This is a helper macro used by other macros and shouldn't be used directly.
+ #define INTERNAL_HISTOGRAM_CUSTOM_COUNTS_WITH_FLAG(name, sample, min, max,     \
+                                                    bucket_count, flag)         \
+@@ -180,6 +192,7 @@
+     base::TimeTicks constructed_;                                              \
+   } scoped_histogram_timer_##key
+ 
++#if !defined(DISABLE_HISTOGRAM) 
+ // Macro for sparse histogram.
+ // The implementation is more costly to add values to, and each value
+ // stored has more overhead, compared to the other histogram types. However it
+@@ -191,5 +204,8 @@
+           name, base::HistogramBase::kUmaTargetedHistogramFlag);               \
+       histogram->Add(sample);                                                  \
+     } while (0)
++#else //TODO(iyatomi) somehow invent a way to give histogram information to custom logger
++#define INTERNAL_HISTOGRAM_SPARSE_SLOWLY(name, sample)                      
++#endif //!DISABLE_HISTOGRAM
+ 
+ #endif  // BASE_METRICS_HISTOGRAM_MACROS_INTERNAL_H_
+diff --git a/base/synchronization/lock_impl_posix.cc b/base/synchronization/lock_impl_posix.cc
+index 5ad337d9f715..38e4cf6a1ea9 100644
+--- a/base/synchronization/lock_impl_posix.cc
++++ b/base/synchronization/lock_impl_posix.cc
+@@ -58,7 +58,7 @@ bool LockImpl::Try() {
+ }
+ 
+ void LockImpl::Lock() {
+-  base::debug::ScopedLockAcquireActivity lock_activity(this);
++  //base::debug::ScopedLockAcquireActivity lock_activity(this);
+   int rv = pthread_mutex_lock(&native_handle_);
+   DCHECK_EQ(rv, 0) << ". " << strerror(rv);
+ }
+diff --git a/base/threading/platform_thread_posix.cc b/base/threading/platform_thread_posix.cc
+index 849fd088ba66..5554b10b477a 100644
+--- a/base/threading/platform_thread_posix.cc
++++ b/base/threading/platform_thread_posix.cc
+@@ -220,7 +220,7 @@ bool PlatformThread::CreateNonJoinableWithPriority(size_t stack_size,
+ // static
+ void PlatformThread::Join(PlatformThreadHandle thread_handle) {
+   // Record the event that this thread is blocking upon (for hang diagnosis).
+-  base::debug::ScopedThreadJoinActivity thread_activity(&thread_handle);
++  // base::debug::ScopedThreadJoinActivity thread_activity(&thread_handle);
+ 
+   // Joining another thread may block the current thread for a long time, since
+   // the thread referred to by |thread_handle| may still be running long-lived /
+diff --git a/base/threading/thread_id_name_manager.cc b/base/threading/thread_id_name_manager.cc
+index 107e0dc49857..192cadb5c1ff 100644
+--- a/base/threading/thread_id_name_manager.cc
++++ b/base/threading/thread_id_name_manager.cc
+@@ -80,8 +80,8 @@ void ThreadIdNameManager::SetName(PlatformThreadId id,
+   // call GetName(which holds a lock) during the first allocation because it can
+   // cause a deadlock when the first allocation happens in the
+   // ThreadIdNameManager itself when holding the lock.
+-  trace_event::AllocationContextTracker::SetCurrentThreadName(
+-      leaked_str->c_str());
++  // trace_event::AllocationContextTracker::SetCurrentThreadName(
++  //    leaked_str->c_str());
+ }
+ 
+ const char* ThreadIdNameManager::GetName(PlatformThreadId id) {

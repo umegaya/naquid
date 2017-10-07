@@ -1,15 +1,15 @@
 set(android_src
-	./ext/chromium/base/android/build_info.cc
-	./ext/chromium/base/android/content_uri_utils.cc
-	./ext/chromium/base/android/java_runtime.cc
-	./ext/chromium/base/android/jni_android.cc
-	./ext/chromium/base/android/jni_array.cc
-	./ext/chromium/base/android/jni_string.cc
-	./ext/chromium/base/android/jni_utils.cc
-	./ext/chromium/base/android/path_utils.cc
-	./ext/chromium/base/android/scoped_java_ref.cc
-	./ext/chromium/base/base_paths_android.cc
-	./ext/chromium/base/os_compat_android.cc
-	./ext/chromium/base/debug/stack_trace_android.cc
-	./ext/chromium/base/trace_event/java_heap_dump_provider_android.cc
+	./src/chromium/base/android/build_info.cc
+	./src/chromium/base/android/content_uri_utils.cc
+	./src/chromium/base/android/java_runtime.cc
+	./src/chromium/base/android/jni_android.cc
+	./src/chromium/base/android/jni_array.cc
+	./src/chromium/base/android/jni_string.cc
+	./src/chromium/base/android/jni_utils.cc
+	./src/chromium/base/android/path_utils.cc
+	./src/chromium/base/android/scoped_java_ref.cc
+	./src/chromium/base/base_paths_android.cc
+	./src/chromium/base/os_compat_android.cc
+	./src/chromium/base/debug/stack_trace_android.cc
+	./src/chromium/base/trace_event/java_heap_dump_provider_android.cc
 )

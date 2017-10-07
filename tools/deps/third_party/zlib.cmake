@@ -1,18 +1,18 @@
 set(zlib_src
-	ext/chromium/third_party/zlib/adler32.c
-	ext/chromium/third_party/zlib/infback.c
-	ext/chromium/third_party/zlib/compress.c
-	ext/chromium/third_party/zlib/inffast.c
-	ext/chromium/third_party/zlib/crc32.c
-	ext/chromium/third_party/zlib/inflate.c
-	ext/chromium/third_party/zlib/inftrees.c
-	ext/chromium/third_party/zlib/deflate.c
-	ext/chromium/third_party/zlib/simd_stub.c
-	ext/chromium/third_party/zlib/trees.c
-	ext/chromium/third_party/zlib/gzclose.c
-	ext/chromium/third_party/zlib/uncompr.c
-	ext/chromium/third_party/zlib/gzlib.c
-	ext/chromium/third_party/zlib/gzread.c
-	ext/chromium/third_party/zlib/zutil.c
-	ext/chromium/third_party/zlib/gzwrite.c
+	./src/chromium/third_party/zlib/adler32.c
+	./src/chromium/third_party/zlib/infback.c
+	./src/chromium/third_party/zlib/compress.c
+	./src/chromium/third_party/zlib/inffast.c
+	./src/chromium/third_party/zlib/crc32.c
+	./src/chromium/third_party/zlib/inflate.c
+	./src/chromium/third_party/zlib/inftrees.c
+	./src/chromium/third_party/zlib/deflate.c
+	./src/chromium/third_party/zlib/simd_stub.c
+	./src/chromium/third_party/zlib/trees.c
+	./src/chromium/third_party/zlib/gzclose.c
+	./src/chromium/third_party/zlib/uncompr.c
+	./src/chromium/third_party/zlib/gzlib.c
+	./src/chromium/third_party/zlib/gzread.c
+	./src/chromium/third_party/zlib/zutil.c
+	./src/chromium/third_party/zlib/gzwrite.c
 )

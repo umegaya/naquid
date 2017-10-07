@@ -1,13 +1,13 @@
 set(linux_src
-	./ext/chromium/base/debug/proc_maps_linux.cc
-	./ext/chromium/base/files/file_util_linux.cc
-	./ext/chromium/base/process/internal_linux.cc
-	./ext/chromium/base/process/memory_linux.cc
-	./ext/chromium/base/process/process_handle_linux.cc
-	./ext/chromium/base/process/process_info_linux.cc
-	./ext/chromium/base/process/process_iterator_linux.cc
-	./ext/chromium/base/process/process_linux.cc
-	./ext/chromium/base/process/process_metrics_linux.cc
-	./ext/chromium/base/sys_info_linux.cc
-	./ext/chromium/base/threading/platform_thread_linux.cc
+	./src/chromium/base/debug/proc_maps_linux.cc
+	./src/chromium/base/files/file_util_linux.cc
+	./src/chromium/base/process/internal_linux.cc
+	./src/chromium/base/process/memory_linux.cc
+	./src/chromium/base/process/process_handle_linux.cc
+	./src/chromium/base/process/process_info_linux.cc
+	./src/chromium/base/process/process_iterator_linux.cc
+	./src/chromium/base/process/process_linux.cc
+	./src/chromium/base/process/process_metrics_linux.cc
+	./src/chromium/base/sys_info_linux.cc
+	./src/chromium/base/threading/platform_thread_linux.cc
 )

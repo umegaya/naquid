@@ -1,2 +1,2 @@
-build
+build/*
 tools/builder/finish
