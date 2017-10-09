@@ -19,11 +19,14 @@ extern "C" char* mkdtemp(char* path);
 extern "C" time_t timegm(struct tm* const t);
 
 // The lockf() function is not available on Android; we translate to flock().
+// TODO(iyatomi): android ndk r15b seems to have lockf()
+#if !defined(F_LOCK)
 #define F_LOCK LOCK_EX
 #define F_ULOCK LOCK_UN
 inline int lockf(int fd, int cmd, off_t ignored_len) {
   return flock(fd, cmd);
 }
+#endif // F_LOCK
 
 // In case __USE_FILE_OFFSET64 is not used, we need to call pwrite64() instead
 // of pwrite()

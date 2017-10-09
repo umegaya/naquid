@@ -1,5 +1,27 @@
 set(android_src
 	./src/chromium/base/android/build_info.cc
+	./src/chromium/base/android/jni_android.cc
+	./src/chromium/base/android/jni_array.cc
+	./src/chromium/base/android/jni_string.cc
+	./src/chromium/base/android/jni_utils.cc
+	./src/chromium/base/android/scoped_java_ref.cc
+	./src/chromium/base/debug/debugger_posix.cc
+	./src/chromium/base/debug/proc_maps_linux.cc
+	./src/chromium/base/debug/stack_trace_android.cc
+	./src/chromium/base/files/scoped_file.cc
+	./src/chromium/base/posix/safe_strerror.cc
+	./src/chromium/base/process/process_handle_posix.cc
+	./src/chromium/base/rand_util_posix.cc
+	./src/chromium/base/synchronization/lock_impl_posix.cc
+	./src/chromium/base/threading/platform_thread_android.cc
+	./src/chromium/base/threading/platform_thread_internal_posix.cc
+	./src/chromium/base/threading/platform_thread_posix.cc
+	./src/chromium/base/threading/thread_local_storage_posix.cc
+	./src/chromium/base/time/time_exploded_posix.cc
+	./src/chromium/base/time/time_now_posix.cc
+)
+set(android_src_bk
+	./src/chromium/base/android/build_info.cc
 	./src/chromium/base/android/content_uri_utils.cc
 	./src/chromium/base/android/java_runtime.cc
 	./src/chromium/base/android/jni_android.cc

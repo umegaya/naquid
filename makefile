@@ -42,8 +42,8 @@ android: proto
 	- mkdir -p build/android.v7
 	- mkdir -p build/android.64
 	- mkdir -p build/android
-	cd build/android.v7 && cmake -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a" -DANDROID_NATIVE_API_LEVEL=android-26 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j4
-	cd build/android.64 && cmake -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-26 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j4
+	cd build/android.v7 && cmake -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j4
+	cd build/android.64 && cmake -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j4
 	mv build/android.v7/lib$(LIB).so build/android/lib$(LIB)-armv7.so
 	mv build/android.64/lib$(LIB).so build/android/lib$(LIB)-arm64.so
 

@@ -47,6 +47,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/platform/android.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/platform/linux.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/platform/win.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/platform/fuchsia.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/platform/posix.cmake)
 # third party srcs
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/zlib.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/ssl.cmake)

@@ -12,6 +12,7 @@ import re
 import datetime
 import argparse
 import collections
+import subprocess
 import shutil
 from pprint import pprint
 
@@ -119,14 +120,45 @@ class DependencyTree(object):
         f.close()
         return path2write
 
+    def run(self, command):
+        retcode = subprocess.call(command, shell=True)
+        if retcode != 0:
+            raise OSError("command '{}' fails with code {}".format(command, retcode))
+
     def write_effective_tld_cc(self, path2write):
         src = path2write.replace("-inc.cc", ".gperf")
-        os.system("python ./src/chromium/net/tools/dafsa/make_dafsa.py {} {}".format(src, path2write))
+        self.run("python {}/net/tools/dafsa/make_dafsa.py {} {}".format(self.find_chromium_root(), src, path2write))
         return path2write
 
     def write_log_list_cc(self, path2write):
         src = path2write.replace("-inc.cc", ".json")
-        os.system("python ./src/chromium/net/tools/ct_log_list/make_ct_known_logs_list.py {} {}".format(src, path2write))
+        self.run("python {}/net/tools/ct_log_list/make_ct_known_logs_list.py {} {}".format(self.find_chromium_root(), src, path2write))
+        return path2write
+
+    def find_src_java_path(self, jni_header_path):
+        for pre in ["base", "net"]:
+            src_java = jni_header_path.replace("_jni.h", ".java").replace("jni/", "{}/android/java/src/org/chromium/{}/".format(pre, pre))
+            print("try src_java = " + src_java)
+            if os.path.exists(src_java):
+                return src_java
+        return None
+
+    def generate_jni_headers(self, path2write):
+        root = self.find_chromium_root()
+        src_java = self.find_src_java_path(path2write)
+        if not src_java:
+            print("src_java not found for " + path2write)
+            return src_java
+
+        if not os.path.exists(os.path.dirname(path2write)):
+            os.makedirs(os.path.dirname(path2write))
+
+        self.run("python {}/base/android/jni_generator/jni_generator.py --input_file={} --includes={} --output_dir={}/jni".format(
+            root, 
+            src_java, 
+            ",".join(["base/android/jni_android.h", "base/android/jni_generator/jni_generator_helper.h"]),
+            root
+        ))
         return path2write
 
     def make_pp_symbol(self, now):
@@ -151,7 +183,10 @@ class DependencyTree(object):
             return self.write_effective_tld_cc(os.path.join(root, non_real_path))            
         elif "certificate_transparency/log_list" in non_real_path:
             root = self.find_chromium_root()
-            return self.write_log_list_cc(os.path.join(root, non_real_path))                        
+            return self.write_log_list_cc(os.path.join(root, non_real_path))
+        elif non_real_path.startswith("jni/"):
+            root = self.find_chromium_root()
+            return self.generate_jni_headers(os.path.join(root, non_real_path))
         else:
             return None
 

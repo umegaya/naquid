@@ -97,6 +97,25 @@ index 3a7212c6f8cc..063b869ba194 100644
 +#endif //!DISABLE_HISTOGRAM
  
  #endif  // BASE_METRICS_HISTOGRAM_MACROS_INTERNAL_H_
+diff --git a/base/os_compat_android.h b/base/os_compat_android.h
+index bfdf2c8e7533..722da07e5b79 100644
+--- a/base/os_compat_android.h
++++ b/base/os_compat_android.h
+@@ -19,11 +19,14 @@ extern "C" char* mkdtemp(char* path);
+ extern "C" time_t timegm(struct tm* const t);
+ 
+ // The lockf() function is not available on Android; we translate to flock().
++// TODO(iyatomi): android ndk r15b seems to have lockf()
++#if !defined(F_LOCK)
+ #define F_LOCK LOCK_EX
+ #define F_ULOCK LOCK_UN
+ inline int lockf(int fd, int cmd, off_t ignored_len) {
+   return flock(fd, cmd);
+ }
++#endif // F_LOCK
+ 
+ // In case __USE_FILE_OFFSET64 is not used, we need to call pwrite64() instead
+ // of pwrite()
 diff --git a/base/synchronization/lock_impl_posix.cc b/base/synchronization/lock_impl_posix.cc
 index 5ad337d9f715..38e4cf6a1ea9 100644
 --- a/base/synchronization/lock_impl_posix.cc
