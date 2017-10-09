@@ -119,7 +119,7 @@ int QuicSocketUtils::SetGetAddressInfo(int fd, int address_family) {
 
 // static
 int QuicSocketUtils::SetGetSoftwareReceiveTimestamp(int fd) {
-#if defined(SO_TIMESTAMPING)
+#if defined(SO_TIMESTAMPING) && defined(SOF_TIMESTAMPING_RX_SOFTWARE)
   int timestamping = SOF_TIMESTAMPING_RX_SOFTWARE | SOF_TIMESTAMPING_SOFTWARE;
   return setsockopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &timestamping,
                     sizeof(timestamping));

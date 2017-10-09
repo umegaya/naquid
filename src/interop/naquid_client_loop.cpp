@@ -49,11 +49,11 @@ bool NaquidClientLoop::ParseUrl(const std::string &url, QuicServerId& server_id,
     port = "443";
   }
   //TODO: being asynchronous somehow. using chromium one or cares
-  struct addrinfo filter = {
-    .ai_socktype = SOCK_DGRAM,
-    .ai_family = AF_UNSPEC,
-    .ai_protocol = 0, .ai_flags = 0,
-  }, *resolved;
+  struct addrinfo filter, *resolved;
+  filter.ai_socktype = SOCK_DGRAM;
+  filter.ai_family = AF_UNSPEC;
+  filter.ai_protocol = 0;
+  filter.ai_flags = 0;
   if (getaddrinfo(host.c_str(), port.c_str(), &filter, &resolved) != 0) {
     return false;
   }

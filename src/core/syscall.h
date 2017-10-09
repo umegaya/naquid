@@ -73,7 +73,7 @@ public:
     }
 	}
 	template <typename T>
-	constexpr static T HostToNet(T value) noexcept {
+	static T HostToNet(T value) noexcept {
     if (Endian::isLittleEndian()) {
   		char* ptr = reinterpret_cast<char*>(&value);
  	 	  std::reverse (ptr, ptr + sizeof(T));

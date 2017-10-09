@@ -1030,7 +1030,7 @@ if( BUILD_WITH_ANDROID_NDK )
    set( __libstl                "${__libstl}/libs/${ANDROID_NDK_ABI_NAME}/libstdc++.a" )
   endif()
  elseif( ANDROID_STL MATCHES "c\\+\\+_static" )
-   set( ANDROID_STL_INCLUDE_DIRS "${ANDROID_NDK}/sources/cxx-stl/llvm-libc++/libcxx/include" "${ANDROID_NDK}/sources/android/support/include" )
+   set( ANDROID_STL_INCLUDE_DIRS "${ANDROID_NDK}/sources/cxx-stl/llvm-libc++/include" "${ANDROID_NDK}/sources/android/support/include" )
    set( __libstl                "${__libstl}/libs/${ANDROID_NDK_ABI_NAME}/libc++_static.a" )  
    link_directories( "${ANDROID_NDK}/sources/cxx-stl/llvm-libc++/libs/${ANDROID_NDK_ABI_NAME}" )
  else()
@@ -1455,7 +1455,7 @@ if( DEFINED ANDROID_EXCEPTIONS AND ANDROID_STL_FORCE_FEATURES )
 endif()
 
 # global includes and link directories
-include_directories( SYSTEM "${ANDROID_SYSROOT}/usr/include" ${ANDROID_STL_INCLUDE_DIRS} )
+include_directories( SYSTEM ${ANDROID_STL_INCLUDE_DIRS} "${ANDROID_SYSROOT}/usr/include" )
 get_filename_component(__android_install_path "${CMAKE_INSTALL_PREFIX}/libs/${ANDROID_NDK_ABI_NAME}" ABSOLUTE) # avoid CMP0015 policy warning
 link_directories( "${__android_install_path}" )
 

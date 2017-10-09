@@ -35,6 +35,8 @@ set(lib_src
 	./src/interop/compat/naquid_url_canon_icu.cpp
 	./src/interop/compat/naquid_file_util.cpp
 	./src/interop/compat/naquid_ref_counted.cpp
+)
+set(lib_mm_src
 	./src/interop/compat/naquid_foundation_util.mm
 )
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/net.cmake)
@@ -54,25 +56,31 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/pb.cmake)
 
 # target settings
 if (IOS)
-	# workaround for problem detailed in https://karp.id.au/a/2015/09/15/xcode-7s-new-linker-rules/
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -miphoneos-version-min=7.0 -Wno-nullability-completeness -D__ENABLE_KQUEUE__")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -miphoneos-version-min=7.0 -Wno-nullability-completeness")
-	add_library(nq STATIC ${nqsrc})
-	target_link_libraries(nq "-lz")
-elseif (OSXBUNDLE)
 	find_library(core_foundation CoreFoundation)
 	find_library(cocoa Cocoa)
 	find_library(iokit IOKit)
 	find_library(security Security)
 
 	set(nqsrc ${lib_src} ${net_src} ${common_src} ${mac_src} ${zlib_src} ${ssl_src} ${pb_src})
+	# workaround for problem detailed in https://karp.id.au/a/2015/09/15/xcode-7s-new-linker-rules/
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -miphoneos-version-min=7.0 -Wno-nullability-completeness -D__ENABLE_KQUEUE__")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -miphoneos-version-min=7.0 -Wno-nullability-completeness")
+	add_library(nq STATIC ${nqsrc})
+	target_link_libraries(nq ${core_foundation} ${iokit} ${security})
+elseif (OSXBUNDLE)
+	find_library(core_foundation CoreFoundation)
+	find_library(cocoa Cocoa)
+	find_library(iokit IOKit)
+	find_library(security Security)
+
+	set(nqsrc ${lib_src} ${lib_mm_src} ${net_src} ${common_src} ${mac_src} ${zlib_src} ${ssl_src} ${pb_src})
 	# message(NQSRC, ${nqsrc})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_KQUEUE__")
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -bundle")
 	add_executable(nq MACOSX_BUNDLE ${nqsrc}) 	
-	target_link_libraries(nq z ${core_foundation} ${cocoa} ${iokit} ${security})
-elseif(BUILD_ANDROID)
-	set(nqsrc ${common_src} ${android_src})
+	target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security})
+elseif(ANDROID)
+	set(nqsrc ${lib_src} ${net_src} ${common_src} ${android_src} ${zlib_src} ${ssl_src} ${pb_src})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_EPOLL__")
 	add_library(nq SHARED ${nqsrc})
 	target_link_libraries(nq "-lc++_static -lz -llog")

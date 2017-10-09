@@ -28,7 +28,9 @@ class HandlerMap {
     if (map_.find(name) != map_.end()) {
       return false;
     }
-  	HandlerEntry he = { .type = FACTORY, .factory = factory };
+  	HandlerEntry he;
+    he.type = FACTORY;
+    he.factory = factory;
   	map_[name] = he;
     return true;
   }
@@ -36,7 +38,9 @@ class HandlerMap {
     if (map_.find(name) != map_.end()) {
       return false;
     }
-  	HandlerEntry he = { .type = STREAM, .stream = stream };
+    HandlerEntry he;
+    he.type = STREAM;
+    he.stream = stream;
   	map_[name] = he;
     return true;
   }
@@ -44,7 +48,9 @@ class HandlerMap {
     if (map_.find(name) != map_.end()) {
       return false;
     }
-  	HandlerEntry he = { .type = RPC, .rpc = rpc };
+    HandlerEntry he;
+    he.type = RPC;
+    he.rpc = rpc;
   	map_[name] = he;
     return true;
   }
