@@ -8,6 +8,10 @@
 #include <unistd.h>
 #include <string>
 
+#ifdef OS_LINUX
+#include <fcntl.h>
+#endif
+
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_bug_tracker.h"
 #include "net/quic/platform/api/quic_flags.h"
