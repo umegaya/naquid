@@ -11,7 +11,7 @@ meta-builder:
 	docker build -t naquid/meta-builder tools/builder
 
 builder:
-	bash tools/builder/create.sh
+	bash tools/builder/create.sh $(CHROMIUM_ROOT)
 
 rebuild-builder: meta-builder builder
 
