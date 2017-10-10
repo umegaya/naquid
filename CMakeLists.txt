@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.6)
 project(naquid C CXX)
 
 
@@ -84,7 +84,7 @@ elseif(ANDROID)
 	set(nqsrc ${lib_src} ${net_src} ${common_src} ${android_src} ${zlib_src} ${ssl_src} ${pb_src})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_EPOLL__")
 	add_library(nq SHARED ${nqsrc})
-	target_link_libraries(nq "-lc++_static -lz -llog")
+	target_link_libraries(nq "-lc++_static -llog")
 else()
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_EPOLL__ -DMMSG_MORE")
 	add_library(nq STATIC ${nqsrc})

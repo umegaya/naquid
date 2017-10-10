@@ -7,7 +7,7 @@ CHROMIUM_ROOT=../chromium
 LIB=nq
 
 define call_protoc
-docker run --rm -v `pwd`:/barequic $(BUILDER_IMAGE) bash -c "cd /barequic && protoc -I$(QUIC_CORE_PROTO_ROOT) $1"
+docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) bash -c "cd /naquid && protoc -I$(QUIC_CORE_PROTO_ROOT) $1"
 endef
 
 $(QUIC_CORE_PROTO_ROOT)/%.pb.cc $(QUIC_CORE_PROTO_ROOT)/%.pb.h: $(QUIC_CORE_PROTO_ROOT)/%.proto 
@@ -16,7 +16,7 @@ $(QUIC_CORE_PROTO_ROOT)/%.pb.cc $(QUIC_CORE_PROTO_ROOT)/%.pb.h: $(QUIC_CORE_PROT
 proto: $(QUIC_CORE_PROTO_SRC:.proto=.pb.cc)
 
 meta-builder:
-	docker build -t barequic/meta-builder tools/builder
+	docker build -t naquid/meta-builder tools/builder
 
 builder: meta-builder
 	bash tools/builder/create.sh
@@ -25,9 +25,12 @@ bundle: proto
 	-@mkdir -p build/osx
 	cd build/osx && cmake -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/bundle.cmake $(RELATIVE_PROJECT_ROOT) && make
 
-linux: proto
+linux_internal: 
 	- mkdir -p build/linux
 	cd build/linux && cmake -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/linux.cmake $(RELATIVE_PROJECT_ROOT) && make
+
+linux: proto
+	docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) bash -c "cd /naquid && make linux_internal"
 
 ios: proto
 	- mkdir -p build/ios.v7

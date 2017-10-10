@@ -17,7 +17,7 @@ while [ ! -f $FINISH_FILE ]; do
 	printf "."
 	sleep 5
 done
-docker commit $CID barequic/builder
+docker commit $CID naquid/builder
 docker kill $CID
 docker rm $CID
 echo "finish"
