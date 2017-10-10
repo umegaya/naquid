@@ -135,6 +135,25 @@ class DependencyTree(object):
         self.run("python {}/net/tools/ct_log_list/make_ct_known_logs_list.py {} {}".format(self.find_chromium_root(), src, path2write))
         return path2write
 
+    def write_proto_file(self, path2write):
+        src = ""
+        if ".pb.h" in path2write:
+            src = path2write.replace(".pb.h", ".proto")
+        elif ".pb.cc" in path2write:
+            src = path2write.replace(".pb.cc", ".proto")
+        
+        if not os.path.exists(src):
+            printf("proto file not found for " + path2write)
+            return None
+
+        self.run("docker run --rm -v `pwd`:/naquid -v `pwd`/{}:/chromium barequic/builder sh -c \"cd /naquid && protoc -I{} --cpp_out={} {}\"".format(
+            self.find_chromium_root(),
+            os.path.dirname(src),
+            os.path.dirname(src),
+            src 
+        ))
+        return path2write
+
     def find_src_java_path(self, jni_header_path):
         for pre in ["base", "net"]:
             src_java = jni_header_path.replace("_jni.h", ".java").replace("jni/", "{}/android/java/src/org/chromium/{}/".format(pre, pre))
@@ -184,6 +203,9 @@ class DependencyTree(object):
         elif "certificate_transparency/log_list" in non_real_path:
             root = self.find_chromium_root()
             return self.write_log_list_cc(os.path.join(root, non_real_path))
+        elif non_real_path.endswith(".pb.h") or non_real_path.endswith(".pb.cc"):
+            root = self.find_chromium_root()
+            return self.write_proto_file(os.path.join(root, non_real_path)) 
         elif non_real_path.startswith("jni/"):
             root = self.find_chromium_root()
             return self.generate_jni_headers(os.path.join(root, non_real_path))

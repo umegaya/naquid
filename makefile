@@ -1,27 +1,21 @@
-QUIC_CORE_PROTO_ROOT=ext/chromium/net/quic/core/proto
 BUILD_SETTING_PATH=tools/cmake
 RELATIVE_PROJECT_ROOT=../..
-QUIC_CORE_PROTO_SRC=$(shell find $(QUIC_CORE_PROTO_ROOT) -name *.proto)
-BUILDER_IMAGE=barequic/builder
 CHROMIUM_ROOT=../chromium
 LIB=nq
 
-define call_protoc
-docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) bash -c "cd /naquid && protoc -I$(QUIC_CORE_PROTO_ROOT) $1"
+define ct_run
+docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) bash -c "cd /naquid && $1"
 endef
-
-$(QUIC_CORE_PROTO_ROOT)/%.pb.cc $(QUIC_CORE_PROTO_ROOT)/%.pb.h: $(QUIC_CORE_PROTO_ROOT)/%.proto 
-	$(call call_protoc,-I. --cpp_out=$(QUIC_CORE_PROTO_ROOT) $<)
-
-proto: $(QUIC_CORE_PROTO_SRC:.proto=.pb.cc)
 
 meta-builder:
 	docker build -t naquid/meta-builder tools/builder
 
-builder: meta-builder
+builder:
 	bash tools/builder/create.sh
 
-bundle: proto 
+rebuild-builder: meta-builder builder
+
+bundle:
 	-@mkdir -p build/osx
 	cd build/osx && cmake -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/bundle.cmake $(RELATIVE_PROJECT_ROOT) && make
 
@@ -29,10 +23,10 @@ linux_internal:
 	- mkdir -p build/linux
 	cd build/linux && cmake -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/linux.cmake $(RELATIVE_PROJECT_ROOT) && make
 
-linux: proto
-	docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) bash -c "cd /naquid && make linux_internal"
+linux:
+	$(call ct_run,make linux_internal)
 
-ios: proto
+ios:
 	- mkdir -p build/ios.v7
 	- mkdir -p build/ios.64
 	- mkdir -p build/ios
@@ -41,7 +35,7 @@ ios: proto
 	lipo build/ios.v7/lib$(LIB).a build/ios.64/lib$(LIB).a -create -output build/ios/lib$(LIB).a
 	strip -S build/ios/lib$(LIB).a
 
-android: proto
+android:
 	- mkdir -p build/android.v7
 	- mkdir -p build/android.64
 	- mkdir -p build/android
