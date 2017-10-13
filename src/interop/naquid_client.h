@@ -73,7 +73,7 @@ class NaquidClient : public QuicClientBase,
   bool OnOpen() override { return nq_closure_call(on_open_, on_conn_open, NaquidSession::CastFrom(this)); }
   bool IsClient() override { return bare_session()->IsClient(); }
   void Disconnect() override;
-  void Reconnect() override;
+  bool Reconnect() override;
   nq::HandlerMap *GetHandlerMap() override;
   nq::HandlerMap *ResetHandlerMap() override;
   QuicStream* NewStream(const std::string &name) override;
@@ -81,7 +81,7 @@ class NaquidClient : public QuicClientBase,
 
  private:
   NaquidClientLoop* loop_;
-  nq::HandlerMap* hdmap_;
+  std::unique_ptr<nq::HandlerMap> own_handler_map_;
   nq_closure_t on_close_, on_open_;
   bool destroyed_;
 

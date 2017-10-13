@@ -25,9 +25,6 @@ class HandlerMap {
  public:
   HandlerMap() : map_() {}
   inline bool AddEntry(const std::string &name, nq_stream_factory_t factory) {
-    if (map_.find(name) != map_.end()) {
-      return false;
-    }
   	HandlerEntry he;
     he.type = FACTORY;
     he.factory = factory;
@@ -35,9 +32,6 @@ class HandlerMap {
     return true;
   }
   inline bool AddEntry(const std::string &name, nq_stream_handler_t stream) {
-    if (map_.find(name) != map_.end()) {
-      return false;
-    }
     HandlerEntry he;
     he.type = STREAM;
     he.stream = stream;
@@ -45,9 +39,6 @@ class HandlerMap {
     return true;
   }
   inline bool AddEntry(const std::string &name, nq_rpc_handler_t rpc) {
-    if (map_.find(name) != map_.end()) {
-      return false;
-    }
     HandlerEntry he;
     he.type = RPC;
     he.rpc = rpc;

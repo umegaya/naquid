@@ -23,6 +23,14 @@ void nq_client_destroy(nq_client_t cl) {
 void nq_client_poll(nq_client_t cl) {
 	((NaquidClientLoop *)cl)->Poll();
 }
+nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
+	NaquidClientConfig cf(*conf);
+	auto c = ((NaquidClientLoop *)cl)->Create(addr->host, addr->port, cf);
+	return (nq_conn_t)c;
+}
+nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
+	return (nq_hdmap_t)((NaquidClientLoop *)cl)->handler_map();	
+}
 
 
 
@@ -31,11 +39,21 @@ void nq_client_poll(nq_client_t cl) {
 // server API
 //
 // --------------------------
-nq_server_t nq_server_listen(const nq_addr_t *addr, const nq_svconf_t *conf) {
-	return nullptr;
+nq_server_t nq_server_create(int n_worker) {
+	auto sv = new NaquidServer(*conf);
+	return (nq_server_t)sv;
+}
+nq_hdmap_t nq_server_lsiten(const nq_addr_t *addr, const nq_svconf_t *conf) {
+	auto psv = (NaquidServer *)sv;
+	psv->Open(addr, conf);
+}
+void nq_server_start(nq_server_t sv, bool block) {
+	auto psv = (NaquidServer *)sv;
+	psv->Start(block);
 }
 void nq_server_join(nq_server_t sv) {
-
+	auto psv = (NaquidServer *)sv;
+	psv->Join();
 }
 
 
@@ -45,15 +63,6 @@ void nq_server_join(nq_server_t sv) {
 // hdmap API
 //
 // --------------------------
-nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
-	return (nq_hdmap_t)((NaquidClientLoop *)cl)->hdmap();	
-}
-nq_hdmap_t nq_server_hdmap(nq_server_t sv) {
-	return nullptr;
-}
-nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
-	return (nq_hdmap_t)((NaquidSession::Delegate*)conn)->ResetHandlerMap();
-}
 bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler) {
 	return ((nq::HandlerMap *)h)->AddEntry(name, handler);
 }
@@ -71,28 +80,27 @@ bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t
 // conn API
 //
 // --------------------------
-nq_conn_t nq_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
-	NaquidClientConfig cf(*conf);
-	auto c = ((NaquidClientLoop *)cl)->Create(addr->url, cf);
-	return (nq_conn_t)c;
-}
 void nq_conn_close(nq_conn_t conn) {
 	auto d = (NaquidSession::Delegate *)conn;
 	d->Disconnect();
 }
-void nq_conn_reset(nq_conn_t conn) {
+int nq_conn_reset(nq_conn_t conn) {
 	auto d = (NaquidSession::Delegate *)conn;
-	d->Reconnect();	
+	return d->Reconnect() ? NQ_OK : NQ_NOT_SUPPORT;	
 } 
 bool nq_conn_is_client(nq_conn_t conn) {
 	auto d = (NaquidSession::Delegate *)conn;
 	return d->IsClient();		
 }
+nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
+	return (nq_hdmap_t)((NaquidSession::Delegate*)conn)->ResetHandlerMap();
+}
+
 
 
 // --------------------------
 //
-// stream API (NaquidBidiStream and its inheritance/NaquidBidiPluginStream)
+// stream API
 //
 // --------------------------
 nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
@@ -111,7 +119,7 @@ void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
 
 // --------------------------
 //
-// rpc API (NaquidRPCStream and its inheritance/NaquidRPCPluginStream)
+// rpc API
 //
 // --------------------------
 nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {

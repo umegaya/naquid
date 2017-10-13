@@ -10,7 +10,6 @@ NaquidSession::NaquidSession(QuicConnection* connection,
                                  Delegate* delegate,
                                  const QuicConfig& config) : 
   QuicSession(connection, nullptr, config), delegate_(delegate) {
-  hdmap_ = delegate_->GetHandlerMap();
   crypto_stream_.reset(delegate_->NewCryptoStream(this));
 }
 QuicStream* NaquidSession::CreateIncomingDynamicStream(QuicStreamId id) {
@@ -40,6 +39,7 @@ void NaquidSession::OnConnectionClosed(QuicErrorCode error,
 void NaquidSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   QuicSession::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
+    //TODO(iyatomi): if entering shutdown mode, always disconnect no matter what OnOpen returns
     if (!delegate_->OnOpen()) {
       delegate_->Disconnect();
     }

@@ -15,7 +15,7 @@ class NaquidSession;
 class NaquidStreamHandler;
 
 class NaquidStream : public QuicStream {
-  NaquidStreamHandler *handler_;
+  std::unique_ptr<NaquidStreamHandler> handler_;
   std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name
   bool establish_side_;
  public:

@@ -1,6 +1,3 @@
-// Copyright (c) 2015 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
 #pragma once
 
 #include <string>
@@ -9,7 +6,7 @@
 #include "net/quic/core/quic_connection.h"
 #include "net/quic/core/quic_crypto_stream.h"
 
-#include "core/hdmap.h"
+#include "core/handler_map.h"
 
 namespace net {
 
@@ -35,7 +32,6 @@ class NaquidSession : public QuicSession {
  private:
   std::unique_ptr<QuicCryptoStream> crypto_stream_;
   Delegate *delegate_;
-  nq::HandlerMap *hdmap_;
  public:
   NaquidSession(QuicConnection *connection,
                 Delegate* delegate,
@@ -43,7 +39,7 @@ class NaquidSession : public QuicSession {
 
   bool IsClient() const { return connection()->perspective() == Perspective::IS_CLIENT; }
   Delegate *delegate() { return delegate_; }
-  nq::HandlerMap *hdmap() { return hdmap_; }
+  nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
   nq_conn_t conn() { return CastFrom(delegate()); }
   static inline nq_conn_t CastFrom(NaquidSession::Delegate *d) { return (nq_conn_t)d; }
 

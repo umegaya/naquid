@@ -10,7 +10,7 @@
 #include "net/quic/platform/api/quic_clock.h"
 
 #include "core/loop.h"
-#include "core/hdmap.h"
+#include "core/handler_map.h"
 
 namespace net {
 class NaquidLoop : public nq::Loop,

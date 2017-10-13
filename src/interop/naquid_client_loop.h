@@ -8,7 +8,7 @@
 namespace net {
 class NaquidClient;
 class NaquidClientLoop : public NaquidLoop {
-  nq::HandlerMap hdmap_;
+  nq::HandlerMap handler_map_;
   std::map<std::string, NaquidClient*> client_map_; //TODO(iyatomi): faster hash key
  public:
   NaquidClientLoop() : hdmap_(), client_map_() {}
@@ -16,10 +16,12 @@ class NaquidClientLoop : public NaquidLoop {
   void Close();
   void RemoveClient(NaquidClient *cl);
 
-  inline nq::HandlerMap *hdmap() { return &hdmap_; }
-  NaquidClient *Create(const std::string &url, 
+  inline nq::HandlerMap *handler_map() { return &handler_map_; }
+  NaquidClient *Create(const std::string &host, 
+                       int port, 
                        NaquidClientConfig &config);
-  static bool ParseUrl(const std::string &url, 
+  static bool ParseUrl(const std::string &host, 
+                       int port, 
                        QuicServerId& server_id, 
                        QuicSocketAddress &address, 
                        QuicConfig &config);

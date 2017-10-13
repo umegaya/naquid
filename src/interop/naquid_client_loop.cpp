@@ -15,11 +15,12 @@ void NaquidClientLoop::RemoveClient(NaquidClient *cl) {
     client_map_.erase(it);
   }
 }
-NaquidClient *NaquidClientLoop::Create(const std::string &url, 
+NaquidClient *NaquidClientLoop::Create(const std::string &host,
+                                       int port,  
                                        NaquidClientConfig &config) {
   QuicServerId server_id;
   QuicSocketAddress server_address;
-  if (!ParseUrl(url, server_id, server_address, config)) {
+  if (!ParseUrl(host, port, server_id, server_address, config)) {
     return nullptr;
   }
   auto c = new NaquidClient(
@@ -34,37 +35,22 @@ NaquidClient *NaquidClientLoop::Create(const std::string &url,
   return c;
 }
 /* static */
-bool NaquidClientLoop::ParseUrl(const std::string &url, QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
-  std::string host, port;
-  auto pos = url.find("://");
-  if (pos != std::string::npos) {
-    auto hpos = url.find(":", pos);
-    auto spos = url.find("?", pos);
-    host = url.substr(pos, hpos - pos);
-    port = url.substr(hpos, spos - hpos);
-  }
+bool NaquidClientLoop::ParseUrl(const std::string &host, int port, QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
   if (host.empty()) {
     return false;
-  } else if (port.empty()) {
-    port = "443";
+  } else if (port == 0) {
+    port = 443;
   }
-  //TODO: being asynchronous somehow. using chromium one or cares
   struct addrinfo filter, *resolved;
   filter.ai_socktype = SOCK_DGRAM;
   filter.ai_family = AF_UNSPEC;
   filter.ai_protocol = 0;
   filter.ai_flags = 0;
-  if (getaddrinfo(host.c_str(), port.c_str(), &filter, &resolved) != 0) {
+  if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &filter, &resolved) != 0) {
     return false;
   }
   try {
-    size_t idx;
-    int portnum = std::stoi(port, &idx);
-    if (idx != port.length()) {
-      freeaddrinfo(resolved);
-      return false;
-    }
-    server_id = QuicServerId(host, portnum, PRIVACY_MODE_ENABLED); //TODO: control privacy mode from url
+    server_id = QuicServerId(host, port, PRIVACY_MODE_ENABLED); //TODO: control privacy mode from url
     address = QuicSocketAddress(*resolved->ai_addr);
     freeaddrinfo(resolved);
     return true;

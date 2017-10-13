@@ -22,7 +22,7 @@ bool NaquidStream::set_protocol(const std::string &name) {
   return handler_ != nullptr;
 }
 NaquidStreamHandler *NaquidStream::CreateStreamHandler(const std::string &name) {
-  auto he = nq_session()->hdmap()->Find(name);
+  auto he = nq_session()->handler_map_ref()->Find(name);
   if (he == nullptr) {
     ASSERT(false);
     return nullptr;
@@ -148,10 +148,10 @@ void NaquidSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
     nq_msgid_t msgid = nq::Syscall::NetbytesToHost16(pstr + 2);
     auto it = req_map_.find(msgid);
     if (it != req_map_.end()) {
-      nq_closure_call(it->second->on_data_, on_rpc_record, CastFrom(this), nq::Syscall::NetbytesToHost16(pstr), ToPV(pstr + 4), reclen - 4);
+      nq_closure_call(it->second->on_data_, on_rpc_result, CastFrom(this), ToPV(pstr + 4), reclen - 4);
     } else if (msgid == 0) {
       //notification
-      nq_closure_call(on_recv_, on_rpc_record, CastFrom(this), nq::Syscall::NetbytesToHost16(pstr), ToPV(pstr + 4), reclen - 4);
+      nq_closure_call(on_recv_, on_rpc_notify, CastFrom(this), nq::Syscall::NetbytesToHost16(pstr), ToPV(pstr + 4), reclen - 4);
     } else {
       //probably timedout
     }

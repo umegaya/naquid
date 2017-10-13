@@ -30,7 +30,6 @@ NaquidClient::NaquidClient(QuicSocketAddress server_address,
           on_close_(config.client().on_close), 
           on_open_(config.client().on_open), 
           destroyed_(false) {
-  hdmap_ = loop_->hdmap();
   set_server_address(server_address);
 }
 NaquidClient::~NaquidClient() {}
@@ -53,7 +52,9 @@ void NaquidClient::OnClose(QuicErrorCode error,
              const std::string& error_details,
              ConnectionCloseSource close_by_peer_or_self) {
   uint64_t next_connect_us = nq_closure_call(on_close_, on_conn_close, NaquidSession::CastFrom(this), 
-        (int)error, error_details.c_str(), close_by_peer_or_self == ConnectionCloseSource::FROM_PEER);
+                                            (int)error, 
+                                            error_details.c_str(), 
+                                            close_by_peer_or_self == ConnectionCloseSource::FROM_PEER);
   //TODO: schedule reconnection somehow, if chromium stack does not do it
   if (next_connect_us > 0 && !destroyed_) {
     auto alarm = alarm_factory()->CreateAlarm(new ReconnectAlarm(this));
@@ -69,19 +70,17 @@ void NaquidClient::Disconnect() {
   set_destroyed();
   QuicClientBase::Disconnect(); 
 }
-void NaquidClient::Reconnect() {
+bool NaquidClient::Reconnect() {
   QuicClientBase::Disconnect(); 
+  return true;
 }
 nq::HandlerMap *NaquidClient::GetHandlerMap() {
-  return hdmap_;
+  return own_hander_map_ != nullptr ? own_hander_map_.get() : loop_->handler_map();
 }
 
 nq::HandlerMap* NaquidClient::ResetHandlerMap() {
-  if (loop_->hdmap() != hdmap_) {
-    delete hdmap_;
-  }
-  hdmap_ = new nq::HandlerMap();
-  return hdmap_;
+  own_hander_map_.reset(new nq::HandlerMap());
+  return own_hander_map_.get();
 }
 QuicStream *NaquidClient::NewStream(const std::string &name) {
   auto s = static_cast<NaquidStream *>(bare_session()->CreateOutgoingDynamicStream());

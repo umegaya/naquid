@@ -184,8 +184,9 @@ int QuicSocketUtils::ReadPacket(int fd,
   if (bytes_read < 0 && errno != 0) {
     if (errno != EAGAIN) {
       LOG(ERROR) << "Error reading " << strerror(errno);
+      return -1;
     }
-    return -1;
+    return 0;
   }
 
   if (hdr.msg_controllen >= arraysize(cbuf)) {

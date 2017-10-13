@@ -12,6 +12,7 @@ namespace nq {
 		typedef LoopImpl::Event Event;
 		Loop() : LoopImpl(), processors_(nullptr), max_nfd_(-1) {}
 		~Loop() { Close(); }
+		template <class T> T *ProcessorAt(int fd) { return (T *)processors_[fd]; }
 		inline int Open(int max_nfd, int timeout_ns = 1000 * 1000) {
 			max_nfd_ = max_nfd; //TODO: use getrlimit if max_nfd omitted
 			ToTimeout(timeout_ns, timeout_);
