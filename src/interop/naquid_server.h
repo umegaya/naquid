@@ -28,7 +28,7 @@ class NaquidServer {
   }; 
  protected:
   bool alive_;
-  int n_worker_;
+  uint32_t n_worker_;
 	PacketQueue *worker_queue_;
 	std::map<int, PortConfig> port_configs_;
   std::map<int, NaquidWorker*> workers_;
@@ -36,7 +36,7 @@ class NaquidServer {
   std::condition_variable cond_;
 
  public:
-	NaquidServer(int n_worker) : alive_(true), n_worker_(n_worker), worker_queue_(nullptr) {}
+	NaquidServer(uint32_t n_worker) : alive_(true), n_worker_(n_worker), worker_queue_(nullptr) {}
   ~NaquidServer() {}
   nq::HandlerMap *Open(const nq_addr_t *addr, const nq_svconf_t *conf) {
     if (port_configs_.find(addr->port) != port_configs_.end()) {
@@ -60,7 +60,8 @@ class NaquidServer {
 		if (worker_queue_ == nullptr) {
 			return NQ_EALLOC;
 		}
-		for (int i = 0, r = 0; i < n_worker_; i++) {
+    int r = 0;
+		for (uint32_t i = 0; i < n_worker_; i++) {
 			if ((r = StartWorker(i)) < 0) {
 				return r;
 			}
@@ -90,7 +91,7 @@ class NaquidServer {
   }
   PacketQueue &Q4(int idx) { return worker_queue_[idx]; }
   inline bool alive() const { return alive_; }
-  inline int n_worker() const { return n_worker_; }
+  inline uint32_t n_worker() const { return n_worker_; }
   inline const std::map<int, PortConfig> &port_configs() const { return port_configs_; }
  protected:
   void Stop() {

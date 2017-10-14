@@ -16,7 +16,8 @@ class NaquidDispatcher : public QuicDispatcher,
                          public nq::IoProcessor,
                          public QuicCryptoServerStream::Helper,
                          public NaquidPacketReader::Delegate {
-  int port_, index_, n_worker_;
+  int port_; 
+  uint32_t index_, n_worker_;
   const NaquidServer &server_;
   NaquidServerLoop &loop_;
   NaquidPacketReader &reader_;

@@ -1,6 +1,10 @@
 #include "base/posix/eintr_wrapper.h"
 #include "base/files/file_path.h"
 
+#if defined(OS_LINUX)
+#include <limits>
+#endif
+
 #include <stddef.h>
 #include <sys/types.h>
 #include <unistd.h>

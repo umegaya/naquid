@@ -28,10 +28,14 @@ class NaquidProofSource : public ProofSourceChromium {
     } 
 #if defined(OS_LINUX)
     if (!inited) {
+      auto basepath = base::FilePath::StringType("/etc/letsencrypt/live/") + 
+                      base::FilePath::StringType(a.host), 
+           certfile = base::FilePath::StringType("/fullchain.pem"),
+           keyfile = base::FilePath::StringType("/privkey.pem");
       //TODO(iyatomi): for linux, try to use /etc/letsencrypt/live/${domain_name}/privkey.pem, fullchain.pem
-      inited = Initialize(
-        base::FilePath(base::FilePath::StringPieceType("/etc/letsencrypt/live/") + a.host + "/fullchain.pem"), 
-        base::FilePath(base::FilePath::StringPieceType("/etc/letsencrypt/live/") + a.host + "/privkey.pem"), 
+      inited = ProofSourceChromium::Initialize(
+        base::FilePath(basepath + certfile), 
+        base::FilePath(basepath + keyfile), 
         base::FilePath());
     }
 #endif

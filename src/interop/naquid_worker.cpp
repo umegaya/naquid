@@ -7,7 +7,7 @@
 
 namespace net {
 void NaquidWorker::Process(NaquidPacket *p) {
-  for (int i = 0; i < dispatchers_.size(); i++) {
+  for (size_t i = 0; i < dispatchers_.size(); i++) {
     if (dispatchers_[i].first == p->port()) {
       dispatchers_[i].second->Process(p);
       return;

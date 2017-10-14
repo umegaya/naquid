@@ -12,7 +12,7 @@ namespace net {
 class NaquidServer;
 class NaquidDispatcher;
 class NaquidWorker {
-  int index_;
+  uint32_t index_;
   const NaquidServer &server_;
   NaquidServerLoop loop_;
   NaquidPacketReader reader_;
@@ -23,7 +23,7 @@ class NaquidWorker {
   bool overflow_supported_;
  public:
   typedef moodycamel::ConcurrentQueue<NaquidPacket*> PacketQueue;
-  NaquidWorker(int index, const NaquidServer &server) : 
+  NaquidWorker(uint32_t index, const NaquidServer &server) : 
     index_(index), server_(server), loop_(), reader_(), 
     thread_(), dispatchers_(), overflow_supported_(false) {}
   void Start(PacketQueue &queue) {
@@ -42,7 +42,7 @@ class NaquidWorker {
   inline const NaquidServer &server() const { return server_; }
   inline NaquidPacketReader &reader() { return reader_; }
   inline NaquidServerLoop &loop() { return loop_; }
-  inline int index() { return index_; }
+  inline uint32_t index() { return index_; }
 
  protected:
   static bool ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &address);
