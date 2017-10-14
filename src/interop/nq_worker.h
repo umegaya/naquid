@@ -5,31 +5,31 @@
 
 #include "MoodyCamel/concurrentqueue.h"
 
-#include "interop/naquid_server_loop.h"
-#include "interop/naquid_packet_reader.h"
+#include "interop/nq_server_loop.h"
+#include "interop/nq_packet_reader.h"
 
 namespace net {
-class NaquidServer;
-class NaquidDispatcher;
-class NaquidWorker {
+class NqServer;
+class NqDispatcher;
+class NqWorker {
   uint32_t index_;
-  const NaquidServer &server_;
-  NaquidServerLoop loop_;
-  NaquidPacketReader reader_;
+  const NqServer &server_;
+  NqServerLoop loop_;
+  NqPacketReader reader_;
   std::thread thread_;
   //TODO(iyatomi): measture this to confirm
   //almost case, should only has a few element. I think linear scan of vector faster
-  std::vector<std::pair<int, NaquidDispatcher*>> dispatchers_;
+  std::vector<std::pair<int, NqDispatcher*>> dispatchers_;
   bool overflow_supported_;
  public:
-  typedef moodycamel::ConcurrentQueue<NaquidPacket*> PacketQueue;
-  NaquidWorker(uint32_t index, const NaquidServer &server) : 
+  typedef moodycamel::ConcurrentQueue<NqPacket*> PacketQueue;
+  NqWorker(uint32_t index, const NqServer &server) : 
     index_(index), server_(server), loop_(), reader_(), 
     thread_(), dispatchers_(), overflow_supported_(false) {}
   void Start(PacketQueue &queue) {
     thread_ = std::thread([this, &queue]() { Run(queue); });
   }
-  void Process(NaquidPacket *p);
+  void Process(NqPacket *p);
   bool Listen();
   void Run(PacketQueue &queue);
   void Join() {
@@ -39,9 +39,9 @@ class NaquidWorker {
   }
 
   //accessor
-  inline const NaquidServer &server() const { return server_; }
-  inline NaquidPacketReader &reader() { return reader_; }
-  inline NaquidServerLoop &loop() { return loop_; }
+  inline const NqServer &server() const { return server_; }
+  inline NqPacketReader &reader() { return reader_; }
+  inline NqServerLoop &loop() { return loop_; }
   inline uint32_t index() { return index_; }
 
  protected:

@@ -11,10 +11,10 @@ namespace net {
 // if not possible I will change this to chromium one. 
 
 // CAUTION: currently this proof verifier does not verify any proof. 
-class NaquidProofVerifier : public ProofVerifier {
+class NqProofVerifier : public ProofVerifier {
  public:
-  NaquidProofVerifier() {}
-  ~NaquidProofVerifier() override {}
+  NqProofVerifier() {}
+  ~NqProofVerifier() override {}
 
   // ProofVerifier override.
   QuicAsyncStatus VerifyProof(

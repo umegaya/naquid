@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "interop/naquid_packet_reader.h"
+#include "interop/nq_packet_reader.h"
 
 #include <errno.h>
 #ifndef __APPLE__
@@ -27,7 +27,7 @@
 
 namespace net {
 
-NaquidPacketReader::Packet::Packet(const char* buffer,
+NqPacketReader::Packet::Packet(const char* buffer,
                                    size_t length,
                                    QuicTime receipt_time,
                                    int ttl,
@@ -39,12 +39,12 @@ NaquidPacketReader::Packet::Packet(const char* buffer,
 
 }
 
-NaquidPacketReader::NaquidPacketReader() {
+NqPacketReader::NqPacketReader() {
   Initialize();
 }
-NaquidPacketReader::~NaquidPacketReader() {}
+NqPacketReader::~NqPacketReader() {}
 
-void NaquidPacketReader::Initialize() {
+void NqPacketReader::Initialize() {
 #if MMSG_MORE
   // Zero initialize uninitialized memory.
   memset(mmsg_hdr_, 0, sizeof(mmsg_hdr_));
@@ -65,7 +65,7 @@ void NaquidPacketReader::Initialize() {
   }
 #endif
 }
-bool NaquidPacketReader::Read(
+bool NqPacketReader::Read(
     int fd,
     int port,
     const QuicClock& clock,
@@ -78,7 +78,7 @@ bool NaquidPacketReader::Read(
                                      packets_dropped);
 #endif
 }
-bool NaquidPacketReader::ReadPacketsMulti(
+bool NqPacketReader::ReadPacketsMulti(
     int fd,
     int port,
     const QuicClock& clock,
@@ -156,7 +156,7 @@ bool NaquidPacketReader::ReadPacketsMulti(
   return false;
 #endif
 }
-bool NaquidPacketReader::ReadPackets(
+bool NqPacketReader::ReadPackets(
     int fd,
     int port,
     const QuicClock& clock,

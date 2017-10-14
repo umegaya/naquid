@@ -9,20 +9,20 @@
 #include <condition_variable>
 
 #include "core/handler_map.h"
-#include "interop/naquid_worker.h"
-#include "interop/naquid_config.h"
+#include "interop/nq_worker.h"
+#include "interop/nq_config.h"
 
 namespace net {
-class NaquidServer {
+class NqServer {
  public:
-	typedef NaquidWorker::PacketQueue PacketQueue;
-  struct PortConfig : public NaquidServerConfig {
+	typedef NqWorker::PacketQueue PacketQueue;
+  struct PortConfig : public NqServerConfig {
     nq_addr_t address_;
     nq::HandlerMap handler_map_;
 
-    PortConfig(const nq_addr_t &a) : NaquidServerConfig(a), address_(a), handler_map_() {}
+    PortConfig(const nq_addr_t &a) : NqServerConfig(a), address_(a), handler_map_() {}
     PortConfig(const nq_addr_t &a, const nq_svconf_t &port_config) : 
-      NaquidServerConfig(a, port_config), address_(a), handler_map_() {}
+      NqServerConfig(a, port_config), address_(a), handler_map_() {}
 
     inline const nq::HandlerMap *handler_map() const { return &handler_map_; }
   }; 
@@ -31,13 +31,13 @@ class NaquidServer {
   uint32_t n_worker_;
 	PacketQueue *worker_queue_;
 	std::map<int, PortConfig> port_configs_;
-  std::map<int, NaquidWorker*> workers_;
+  std::map<int, NqWorker*> workers_;
   std::mutex mutex_;
   std::condition_variable cond_;
 
  public:
-	NaquidServer(uint32_t n_worker) : alive_(true), n_worker_(n_worker), worker_queue_(nullptr) {}
-  ~NaquidServer() {}
+	NqServer(uint32_t n_worker) : alive_(true), n_worker_(n_worker), worker_queue_(nullptr) {}
+  ~NqServer() {}
   nq::HandlerMap *Open(const nq_addr_t *addr, const nq_svconf_t *conf) {
     if (port_configs_.find(addr->port) != port_configs_.end()) {
       return nullptr; //already port used
@@ -106,7 +106,7 @@ class NaquidServer {
     }
   }
   int StartWorker(int index) {
-    auto l = new NaquidWorker(index, *this);
+    auto l = new NqWorker(index, *this);
     workers_[index] = l;
     l->Start(worker_queue_[index]);
     return NQ_OK;

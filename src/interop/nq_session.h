@@ -11,7 +11,7 @@
 namespace net {
 
 // A QUIC session with a headers stream.
-class NaquidSession : public QuicSession {
+class NqSession : public QuicSession {
  public:
   class Delegate {
    public:
@@ -25,7 +25,7 @@ class NaquidSession : public QuicSession {
     virtual bool Reconnect() = 0; //only supported for client 
     virtual bool IsClient() = 0;
     virtual QuicStream *NewStream(const std::string &name) = 0;
-    virtual QuicCryptoStream *NewCryptoStream(NaquidSession *session) = 0;
+    virtual QuicCryptoStream *NewCryptoStream(NqSession *session) = 0;
     virtual const nq::HandlerMap *GetHandlerMap() const = 0;
     virtual nq::HandlerMap *ResetHandlerMap() = 0;
   };
@@ -33,7 +33,7 @@ class NaquidSession : public QuicSession {
   std::unique_ptr<QuicCryptoStream> crypto_stream_;
   Delegate *delegate_;
  public:
-  NaquidSession(QuicConnection *connection,
+  NqSession(QuicConnection *connection,
                 Delegate* delegate,
               	const QuicConfig& config);
 
@@ -41,7 +41,7 @@ class NaquidSession : public QuicSession {
   Delegate *delegate() { return delegate_; }
   const nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
   nq_conn_t conn() { return CastFrom(delegate()); }
-  static inline nq_conn_t CastFrom(NaquidSession::Delegate *d) { return (nq_conn_t)d; }
+  static inline nq_conn_t CastFrom(NqSession::Delegate *d) { return (nq_conn_t)d; }
 
   //implements QuicSession
   QuicStream* CreateIncomingDynamicStream(QuicStreamId id) override;

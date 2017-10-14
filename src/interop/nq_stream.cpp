@@ -1,49 +1,49 @@
-#include "interop/naquid_stream.h"
+#include "interop/nq_stream.h"
 
 #include "core/length_codec.h"
-#include "interop/naquid_loop.h"
-#include "interop/naquid_session.h"
+#include "interop/nq_loop.h"
+#include "interop/nq_session.h"
 
 namespace net {
 
-NaquidStream::NaquidStream(QuicStreamId id, NaquidSession* nq_session, bool establish_side) : 
+NqStream::NqStream(QuicStreamId id, NqSession* nq_session, bool establish_side) : 
   QuicStream(id, nq_session), handler_(nullptr), establish_side_(establish_side) {
 }
-NaquidSession *NaquidStream::nq_session() { 
-  return static_cast<NaquidSession *>(session()); 
+NqSession *NqStream::nq_session() { 
+  return static_cast<NqSession *>(session()); 
 }
-bool NaquidStream::set_protocol(const std::string &name) {
+bool NqStream::set_protocol(const std::string &name) {
   if (!establish_side()) {
     ASSERT(false); //should be establish side
     return false; 
   }
   buffer_ = name;
-  handler_ = std::unique_ptr<NaquidStreamHandler>(CreateStreamHandler(name));
+  handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name));
   return handler_ != nullptr;
 }
-NaquidStreamHandler *NaquidStream::CreateStreamHandler(const std::string &name) {
+NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
   auto he = nq_session()->handler_map()->Find(name);
   if (he == nullptr) {
     ASSERT(false);
     return nullptr;
   }
-  NaquidStreamHandler *s;
+  NqStreamHandler *s;
   switch (he->type) {
   case nq::HandlerMap::FACTORY: {
-    s = (NaquidStreamHandler *)nq_closure_call(he->factory, create_stream, nq_session()->conn());
+    s = (NqStreamHandler *)nq_closure_call(he->factory, create_stream, nq_session()->conn());
   } break;
   case nq::HandlerMap::STREAM: {
     if (nq_closure_is_empty(he->stream.stream_reader)) {
-      s = new NaquidSimpleStreamHandler(this, he->stream.on_stream_record);
+      s = new NqSimpleStreamHandler(this, he->stream.on_stream_record);
     } else {
-      s = new NaquidRawStreamHandler(this, he->stream.on_stream_record, 
+      s = new NqRawStreamHandler(this, he->stream.on_stream_record, 
                                           he->stream.stream_reader, 
                                           he->stream.stream_writer); 
     }
     s->SetLifeCycleCallback(he->stream.on_stream_open, he->stream.on_stream_close);
   } break;
   case nq::HandlerMap::RPC: {
-    s = new NaquidSimpleRPCStreamHandler(this, he->rpc.on_rpc_notify);
+    s = new NqSimpleRPCStreamHandler(this, he->rpc.on_rpc_notify);
     s->SetLifeCycleCallback(he->rpc.on_stream_open, he->rpc.on_stream_close);
   } break;
   default:
@@ -52,13 +52,13 @@ NaquidStreamHandler *NaquidStream::CreateStreamHandler(const std::string &name) 
   }
   return s;
 }
-void NaquidStream::Disconnect() {
+void NqStream::Disconnect() {
   WriteOrBufferData(QuicStringPiece(), true, nullptr);
 }
-void NaquidStream::OnClose() {
+void NqStream::OnClose() {
   handler_->OnClose();
 }
-void NaquidStream::OnDataAvailable() {
+void NqStream::OnDataAvailable() {
   //greedy read and called back
   struct iovec v[256];
   int n_blocks = sequencer()->GetReadableRegions(v, 256);
@@ -66,14 +66,14 @@ void NaquidStream::OnDataAvailable() {
   if (handler_ == nullptr && !establish_side()) {
     //establishment
     for (;i < n_blocks; i++) {
-      buffer_.append(NaquidStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
+      buffer_.append(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
       size_t idx = buffer_.find('\0');
       if (idx == std::string::npos) {
         continue; //not yet established
       }
       //create handler by initial establish string
       auto name = buffer_.substr(0, idx);
-      handler_ = std::unique_ptr<NaquidStreamHandler>(CreateStreamHandler(name));
+      handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name));
       handler_->ProtoSent();
       if (handler_ == nullptr || !handler_->OnOpen()) { //server side OnOpen
         Disconnect();
@@ -88,14 +88,14 @@ void NaquidStream::OnDataAvailable() {
     }
   }
   for (;i < n_blocks; i++) {
-    handler_->OnRecv(NaquidStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
+    handler_->OnRecv(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
   }
 }
 
 
 
 constexpr size_t len_buff_len = nq::LengthCodec::EncodeLength(sizeof(nq_size_t));
-void NaquidSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
+void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
   //greedy read and called back
 	parse_buffer_.append(ToCStr(p), len);
 	const char *pstr = parse_buffer_.c_str();
@@ -109,7 +109,7 @@ void NaquidSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 		stream_->Disconnect();
 	}
 }
-void NaquidSimpleStreamHandler::Send(const void *p, nq_size_t len) {
+void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
 	char len_buff[len_buff_len];
 	auto enc_len = nq::LengthCodec::Encode(len, len_buff, sizeof(len_buff));
 	WriteBytes(len_buff, enc_len);
@@ -118,7 +118,7 @@ void NaquidSimpleStreamHandler::Send(const void *p, nq_size_t len) {
 
 
 
-void NaquidRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
+void NqRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
   int reclen;
   void *rec = nq_closure_call(reader_, stream_reader, ToCStr(p), len, &reclen);
   if (rec != nullptr) {
@@ -130,14 +130,14 @@ void NaquidRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
   
 
 
-void NaquidSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, uint64_t timeout_duration_us) {
+void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, uint64_t timeout_duration_us) {
   auto req = new Request(this, msgid, cb);
   req_map_[msgid] = req;
   auto alarm = loop_->CreateAlarm(req);
-  alarm->Set(NaquidLoop::ToQuicTime(loop_->NowInUsec() + timeout_duration_us));
+  alarm->Set(NqLoop::ToQuicTime(loop_->NowInUsec() + timeout_duration_us));
 }
 
-void NaquidSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
+void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
   const char *pstr = parse_buffer_.c_str();
@@ -161,7 +161,7 @@ void NaquidSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
     stream_->Disconnect();
   }
 }
-void NaquidSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len) {
+void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len) {
   //pack and send buffer
   char len_buff[len_buff_len];
   auto enc_len = nq::LengthCodec::Encode(len + 4, len_buff, sizeof(len_buff));
@@ -171,7 +171,7 @@ void NaquidSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t 
   WriteBytes((char *)&nmsgid, 2);
   WriteBytes(ToCStr(p), len);  
 }
-void NaquidSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
+void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
   nq_msgid_t msgid = msgid_factory_.New();
   //pack and send buffer
   char len_buff[len_buff_len];

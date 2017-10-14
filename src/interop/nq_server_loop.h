@@ -1,12 +1,12 @@
 #pragma once
 
-#include "interop/naquid_loop.h"
-#include "interop/naquid_config.h"
+#include "interop/nq_loop.h"
+#include "interop/nq_config.h"
 
 namespace net {
-class NaquidServerLoop : public NaquidLoop {
+class NqServerLoop : public NqLoop {
  public:
-  NaquidServerLoop() {}
-  ~NaquidServerLoop() {}
+  NqServerLoop() {}
+  ~NqServerLoop() {}
 };
 }

@@ -1,30 +1,30 @@
-#include "interop/naquid_client_loop.h"
+#include "interop/nq_client_loop.h"
 
-#include "interop/naquid_client.h"
+#include "interop/nq_client.h"
 
 namespace net {
-void NaquidClientLoop::Close() {
+void NqClientLoop::Close() {
   for (auto &kv : client_map_) {
     delete kv.second;
   }
-  NaquidLoop::Close();
+  NqLoop::Close();
 }
 //called from diseonnecting alarm
-void NaquidClientLoop::RemoveClient(NaquidClient *cl) {
+void NqClientLoop::RemoveClient(NqClient *cl) {
   auto it = client_map_.find(cl->server_address().ToString());
   if (it != client_map_.end()) {
     client_map_.erase(it);
   }
 }
-NaquidClient *NaquidClientLoop::Create(const std::string &host,
+NqClient *NqClientLoop::Create(const std::string &host,
                                        int port,  
-                                       NaquidClientConfig &config) {
+                                       NqClientConfig &config) {
   QuicServerId server_id;
   QuicSocketAddress server_address;
   if (!ParseUrl(host, port, server_id, server_address, config)) {
     return nullptr;
   }
-  auto c = new NaquidClient(
+  auto c = new NqClient(
       server_address,
       server_id, 
       AllSupportedVersions(),
@@ -36,7 +36,7 @@ NaquidClient *NaquidClientLoop::Create(const std::string &host,
   return c;
 }
 /* static */
-bool NaquidClientLoop::ParseUrl(const std::string &host, int port, QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
+bool NqClientLoop::ParseUrl(const std::string &host, int port, QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
   if (host.empty()) {
     return false;
   } else if (port == 0) {

@@ -10,12 +10,12 @@
 
 namespace net {
 
-class NaquidProofSource : public ProofSourceChromium {
+class NqProofSource : public ProofSourceChromium {
  public:
-  NaquidProofSource(const nq_addr_t &addr) : ProofSourceChromium() {
+  NqProofSource(const nq_addr_t &addr) : ProofSourceChromium() {
     Initialize(addr);
   }
-  ~NaquidProofSource() override {}
+  ~NqProofSource() override {}
 
   bool Initialize(const nq_addr_t &a) {
     bool inited = false;
@@ -43,7 +43,7 @@ class NaquidProofSource : public ProofSourceChromium {
   }
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(NaquidProofSource);
+  DISALLOW_COPY_AND_ASSIGN(NqProofSource);
 };
 
 }  // namespace net

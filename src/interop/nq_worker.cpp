@@ -1,12 +1,12 @@
-#include "interop/naquid_worker.h"
+#include "interop/nq_worker.h"
 
-#include "interop/naquid_client_loop.h"
-#include "interop/naquid_dispatcher.h"
-#include "interop/naquid_server_session.h"
-#include "interop/naquid_server.h"
+#include "interop/nq_client_loop.h"
+#include "interop/nq_dispatcher.h"
+#include "interop/nq_server_session.h"
+#include "interop/nq_server.h"
 
 namespace net {
-void NaquidWorker::Process(NaquidPacket *p) {
+void NqWorker::Process(NqPacket *p) {
   for (size_t i = 0; i < dispatchers_.size(); i++) {
     if (dispatchers_[i].first == p->port()) {
       dispatchers_[i].second->Process(p);
@@ -15,11 +15,11 @@ void NaquidWorker::Process(NaquidPacket *p) {
   }
   ASSERT(false);
 }
-void NaquidWorker::Run(PacketQueue &queue) {
+void NqWorker::Run(PacketQueue &queue) {
   if (!Listen()) {
     return;
   }
-  NaquidPacket *p;
+  NqPacket *p;
   while (server_.alive()) {
     //consume queue
     while (queue.try_dequeue(p)) {
@@ -37,7 +37,7 @@ void NaquidWorker::Run(PacketQueue &queue) {
     Process(p);
   }
 }
-bool NaquidWorker::Listen() {
+bool NqWorker::Listen() {
   for (auto &kv : server_.port_configs()) {
     //TODO(iyatomi): enable multiport server
     QuicSocketAddress address;
@@ -50,19 +50,19 @@ bool NaquidWorker::Listen() {
       ASSERT(false);
       return false;
     }
-    auto d = new NaquidDispatcher(kv.first, kv.second, *this);
-    if (loop_.Add(listen_fd, d, NaquidLoop::EV_READ | NaquidLoop::EV_WRITE) != NQ_OK) {
+    auto d = new NqDispatcher(kv.first, kv.second, *this);
+    if (loop_.Add(listen_fd, d, NqLoop::EV_READ | NqLoop::EV_WRITE) != NQ_OK) {
       nq::Syscall::Close(listen_fd);
       delete d;
       ASSERT(false);
       return false;
     }
-    dispatchers_.push_back(std::pair<int, NaquidDispatcher*>(kv.first, d));
+    dispatchers_.push_back(std::pair<int, NqDispatcher*>(kv.first, d));
   }
   return true;
 }
 //helper
-nq::Fd NaquidWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
+nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
   nq::Fd fd = QuicSocketUtils::CreateUDPSocket(address, &overflow_supported_);
   if (fd < 0) {
     QUIC_LOG(ERROR) << "CreateSocket() failed: " << strerror(errno);
@@ -79,9 +79,9 @@ nq::Fd NaquidWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
   return fd; 
 }
 /* static */
-bool NaquidWorker::ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &socket_address) {
+bool NqWorker::ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &socket_address) {
   QuicServerId server_id;
   QuicConfig config;
-  return NaquidClientLoop::ParseUrl(addr.host, addr.port, server_id, socket_address, config);
+  return NqClientLoop::ParseUrl(addr.host, addr.port, server_id, socket_address, config);
 }
 }

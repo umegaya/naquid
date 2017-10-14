@@ -24,17 +24,17 @@ typedef uint32_t nq_msgid_t;
 
 typedef uint32_t nq_stream_id_t;
 
-typedef struct nq_client_tag *nq_client_t; //NaquidClientLoop
+typedef struct nq_client_tag *nq_client_t; //NqClientLoop
 
-typedef struct nq_server_tag *nq_server_t; //NaquidServer
+typedef struct nq_server_tag *nq_server_t; //NqServer
 
-typedef struct nq_conn_tag *nq_conn_t; //NaquidSession::Delegate
+typedef struct nq_conn_tag *nq_conn_t; //NqSession::Delegate
 
 typedef struct nq_hdmap_tag *nq_hdmap_t; //nq::HandlerMap
 
-typedef struct nq_stream_tag *nq_stream_t; //NaquidStreamHandler
+typedef struct nq_stream_tag *nq_stream_t; //NqStreamHandler
 
-typedef struct nq_rpc_tag *nq_rpc_t; //NaquidSimpleRpcStreamHandler
+typedef struct nq_rpc_tag *nq_rpc_t; //NqSimpleRpcStreamHandler
 
 typedef enum {
 	NQ_OK = 0,

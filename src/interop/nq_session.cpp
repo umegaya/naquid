@@ -1,42 +1,42 @@
-#include "interop/naquid_session.h"
+#include "interop/nq_session.h"
 
 #include "net/quic/platform/api/quic_ptr_util.h"
 
-#include "interop/naquid_stream.h"
+#include "interop/nq_stream.h"
 
 namespace net {
 
-NaquidSession::NaquidSession(QuicConnection* connection,
+NqSession::NqSession(QuicConnection* connection,
                                  Delegate* delegate,
                                  const QuicConfig& config) : 
   QuicSession(connection, nullptr, config), delegate_(delegate) {
   crypto_stream_.reset(delegate_->NewCryptoStream(this));
 }
-QuicStream* NaquidSession::CreateIncomingDynamicStream(QuicStreamId id) {
-  auto s = new NaquidStream(id, this, false);
+QuicStream* NqSession::CreateIncomingDynamicStream(QuicStreamId id) {
+  auto s = new NqStream(id, this, false);
   ActivateStream(QuicWrapUnique(s));
   return s;
 }
-QuicStream* NaquidSession::CreateOutgoingDynamicStream() {
-  auto s = new NaquidStream(GetNextOutgoingStreamId(), this, true);
+QuicStream* NqSession::CreateOutgoingDynamicStream() {
+  auto s = new NqStream(GetNextOutgoingStreamId(), this, true);
   ActivateStream(QuicWrapUnique(s));
   return s;
 }
-QuicCryptoStream* NaquidSession::GetMutableCryptoStream() {
+QuicCryptoStream* NqSession::GetMutableCryptoStream() {
   return crypto_stream_.get();
 }
-const QuicCryptoStream* NaquidSession::GetCryptoStream() const {
+const QuicCryptoStream* NqSession::GetCryptoStream() const {
   return crypto_stream_.get();
 }
 
 //implements QuicConnectionVisitorInterface
-void NaquidSession::OnConnectionClosed(QuicErrorCode error,
+void NqSession::OnConnectionClosed(QuicErrorCode error,
                                 const std::string& error_details,
                                 ConnectionCloseSource close_by_peer_or_self) {
   QuicSession::OnConnectionClosed(error, error_details, close_by_peer_or_self);
   delegate_->OnClose(error, error_details, close_by_peer_or_self);
 }
-void NaquidSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
+void NqSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   QuicSession::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
     //TODO(iyatomi): if entering shutdown mode, always disconnect no matter what OnOpen returns

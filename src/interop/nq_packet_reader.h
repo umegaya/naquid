@@ -24,7 +24,7 @@ namespace net {
 const int kNumPacketsPerReadMmsgCall = 16;
 #endif
 
-class NaquidPacketReader {
+class NqPacketReader {
  public:
   class Packet : public QuicReceivedPacket {
     QuicSocketAddress client_address_, server_address_;
@@ -56,9 +56,9 @@ class NaquidPacketReader {
     virtual void OnRecv(Packet *p) = 0;
   };
  public:
-  NaquidPacketReader();
+  NqPacketReader();
 
-  ~NaquidPacketReader();
+  ~NqPacketReader();
 
   // Reads a number of packets from the given fd, and then passes them off to
   // the PacketProcessInterface.  Returns true if there may be additional
@@ -141,9 +141,9 @@ class NaquidPacketReader {
   mmsghdr mmsg_hdr_[kNumPacketsPerReadMmsgCall];
 #endif
 
-  DISALLOW_COPY_AND_ASSIGN(NaquidPacketReader);
+  DISALLOW_COPY_AND_ASSIGN(NqPacketReader);
 };
 
-typedef NaquidPacketReader::Packet NaquidPacket;
+typedef NqPacketReader::Packet NqPacket;
 
 }  // namespace net

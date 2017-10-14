@@ -1,48 +1,48 @@
-#include "interop/naquid_loop.h"
+#include "interop/nq_loop.h"
 
 #include <sys/time.h>
 
 namespace net {
 //implements QuicTime
-QuicTime NaquidLoop::ApproximateNow() const {
+QuicTime NqLoop::ApproximateNow() const {
   if (approx_now_in_usec_ == 0) {
     return Now(); //not yet initialized
   }
   return QuicTime::Zero() + QuicTime::Delta::FromMicroseconds(approx_now_in_usec_);
 }
 
-QuicTime NaquidLoop::Now() const {
+QuicTime NqLoop::Now() const {
   return QuicTime::Zero() +
          QuicTime::Delta::FromMicroseconds(NowInUsec());
 }
 
-QuicWallTime NaquidLoop::WallNow() const {
+QuicWallTime NqLoop::WallNow() const {
   if (approx_now_in_usec_ == 0) {
     return QuicWallTime::FromUNIXMicroseconds(NowInUsec()); //not yet initialized
   }
   return QuicWallTime::FromUNIXMicroseconds(approx_now_in_usec_);
 }
 
-QuicTime NaquidLoop::ConvertWallTimeToQuicTime(
+QuicTime NqLoop::ConvertWallTimeToQuicTime(
     const QuicWallTime& walltime) const {
   return QuicTime::Zero() +
          QuicTime::Delta::FromMicroseconds(walltime.ToUNIXMicroseconds());
 }
-uint64_t NaquidLoop::NowInUsec() const {
+uint64_t NqLoop::NowInUsec() const {
   struct timeval tv;
   gettimeofday(&tv, nullptr);
   return ((uint64_t)tv.tv_usec) + (((uint64_t)tv.tv_sec) * 1000 * 1000);
 }
 /* static */
-QuicTime NaquidLoop::ToQuicTime(uint64_t from_us) {
+QuicTime NqLoop::ToQuicTime(uint64_t from_us) {
   return QuicTime::Zero() + QuicTime::Delta::FromMicroseconds(from_us);
 }
 
 
 //implements QuicAlarmFactory
-class NaquidAlarm : public QuicAlarm {
+class NqAlarm : public QuicAlarm {
  public:
-  NaquidAlarm(NaquidLoop *loop, QuicArenaScopedPtr<Delegate> delegate)
+  NqAlarm(NqLoop *loop, QuicArenaScopedPtr<Delegate> delegate)
       : QuicAlarm(std::move(delegate)), loop_(loop), timeout_in_us_(0) {}
 
   inline void OnAlarm() { Fire(); }
@@ -71,33 +71,33 @@ class NaquidAlarm : public QuicAlarm {
     }
   }
 
-  NaquidLoop* loop_;
+  NqLoop* loop_;
   uint64_t timeout_in_us_;
 };
 
-QuicAlarm* NaquidLoop::CreateAlarm(QuicAlarm::Delegate* delegate) {
-  return new NaquidAlarm(this, QuicArenaScopedPtr<QuicAlarm::Delegate>(delegate));
+QuicAlarm* NqLoop::CreateAlarm(QuicAlarm::Delegate* delegate) {
+  return new NqAlarm(this, QuicArenaScopedPtr<QuicAlarm::Delegate>(delegate));
 }
 
-QuicArenaScopedPtr<QuicAlarm> NaquidLoop::CreateAlarm(
+QuicArenaScopedPtr<QuicAlarm> NqLoop::CreateAlarm(
     QuicArenaScopedPtr<QuicAlarm::Delegate> delegate,
     QuicConnectionArena* arena) {
   if (arena != nullptr) {
-    return arena->New<NaquidAlarm>(this, std::move(delegate));
+    return arena->New<NqAlarm>(this, std::move(delegate));
   } else {
-    return QuicArenaScopedPtr<NaquidAlarm>(new NaquidAlarm(this, std::move(delegate)));
+    return QuicArenaScopedPtr<NqAlarm>(new NqAlarm(this, std::move(delegate)));
   }
 }
 
 // polling
-void NaquidLoop::Poll() {
+void NqLoop::Poll() {
   nq::Loop::Poll();
   approx_now_in_usec_ = NowInUsec();  
   for (auto it = alarm_map_.begin(); it != alarm_map_.end();) {
     if (it->first > approx_now_in_usec_) {
       break;
     }
-    NaquidAlarm* cb = static_cast<NaquidAlarm*>(it->second);
+    NqAlarm* cb = static_cast<NqAlarm*>(it->second);
     cb->OnAlarm();
     auto it_prev = it;
     it++;

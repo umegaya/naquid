@@ -7,27 +7,27 @@
 #include "net/quic/core/quic_crypto_server_stream.h"
 #include "net/quic/core/crypto/quic_compressed_certs_cache.h"
 
-#include "interop/naquid_worker.h"
+#include "interop/nq_worker.h"
 
 namespace net {
-class NaquidWorker;
-class NaquidServerConfig;
-class NaquidDispatcher : public QuicDispatcher, 
+class NqWorker;
+class NqServerConfig;
+class NqDispatcher : public QuicDispatcher, 
                          public nq::IoProcessor,
                          public QuicCryptoServerStream::Helper,
-                         public NaquidPacketReader::Delegate {
+                         public NqPacketReader::Delegate {
   int port_; 
   uint32_t index_, n_worker_;
-  const NaquidServer &server_;
-  NaquidServerLoop &loop_;
-  NaquidPacketReader &reader_;
+  const NqServer &server_;
+  NqServerLoop &loop_;
+  NqPacketReader &reader_;
   QuicCompressedCertsCache cert_cache_;
   std::map<QuicConnectionId, std::unique_ptr<QuicConnection>> conn_map_;
  public:
   //TODO(iyatomi): find proper cache size
   static const int kDefaultCertCacheSize = 16; 
-  NaquidDispatcher(int port, const NaquidServerConfig& config, NaquidWorker &worker);
-  void Process(NaquidPacket *p) {
+  NqDispatcher(int port, const NqServerConfig& config, NqWorker &worker);
+  void Process(NqPacket *p) {
     ProcessPacket(p->server_address(), p->client_address(), *p);
     reader_.Pool(const_cast<char *>(p->data()), p);
   }
@@ -37,8 +37,8 @@ class NaquidDispatcher : public QuicDispatcher,
   void OnClose(nq::Fd fd) override {}
 	int OnOpen(nq::Fd fd) override;
 
-  //implements NaquidPacketReader::Delegate
-  void OnRecv(NaquidPacket *packet) override;
+  //implements NqPacketReader::Delegate
+  void OnRecv(NqPacket *packet) override;
 
   //implements QuicCryptoServerStream::Helper
   QuicConnectionId GenerateConnectionIdForReject(

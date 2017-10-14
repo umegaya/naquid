@@ -7,25 +7,25 @@
 
 #include "core/closure.h"
 #include "core/msgid_factory.h"
-#include "interop/naquid_loop.h"
+#include "interop/nq_loop.h"
 
 namespace net {
 
-class NaquidSession;
-class NaquidStreamHandler;
+class NqSession;
+class NqStreamHandler;
 
-class NaquidStream : public QuicStream {
-  std::unique_ptr<NaquidStreamHandler> handler_;
+class NqStream : public QuicStream {
+  std::unique_ptr<NqStreamHandler> handler_;
   std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name
   bool establish_side_;
  public:
-  NaquidStream(QuicStreamId id, NaquidSession* nq_session, bool establish_side);
-  ~NaquidStream() override {}
+  NqStream(QuicStreamId id, NqSession* nq_session, bool establish_side);
+  ~NqStream() override {}
 
   void OnDataAvailable() override;
   void OnClose() override;
 
-  NaquidStreamHandler *CreateStreamHandler(const std::string &name);
+  NqStreamHandler *CreateStreamHandler(const std::string &name);
   void Disconnect();
 
   inline const std::string &protocol() const { return buffer_; }
@@ -33,18 +33,18 @@ class NaquidStream : public QuicStream {
   bool set_protocol(const std::string &name);
 
  protected:
-  NaquidSession *nq_session();
+  NqSession *nq_session();
 };
 
 
 
-class NaquidStreamHandler {
+class NqStreamHandler {
 protected:
-  NaquidStream *stream_;
+  NqStream *stream_;
   nq_closure_t on_open_, on_close_;
   bool proto_sent_;
 public:
-  NaquidStreamHandler(NaquidStream *stream) : stream_(stream), proto_sent_(false) {}
+  NqStreamHandler(NqStream *stream) : stream_(stream), proto_sent_(false) {}
   
   //interface
   virtual void OnRecv(const void *p, nq_size_t len) = 0;
@@ -69,35 +69,35 @@ public:
     }
     stream_->WriteOrBufferData(QuicStringPiece(p, len), false, nullptr);
   }
-  static inline nq_stream_t CastFrom(NaquidStreamHandler *h) { return (nq_stream_t)h; }
+  static inline nq_stream_t CastFrom(NqStreamHandler *h) { return (nq_stream_t)h; }
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
 };
 
 // A QUIC stream that separated with encoded length
-class NaquidSimpleStreamHandler : public NaquidStreamHandler {
+class NqSimpleStreamHandler : public NqStreamHandler {
   nq_closure_t on_recv_;
   std::string parse_buffer_;
  public:
-  NaquidSimpleStreamHandler(NaquidStream *stream, nq_closure_t on_recv) : 
-    NaquidStreamHandler(stream), on_recv_(on_recv), parse_buffer_() {};
+  NqSimpleStreamHandler(NqStream *stream, nq_closure_t on_recv) : 
+    NqStreamHandler(stream), on_recv_(on_recv), parse_buffer_() {};
 
-  //implements NaquidStream
+  //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override;
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(NaquidSimpleStreamHandler);
+  DISALLOW_COPY_AND_ASSIGN(NqSimpleStreamHandler);
 };
 
 // A QUIC stream that has customized record reader/writer to define record boundary
-class NaquidRawStreamHandler : public NaquidStreamHandler {
+class NqRawStreamHandler : public NqStreamHandler {
   nq_closure_t on_recv_, reader_, writer_;
  public:
-  NaquidRawStreamHandler(NaquidStream *stream, nq_closure_t on_recv, nq_closure_t reader, nq_closure_t writer) : 
-    NaquidStreamHandler(stream), on_recv_(on_recv), reader_(reader), writer_(writer) {}
-  //implements NaquidStream
+  NqRawStreamHandler(NqStream *stream, nq_closure_t on_recv, nq_closure_t reader, nq_closure_t writer) : 
+    NqStreamHandler(stream), on_recv_(on_recv), reader_(reader), writer_(writer) {}
+  //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override {
     nq_closure_call(writer_, stream_writer, p, len, CastFrom(this));
@@ -105,14 +105,14 @@ class NaquidRawStreamHandler : public NaquidStreamHandler {
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(NaquidRawStreamHandler);
+  DISALLOW_COPY_AND_ASSIGN(NqRawStreamHandler);
 };
 
 // A QUIC stream handles RPC style communication
-class NaquidSimpleRPCStreamHandler : public NaquidStreamHandler {
+class NqSimpleRPCStreamHandler : public NqStreamHandler {
   class Request : public QuicAlarm::Delegate {
    public:
-    Request(NaquidSimpleRPCStreamHandler *stream, 
+    Request(NqSimpleRPCStreamHandler *stream, 
             nq_msgid_t msgid,
             nq_closure_t on_data) : 
             stream_(stream), msgid_(msgid), on_data_(on_data) {}
@@ -123,7 +123,7 @@ class NaquidSimpleRPCStreamHandler : public NaquidStreamHandler {
       }
     }
    public:
-    NaquidSimpleRPCStreamHandler *stream_; 
+    NqSimpleRPCStreamHandler *stream_; 
     nq_msgid_t msgid_, padd_[3];
     nq_closure_t on_data_;
   };
@@ -133,20 +133,20 @@ class NaquidSimpleRPCStreamHandler : public NaquidStreamHandler {
   nq_closure_t on_recv_;
   nq::MsgIdFactory msgid_factory_;
   std::map<uint32_t, Request*> req_map_;
-  NaquidLoop *loop_;
+  NqLoop *loop_;
  public:
-  NaquidSimpleRPCStreamHandler(NaquidStream *stream, nq_closure_t on_recv) : 
-    NaquidStreamHandler(stream), parse_buffer_(), on_recv_(on_recv), msgid_factory_(), req_map_() {};
+  NqSimpleRPCStreamHandler(NqStream *stream, nq_closure_t on_recv) : 
+    NqStreamHandler(stream), parse_buffer_(), on_recv_(on_recv), msgid_factory_(), req_map_() {};
 
-  static inline nq_rpc_t CastFrom(NaquidSimpleRPCStreamHandler *h) { return (nq_rpc_t)h; }
-  //implements NaquidStream
+  static inline nq_rpc_t CastFrom(NqSimpleRPCStreamHandler *h) { return (nq_rpc_t)h; }
+  //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override { ASSERT(false); }
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override;
   void Send(uint16_t type, const void *p, nq_size_t len);
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(NaquidSimpleRPCStreamHandler);
+  DISALLOW_COPY_AND_ASSIGN(NqSimpleRPCStreamHandler);
 };
 
 // TODO: customized rpc handler? but needed?

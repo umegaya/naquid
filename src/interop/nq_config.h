@@ -5,17 +5,17 @@
 #include "net/quic/core/crypto/quic_crypto_server_config.h"
 
 #include "naquid.h"
-#include "interop/naquid_proof_verifier.h"
-#include "interop/naquid_proof_source.h"
+#include "interop/nq_proof_verifier.h"
+#include "interop/nq_proof_source.h"
 
 namespace net {
 
-class NaquidClientConfig : public QuicConfig {
+class NqClientConfig : public QuicConfig {
  protected:
   nq_clconf_t client_;
   std::unique_ptr<ProofVerifier> proof_verifier_;
  public:
-  NaquidClientConfig(const nq_clconf_t &conf) : QuicConfig(), client_(conf) {
+  NqClientConfig(const nq_clconf_t &conf) : QuicConfig(), client_(conf) {
     Setup();
   }
   void Setup(); //init other variables from client_
@@ -23,28 +23,28 @@ class NaquidClientConfig : public QuicConfig {
   std::unique_ptr<ProofVerifier> proof_verifier() { return std::move(proof_verifier_); }
 };
 
-class NaquidServerConfig : public QuicConfig {
+class NqServerConfig : public QuicConfig {
  protected:
   nq_svconf_t server_;
   QuicCryptoServerConfig crypto_;
   static const char kDefaultQuicSecret[];
  public:
-  NaquidServerConfig(const nq_addr_t &addr) : QuicConfig(), 
+  NqServerConfig(const nq_addr_t &addr) : QuicConfig(), 
     crypto_(kDefaultQuicSecret, 
       QuicRandom::GetInstance(), 
-      std::unique_ptr<ProofSource>(new NaquidProofSource(addr))
+      std::unique_ptr<ProofSource>(new NqProofSource(addr))
     ) {
     memset(&server_, 0, sizeof(server_));
     nq_closure_init(server_.on_open, on_conn_open, NoopOnOpen, nullptr);
     nq_closure_init(server_.on_close, on_conn_close, NoopOnClose, nullptr);
     Setup();
   }
-  NaquidServerConfig(const nq_addr_t &addr, const nq_svconf_t &conf) : 
+  NqServerConfig(const nq_addr_t &addr, const nq_svconf_t &conf) : 
     QuicConfig(), server_(conf), 
     crypto_(
       conf.quic_secret == nullptr ? kDefaultQuicSecret : conf.quic_secret, 
       QuicRandom::GetInstance(),
-      std::unique_ptr<ProofSource>(new NaquidProofSource(addr))
+      std::unique_ptr<ProofSource>(new NqProofSource(addr))
     ) {
     Setup();
   }

@@ -8,19 +8,19 @@
 #include "net/tools/quic/quic_packet_reader.h"
 
 #include "core/io_processor.h"
-#include "interop/naquid_loop.h"
+#include "interop/nq_loop.h"
 
 namespace net {
 // An implementation of the QuicClientBase::NetworkHelper based off
 // the epoll server.
-class NaquidNetworkHelper : public QuicClientBase::NetworkHelper,
+class NqNetworkHelper : public QuicClientBase::NetworkHelper,
 								            public nq::IoProcessor,
                             public ProcessPacketInterface {
  public:
   // Create a quic client, which will have events managed by an externally owned
   // EpollServer.
-  NaquidNetworkHelper(NaquidLoop* loop, QuicClientBase* client);
-  ~NaquidNetworkHelper() override;
+  NqNetworkHelper(NqLoop* loop, QuicClientBase* client);
+  ~NqNetworkHelper() override;
 
   // implements nq::IoProcessor
   typedef nq::Fd Fd;
@@ -57,7 +57,7 @@ class NaquidNetworkHelper : public QuicClientBase::NetworkHelper,
   void CleanUpUDPSocketImpl(Fd fd);
 
   // Listens for events on the client socket.
-  NaquidLoop* loop_;
+  NqLoop* loop_;
 
   // single file descriptor for client connection
   Fd fd_;
@@ -79,7 +79,7 @@ class NaquidNetworkHelper : public QuicClientBase::NetworkHelper,
 
   QuicClientBase* client_;
 
-  DISALLOW_COPY_AND_ASSIGN(NaquidNetworkHelper);
+  DISALLOW_COPY_AND_ASSIGN(NqNetworkHelper);
 };
 
 }  // namespace net

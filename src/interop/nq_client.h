@@ -10,38 +10,38 @@
 #include "net/tools/quic/quic_client_base.h"
 
 #include "core/closure.h"
-#include "interop/naquid_client_loop.h"
-#include "interop/naquid_session.h"
-#include "interop/naquid_config.h"
+#include "interop/nq_client_loop.h"
+#include "interop/nq_session.h"
+#include "interop/nq_config.h"
 
 namespace net {
 
 class QuicServerId;
 
-class NaquidClient : public QuicClientBase, 
+class NqClient : public QuicClientBase, 
                      public QuicAlarm::Delegate,
                      public QuicCryptoClientStream::ProofHandler, 
-                     public NaquidSession::Delegate {
+                     public NqSession::Delegate {
  public:
   class ReconnectAlarm : public QuicAlarm::Delegate {
    public:
-    ReconnectAlarm(NaquidClient *client) : client_(client) {}
+    ReconnectAlarm(NqClient *client) : client_(client) {}
     void OnAlarm() { client_->StartConnect(); }
    private:
-    NaquidClient *client_;
+    NqClient *client_;
   };
  public:
   // This will create its own QuicClientEpollNetworkHelper.
-  NaquidClient(QuicSocketAddress server_address,
+  NqClient(QuicSocketAddress server_address,
                  const QuicServerId& server_id,
                  const QuicVersionVector& supported_versions,
-                 const NaquidClientConfig &config,
-                 NaquidClientLoop* loop,
+                 const NqClientConfig &config,
+                 NqClientLoop* loop,
                  std::unique_ptr<ProofVerifier> proof_verifier);
-  ~NaquidClient() override;
+  ~NqClient() override;
 
   // operation
-  inline NaquidSession *bare_session() { return static_cast<NaquidSession *>(session()); }
+  inline NqSession *bare_session() { return static_cast<NqSession *>(session()); }
   inline void set_destroyed() { destroyed_ = true; }
 
   // implements QuicClientBase. TODO(umegaya): these are really not needed?
@@ -66,26 +66,26 @@ class NaquidClient : public QuicClientBase,
   void OnProofVerifyDetailsAvailable(const ProofVerifyDetails& verify_details) override;
 
 
-  // implements NaquidSession::Delegate
+  // implements NqSession::Delegate
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
-  bool OnOpen() override { return nq_closure_call(on_open_, on_conn_open, NaquidSession::CastFrom(this)); }
+  bool OnOpen() override { return nq_closure_call(on_open_, on_conn_open, NqSession::CastFrom(this)); }
   bool IsClient() override { return bare_session()->IsClient(); }
   void Disconnect() override;
   bool Reconnect() override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
   QuicStream* NewStream(const std::string &name) override;
-  QuicCryptoStream *NewCryptoStream(NaquidSession *session) override;
+  QuicCryptoStream *NewCryptoStream(NqSession *session) override;
 
  private:
-  NaquidClientLoop* loop_;
+  NqClientLoop* loop_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
   nq_closure_t on_close_, on_open_;
   bool destroyed_;
 
-  DISALLOW_COPY_AND_ASSIGN(NaquidClient);
+  DISALLOW_COPY_AND_ASSIGN(NqClient);
 };
 
 } //net

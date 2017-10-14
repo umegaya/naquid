@@ -1,15 +1,15 @@
-#include "interop/naquid_network_helper.h"
+#include "interop/nq_network_helper.h"
 
 #include "net/tools/quic/quic_default_packet_writer.h"
 
 namespace net {
 
 namespace {
-const int kLoopFlags = NaquidLoop::EV_READ | NaquidLoop::EV_WRITE;
+const int kLoopFlags = NqLoop::EV_READ | NqLoop::EV_WRITE;
 }  // namespace
 
-NaquidNetworkHelper::NaquidNetworkHelper(
-    NaquidLoop* loop,
+NqNetworkHelper::NqNetworkHelper(
+    NqLoop* loop,
     QuicClientBase* client)
     : loop_(loop),
       packets_dropped_(0),
@@ -17,7 +17,7 @@ NaquidNetworkHelper::NaquidNetworkHelper(
       packet_reader_(new QuicPacketReader()),
       client_(client) {}
 
-NaquidNetworkHelper::~NaquidNetworkHelper() {
+NqNetworkHelper::~NqNetworkHelper() {
   if (client_->connected()) {
     client_->session()->connection()->CloseConnection(
         QUIC_PEER_GOING_AWAY, "Client being torn down",
@@ -27,7 +27,7 @@ NaquidNetworkHelper::~NaquidNetworkHelper() {
   CleanUpAllUDPSockets();
 }
 
-bool NaquidNetworkHelper::CreateUDPSocketAndBind(
+bool NqNetworkHelper::CreateUDPSocketAndBind(
     QuicSocketAddress server_address,
     QuicIpAddress bind_to_address,
     int bind_to_port) {
@@ -60,16 +60,16 @@ bool NaquidNetworkHelper::CreateUDPSocketAndBind(
   return true;
 }
 
-void NaquidNetworkHelper::CleanUpUDPSocket(Fd fd) {
+void NqNetworkHelper::CleanUpUDPSocket(Fd fd) {
   DCHECK_EQ(fd, fd_);
   CleanUpUDPSocketImpl(fd);
 }
 
-void NaquidNetworkHelper::CleanUpAllUDPSockets() {
+void NqNetworkHelper::CleanUpAllUDPSockets() {
   CleanUpUDPSocketImpl(fd_);
 }
 
-void NaquidNetworkHelper::CleanUpUDPSocketImpl(Fd fd) {
+void NqNetworkHelper::CleanUpUDPSocketImpl(Fd fd) {
   DCHECK_EQ(fd, fd_);
   if (fd > -1) {
     loop_->Del(fd);
@@ -78,14 +78,14 @@ void NaquidNetworkHelper::CleanUpUDPSocketImpl(Fd fd) {
   }
 }
 
-void NaquidNetworkHelper::RunEventLoop() {
+void NqNetworkHelper::RunEventLoop() {
   loop_->Poll();
 }
 
-void NaquidNetworkHelper::OnClose(Fd /*fd*/) {}
-int NaquidNetworkHelper::OnOpen(Fd /*fd*/) {  return NQ_OK; }
-void NaquidNetworkHelper::OnEvent(Fd fd, const Event& event) {
-  if (NaquidLoop::Readable(event)) {
+void NqNetworkHelper::OnClose(Fd /*fd*/) {}
+int NqNetworkHelper::OnOpen(Fd /*fd*/) {  return NQ_OK; }
+void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
+  if (NqLoop::Readable(event)) {
     bool more_to_read = true;
     while (client_->connected() && more_to_read) {
       more_to_read = packet_reader_->ReadAndDispatchPackets(
@@ -94,24 +94,24 @@ void NaquidNetworkHelper::OnEvent(Fd fd, const Event& event) {
           overflow_supported_ ? &packets_dropped_ : nullptr);
     }
   }
-  if (client_->connected() && NaquidLoop::Writable(event)) {
+  if (client_->connected() && NqLoop::Writable(event)) {
     client_->writer()->SetWritable();
     client_->session()->connection()->OnCanWrite();
   }
-  if (NaquidLoop::Closed(event)) {
+  if (NqLoop::Closed(event)) {
     QUIC_DLOG(INFO) << "looperr";
   }
 }
 
-QuicPacketWriter* NaquidNetworkHelper::CreateQuicPacketWriter() {
+QuicPacketWriter* NqNetworkHelper::CreateQuicPacketWriter() {
   return new QuicDefaultPacketWriter(fd_);
 }
 
-QuicSocketAddress NaquidNetworkHelper::GetLatestClientAddress() const {
+QuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
   return address_;
 }
 
-void NaquidNetworkHelper::ProcessPacket(
+void NqNetworkHelper::ProcessPacket(
     const QuicSocketAddress& self_address,
     const QuicSocketAddress& peer_address,
     const QuicReceivedPacket& packet) {

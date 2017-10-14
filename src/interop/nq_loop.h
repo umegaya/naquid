@@ -13,12 +13,12 @@
 #include "core/handler_map.h"
 
 namespace net {
-class NaquidLoop : public nq::Loop,
+class NqLoop : public nq::Loop,
 				           public QuicConnectionHelperInterface,
 				           public QuicAlarmFactory,
                    public QuicClock {
  public:
-  NaquidLoop() : nq::Loop(), 
+  NqLoop() : nq::Loop(), 
                    approx_now_in_usec_(0),
                    alarm_map_() {}
 

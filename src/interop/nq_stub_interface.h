@@ -1,31 +1,31 @@
 #pragma once
 
-#include "interop/naquid_loop.h"
-#include "interop/naquid_dispatcher.h"
+#include "interop/nq_loop.h"
+#include "interop/nq_dispatcher.h"
 
 namespace net {
-class NaquidStubConnectionHelper : public QuicConnectionHelperInterface {
-	NaquidLoop &loop_;
+class NqStubConnectionHelper : public QuicConnectionHelperInterface {
+	NqLoop &loop_;
  public:
-  NaquidStubConnectionHelper(NaquidLoop &loop) : loop_(loop) {}
+  NqStubConnectionHelper(NqLoop &loop) : loop_(loop) {}
   const QuicClock* GetClock() const override { return &loop_; }
   QuicRandom* GetRandomGenerator() override { return loop_.GetRandomGenerator(); }
   QuicBufferAllocator* GetStreamFrameBufferAllocator() override { return loop_.GetStreamFrameBufferAllocator(); }
   QuicBufferAllocator* GetStreamSendBufferAllocator() override { return loop_.GetStreamSendBufferAllocator(); }
 };
-class NaquidStubAlarmFactory : public QuicAlarmFactory {
-  NaquidLoop &loop_;
+class NqStubAlarmFactory : public QuicAlarmFactory {
+  NqLoop &loop_;
 public:
-  NaquidStubAlarmFactory(NaquidLoop &loop) : loop_(loop) {}
+  NqStubAlarmFactory(NqLoop &loop) : loop_(loop) {}
   QuicAlarm* CreateAlarm(QuicAlarm::Delegate* delegate) override { return loop_.CreateAlarm(delegate); }
   QuicArenaScopedPtr<QuicAlarm> CreateAlarm(
       QuicArenaScopedPtr<QuicAlarm::Delegate> delegate,
       QuicConnectionArena* arena) override { return loop_.CreateAlarm(std::move(delegate), arena); }
 };
-class NaquidStubCryptoServerStreamHelper : public QuicCryptoServerStream::Helper {
-  NaquidDispatcher &dispather_;
+class NqStubCryptoServerStreamHelper : public QuicCryptoServerStream::Helper {
+  NqDispatcher &dispather_;
 public:
-  NaquidStubCryptoServerStreamHelper(NaquidDispatcher &dispather) : dispather_(dispather) {}
+  NqStubCryptoServerStreamHelper(NqDispatcher &dispather) : dispather_(dispather) {}
   // Given the current connection_id, generates a new ConnectionId to
   // be returned with a stateless reject.
   QuicConnectionId GenerateConnectionIdForReject(
