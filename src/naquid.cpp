@@ -1,6 +1,7 @@
 #include "naquid.h"
 
 #include "interop/naquid_client.h"
+#include "interop/naquid_server.h"
 #include "interop/naquid_stream.h"
 
 using namespace net;
@@ -29,7 +30,7 @@ nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clco
 	return (nq_conn_t)c;
 }
 nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
-	return (nq_hdmap_t)((NaquidClientLoop *)cl)->handler_map();	
+	return (nq_hdmap_t)((NaquidClientLoop *)cl)->mutable_handler_map();	
 }
 
 
@@ -40,12 +41,12 @@ nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
 //
 // --------------------------
 nq_server_t nq_server_create(int n_worker) {
-	auto sv = new NaquidServer(*conf);
+	auto sv = new NaquidServer(n_worker);
 	return (nq_server_t)sv;
 }
-nq_hdmap_t nq_server_lsiten(const nq_addr_t *addr, const nq_svconf_t *conf) {
+nq_hdmap_t nq_server_listen(nq_server_t sv, const nq_addr_t *addr, const nq_svconf_t *conf) {
 	auto psv = (NaquidServer *)sv;
-	psv->Open(addr, conf);
+	return (nq_hdmap_t)psv->Open(addr, conf);
 }
 void nq_server_start(nq_server_t sv, bool block) {
 	auto psv = (NaquidServer *)sv;

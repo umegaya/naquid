@@ -45,7 +45,7 @@ android:
 	mv build/android.v7/lib$(LIB).so build/android/lib$(LIB)-armv7.so
 	mv build/android.64/lib$(LIB).so build/android/lib$(LIB)-arm64.so
 
-sync:
+inject:
 	python tools/deps/tools/sync.py --dir ./src --dir $(CHROMIUM_ROOT) \
 		--sync_dir=$(CHROMIUM_ROOT)/third_party/protobuf/src/google \
 		--sync_dir=$(CHROMIUM_ROOT)/third_party/boringssl/src/crypto \
@@ -57,3 +57,5 @@ sync:
 
 patch:
 	cd ./src/chromium && patch -p1 < ../../tools/patch/current.patch
+
+sync: inject patch

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/tools/quic/quic_packet_reader.h"
+#include "interop/naquid_packet_reader.h"
 
 #include <errno.h>
 #ifndef __APPLE__
@@ -35,13 +35,14 @@ NaquidPacketReader::Packet::Packet(const char* buffer,
                                    struct sockaddr_storage client_sockaddr, 
                                    QuicIpAddress &server_ip, int server_port) : 
                                   QuicReceivedPacket(buffer, length, receipt_time, false, ttl, ttl_valid), 
-                                  client_address_(client_sockaddr), server_address(server_ip, server_port) {
+                                  client_address_(client_sockaddr), server_address_(server_ip, server_port) {
 
 }
 
 NaquidPacketReader::NaquidPacketReader() {
   Initialize();
 }
+NaquidPacketReader::~NaquidPacketReader() {}
 
 void NaquidPacketReader::Initialize() {
 #if MMSG_MORE
@@ -49,7 +50,7 @@ void NaquidPacketReader::Initialize() {
   memset(mmsg_hdr_, 0, sizeof(mmsg_hdr_));
 
   for (int i = 0; i < kNumPacketsPerReadMmsgCall; ++i) {
-    packets_[i].buf = reader_.NewBuffer();
+    packets_[i].buf = NewBuffer();
     packets_[i].iov.iov_base = packets_[i].buf;
     packets_[i].iov.iov_len = kMaxPacketSize;
     
@@ -64,33 +65,31 @@ void NaquidPacketReader::Initialize() {
   }
 #endif
 }
-
-NaquidPacketReader::~NaquidPacketReader() {}
-
-int NaquidPacketReader::ReadAndDispatchPackets(
+bool NaquidPacketReader::Read(
     int fd,
     int port,
     const QuicClock& clock,
+    Delegate *delegate,
     QuicPacketCount* packets_dropped) {
 #if MMSG_MORE
-  return ReadPacketsMulti(fd, port, clock, packets_dropped);
+  return ReadPacketsMulti(fd, port, clock, delegate, packets_dropped);
 #else
-  return ReadPackets(fd, port, clock, delegate_,
+  return ReadPackets(fd, port, clock, delegate,
                                      packets_dropped);
 #endif
 }
-
 bool NaquidPacketReader::ReadPacketsMulti(
     int fd,
     int port,
     const QuicClock& clock,
+    Delegate *delegate,
     QuicPacketCount* packets_dropped) {
 #if MMSG_MORE
   // Re-set the length fields in case recvmmsg has changed them.
   for (int i = 0; i < kNumPacketsPerReadMmsgCall; ++i) {
     DCHECK_EQ(kMaxPacketSize, packets_[i].iov.iov_len);
     if (packets_[i].buf == nullptr) { //if packet send to queue or consumed, assign new one.
-      packets_[i].buf = reader_.NewBuffer();
+      packets_[i].buf = NewBuffer();
       packets_[i].iov.iov_base = p->buffer();
       packets_[i].packet.reset(p);
     }
@@ -141,8 +140,8 @@ bool NaquidPacketReader::ReadPacketsMulti(
     auto packet = NewPacket(packets_[i].buf.release(),
                               mmsg_hdr_[i].msg_len, timestamp, false, ttl,
                               has_ttl, packets_[i].raw_address, server_ip, port);
-    packet->port_ = port;
-    delegate_->Process(packet);
+    packet->set_port(port);
+    delegate->OnRecv(packet);
   }
 
   if (packets_dropped != nullptr) {
@@ -157,21 +156,19 @@ bool NaquidPacketReader::ReadPacketsMulti(
   return false;
 #endif
 }
-
-/* static */
-bool NaquidPacketReader::ReadAndDispatchSinglePacket(
+bool NaquidPacketReader::ReadPackets(
     int fd,
     int port,
     const QuicClock& clock,
     Delegate *delegate, 
     QuicPacketCount* packets_dropped) {
-  char buf[kMaxPacketSize];
+  char *buf = NewBuffer();
 
   QuicSocketAddress client_address;
   QuicIpAddress server_ip;
   QuicWallTime walltimestamp = QuicWallTime::Zero();
   int bytes_read =
-      QuicSocketUtils::ReadPacket(fd, buf, arraysize(buf), packets_dropped,
+      QuicSocketUtils::ReadPacket(fd, buf, kMaxPacketSize, packets_dropped,
                                   &server_ip, &walltimestamp, &client_address);
   if (bytes_read < 0) {
     return false;  // ReadPacket failed.
@@ -187,11 +184,11 @@ bool NaquidPacketReader::ReadAndDispatchSinglePacket(
     walltimestamp = clock.WallNow();
   }
   QuicTime timestamp = clock.ConvertWallTimeToQuicTime(walltimestamp);
+  auto packet = NewPacket(buf, bytes_read, timestamp, 0, false,
+                          client_address.generic_address(), server_ip, port);
 
-  QuicReceivedPacket packet(buf, bytes_read, timestamp, false);
-  QuicSocketAddress server_address(server_ip, port);
-  processor->ProcessPacket(server_address, client_address, packet);
-
+  packet->set_port(port);
+  delegate->OnRecv(packet);
   // The socket read was successful, so return true even if packet dispatch
   // failed.
   return true;

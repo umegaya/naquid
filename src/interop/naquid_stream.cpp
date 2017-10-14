@@ -18,11 +18,11 @@ bool NaquidStream::set_protocol(const std::string &name) {
     return false; 
   }
   buffer_ = name;
-  handler_ = CreateStreamHandler(name);
+  handler_ = std::unique_ptr<NaquidStreamHandler>(CreateStreamHandler(name));
   return handler_ != nullptr;
 }
 NaquidStreamHandler *NaquidStream::CreateStreamHandler(const std::string &name) {
-  auto he = nq_session()->handler_map_ref()->Find(name);
+  auto he = nq_session()->handler_map()->Find(name);
   if (he == nullptr) {
     ASSERT(false);
     return nullptr;
@@ -73,7 +73,7 @@ void NaquidStream::OnDataAvailable() {
       }
       //create handler by initial establish string
       auto name = buffer_.substr(0, idx);
-      handler_ = CreateStreamHandler(name);
+      handler_ = std::unique_ptr<NaquidStreamHandler>(CreateStreamHandler(name));
       handler_->ProtoSent();
       if (handler_ == nullptr || !handler_->OnOpen()) { //server side OnOpen
         Disconnect();

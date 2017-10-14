@@ -5,6 +5,7 @@ set(common_src
 	./src/chromium/base/debug/alias.cc
 	./src/chromium/base/debug/debugger.cc
 	./src/chromium/base/debug/stack_trace.cc
+	./src/chromium/base/i18n/i18n_constants.cc
 	./src/chromium/base/lazy_instance.cc
 	./src/chromium/base/location.cc
 	./src/chromium/base/logging.cc
@@ -38,6 +39,7 @@ set(common_src
 	./src/chromium/crypto/random.cc
 	./src/chromium/crypto/secure_util.cc
 	./src/chromium/crypto/symmetric_key.cc
+	./src/chromium/crypto/rsa_private_key.cc
 
 	./src/chromium/third_party/modp_b64/modp_b64.cc
 

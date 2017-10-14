@@ -6,7 +6,8 @@
 
 namespace net {
 // TODO(iyatomi): because most of developer don't want heavy-wait proof verification, 
-// intend to implement minimum one. but Im not sure that such a light weight version is possible,
+// need to implement minimum one (eg. allow self cert). 
+// but Im not sure that such a light weight version is possible,
 // if not possible I will change this to chromium one. 
 
 // CAUTION: currently this proof verifier does not verify any proof. 

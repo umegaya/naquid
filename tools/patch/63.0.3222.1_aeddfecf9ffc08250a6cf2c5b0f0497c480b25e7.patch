@@ -157,3 +157,17 @@ index 107e0dc49857..192cadb5c1ff 100644
  }
  
  const char* ThreadIdNameManager::GetName(PlatformThreadId id) {
+diff --git a/net/cert/x509_certificate.cc b/net/cert/x509_certificate.cc
+index 14aaa5b4461f..4709bf4b4443 100644
+--- a/net/cert/x509_certificate.cc
++++ b/net/cert/x509_certificate.cc
+@@ -75,7 +75,8 @@ scoped_refptr<X509Certificate> X509Certificate::CreateFromHandle(
+ // static
+ scoped_refptr<X509Certificate> X509Certificate::CreateFromDERCertChain(
+     const std::vector<base::StringPiece>& der_certs) {
+-  TRACE_EVENT0("io", "X509Certificate::CreateFromDERCertChain");
++  //TODO(iyatomi): somehow invent the way to replace trace event
++  //TRACE_EVENT0("io", "X509Certificate::CreateFromDERCertChain");
+   if (der_certs.empty())
+     return NULL;
+ 

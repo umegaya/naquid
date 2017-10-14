@@ -8,6 +8,8 @@
 
 #include <algorithm>
 
+#include "core/defs.h"
+
 namespace nq {
 class Syscall {
 public:

@@ -9,6 +9,7 @@ void NaquidClientLoop::Close() {
   }
   NaquidLoop::Close();
 }
+//called from diseonnecting alarm
 void NaquidClientLoop::RemoveClient(NaquidClient *cl) {
   auto it = client_map_.find(cl->server_address().ToString());
   if (it != client_map_.end()) {

@@ -75,7 +75,8 @@ scoped_refptr<X509Certificate> X509Certificate::CreateFromHandle(
 // static
 scoped_refptr<X509Certificate> X509Certificate::CreateFromDERCertChain(
     const std::vector<base::StringPiece>& der_certs) {
-  TRACE_EVENT0("io", "X509Certificate::CreateFromDERCertChain");
+  //TODO(iyatomi): somehow invent the way to replace trace event
+  //TRACE_EVENT0("io", "X509Certificate::CreateFromDERCertChain");
   if (der_certs.empty())
     return NULL;
 

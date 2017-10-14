@@ -74,7 +74,7 @@ class NaquidClient : public QuicClientBase,
   bool IsClient() override { return bare_session()->IsClient(); }
   void Disconnect() override;
   bool Reconnect() override;
-  nq::HandlerMap *GetHandlerMap() override;
+  const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
   QuicStream* NewStream(const std::string &name) override;
   QuicCryptoStream *NewCryptoStream(NaquidSession *session) override;

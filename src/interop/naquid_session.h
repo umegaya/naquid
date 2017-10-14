@@ -22,11 +22,11 @@ class NaquidSession : public QuicSession {
     virtual bool OnOpen() = 0;
 
     virtual void Disconnect() = 0;
-    virtual void Reconnect() = 0; //only supported for client 
+    virtual bool Reconnect() = 0; //only supported for client 
     virtual bool IsClient() = 0;
     virtual QuicStream *NewStream(const std::string &name) = 0;
     virtual QuicCryptoStream *NewCryptoStream(NaquidSession *session) = 0;
-    virtual nq::HandlerMap *GetHandlerMap() = 0;
+    virtual const nq::HandlerMap *GetHandlerMap() const = 0;
     virtual nq::HandlerMap *ResetHandlerMap() = 0;
   };
  private:
@@ -39,7 +39,7 @@ class NaquidSession : public QuicSession {
 
   bool IsClient() const { return connection()->perspective() == Perspective::IS_CLIENT; }
   Delegate *delegate() { return delegate_; }
-  nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
+  const nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
   nq_conn_t conn() { return CastFrom(delegate()); }
   static inline nq_conn_t CastFrom(NaquidSession::Delegate *d) { return (nq_conn_t)d; }
 

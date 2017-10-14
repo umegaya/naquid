@@ -9,5 +9,5 @@
 #endif
 
 #if defined(NET_COMPILE_FLAGS)
-
+#define BUILDFLAG_INTERNAL_USE_BYTE_CERTS() 1
 #endif

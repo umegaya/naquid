@@ -5,11 +5,15 @@
 // regardless of how the below transitive header include set may change.
 #include <sys/socket.h>
 
+#include <stack>
+
 #include "base/macros.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/quic/platform/api/quic_socket_address.h"
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
+
+#include "core/syscall.h"
 
 #define MMSG_MORE 0
 
@@ -23,7 +27,7 @@ const int kNumPacketsPerReadMmsgCall = 16;
 class NaquidPacketReader {
  public:
   class Packet : public QuicReceivedPacket {
-    QuicSocketAddress server_address_, client_address_;
+    QuicSocketAddress client_address_, server_address_;
     int port_;
    public:
     Packet(const char* buffer,
@@ -33,15 +37,26 @@ class NaquidPacketReader {
            bool ttl_valid, 
            struct sockaddr_storage client_sockaddr, 
            QuicIpAddress &server_ip, int server_port);
-    QuicSocketAddress &server_address() { return server_address_; }
-    QuicSocketAddress &client_address() { return client_address_; }
+    inline QuicSocketAddress &server_address() { return server_address_; }
+    inline QuicSocketAddress &client_address() { return client_address_; }
+    inline void set_port(int port) { port_ = port; }
+    inline int port() const { return port_; }
+    inline uint64_t ConnectionId() const {
+      switch (data()[0] & 0x08) {
+        case 0x08:
+          return nq::Syscall::NetbytesToHost64(data() + 1);
+        default:
+          //TODO(iyatomi): can we detect connection_id from packet->client_address()? but chromium server sample itself seems to ignore...
+          return 0;
+      }
+    } 
   };
   class Delegate {
    public:
     virtual void OnRecv(Packet *p) = 0;
-  }
+  };
  public:
-  NaquidPacketReader(Delegate *d);
+  NaquidPacketReader();
 
   ~NaquidPacketReader();
 
@@ -52,7 +67,8 @@ class NaquidPacketReader {
   // to track dropped packets and some packets are read.
   // If the socket has timestamping enabled, the per packet timestamps will be
   // passed to the processor. Otherwise, |clock| will be used.
-  bool Read(int fd, int port, const QuicClock& clock, QuicPacketCount* packets_dropped);
+  bool Read(int fd, int port, const QuicClock& clock, 
+            Delegate *delegate, QuicPacketCount* packets_dropped);
 
   // memory pool
   inline void Pool(char *buffer, Packet *packet) { 
@@ -60,7 +76,13 @@ class NaquidPacketReader {
     packet_pool_.push(reinterpret_cast<char*>(packet));
   }
   inline char *NewBuffer() { 
-    return buffer_pool_.size() > 0 ? buffer_pool_.pop() : new char[kMaxPacketSize];
+    if (buffer_pool_.size() > 0) {
+      auto p = buffer_pool_.top();
+      buffer_pool_.pop();
+      return p;
+    } else {
+      return new char[kMaxPacketSize];
+    }
   }
   inline Packet *NewPacket(const char* buffer,
            size_t length,
@@ -69,7 +91,13 @@ class NaquidPacketReader {
            bool ttl_valid, 
            struct sockaddr_storage client_sockaddr, 
            QuicIpAddress &server_ip, int server_port) { 
-    auto p = packet_pool_.size() > 0 ? packet_pool_.pop() : new char[sizeof(Packet)];
+    char *p;
+    if (packet_pool_.size() > 0) {
+      p = packet_pool_.top();
+      packet_pool_.pop();
+    } else {
+      p =new char[sizeof(Packet)];
+    }
     return new(p) Packet(buffer, length, receipt_time, ttl, ttl_valid, client_sockaddr, server_ip, server_port);
   }
 
@@ -81,16 +109,16 @@ class NaquidPacketReader {
   bool ReadPacketsMulti(int fd,
                         int port,
                         const QuicClock& clock,
+                        Delegate *delegate,
                         QuicPacketCount* packets_dropped);
 
   // Reads and dispatches a single packet using recvmsg.
-  static bool ReadPackets(int fd,
+  bool ReadPackets(int fd,
                           int port,
                           const QuicClock& clock,
                           Delegate *delegate,
                           QuicPacketCount* packets_dropped);
  private:
-  Delegate *delegate_;
   std::stack<char *> buffer_pool_;
   std::stack<char *> packet_pool_;
   // Storage only used when recvmmsg is available.

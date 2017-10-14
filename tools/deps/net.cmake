@@ -14,6 +14,30 @@ set(net_src
 	./src/chromium/net/base/registry_controlled_domains/registry_controlled_domain.cc
 	./src/chromium/net/base/sockaddr_storage.cc
 	./src/chromium/net/base/url_util.cc
+	./src/chromium/net/cert/internal/cert_errors.cc
+	./src/chromium/net/cert/internal/cert_error_id.cc
+	./src/chromium/net/cert/internal/cert_error_params.cc
+	./src/chromium/net/cert/internal/certificate_policies.cc
+	./src/chromium/net/cert/internal/extended_key_usage.cc
+	./src/chromium/net/cert/internal/general_names.cc
+	./src/chromium/net/cert/internal/name_constraints.cc
+	./src/chromium/net/cert/internal/parse_certificate.cc
+	./src/chromium/net/cert/internal/parse_name.cc
+	./src/chromium/net/cert/internal/parsed_certificate.cc
+	./src/chromium/net/cert/internal/signature_algorithm.cc
+	./src/chromium/net/cert/internal/verify_name_match.cc
+	./src/chromium/net/cert/internal/verify_signed_data.cc
+	./src/chromium/net/cert/asn1_util.cc
+	./src/chromium/net/cert/pem_tokenizer.cc
+	./src/chromium/net/cert/x509_cert_types.cc
+	./src/chromium/net/cert/x509_certificate.cc
+	./src/chromium/net/cert/x509_certificate_bytes.cc
+	./src/chromium/net/cert/x509_util.cc
+	./src/chromium/net/der/encode_values.cc
+	./src/chromium/net/der/input.cc
+	./src/chromium/net/der/parser.cc
+	./src/chromium/net/der/parse_values.cc
+	./src/chromium/net/der/tag.cc
 	./src/chromium/net/quic/core/congestion_control/bandwidth_sampler.cc
 	./src/chromium/net/quic/core/congestion_control/bbr_sender.cc
 	./src/chromium/net/quic/core/congestion_control/cubic.cc
@@ -65,6 +89,7 @@ set(net_src
 	./src/chromium/net/quic/core/frames/quic_stop_waiting_frame.cc
 	./src/chromium/net/quic/core/frames/quic_stream_frame.cc
 	./src/chromium/net/quic/core/frames/quic_window_update_frame.cc
+	./src/chromium/net/quic/chromium/crypto/proof_source_chromium.cc
 	./src/chromium/net/quic/core/proto/cached_network_parameters.pb.cc
 	./src/chromium/net/quic/core/proto/source_address_token.pb.cc
 	./src/chromium/net/quic/core/quic_ack_listener_interface.cc

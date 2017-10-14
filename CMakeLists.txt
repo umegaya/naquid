@@ -8,7 +8,7 @@ set(DEBUG false CACHE BOOL "do debug build")
 set(CHROMIUM_VERSION "63.0.3222.1")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -DHAVE_PTHREAD -DDISABLE_HISTOGRAM")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11 -DOPENSSL_NO_ASM -DOSATOMIC_USE_INLINED=1 -DPB_NO_PACKED_STRUCTS")
-include_directories(src src/chromium src/chromium/third_party/icu/source/common)
+include_directories(src src/chromium src/chromium/third_party/icu/source/common ext)
 include_directories(SYSTEM src/chromium/third_party/protobuf/src src/chromium/third_party/boringssl/src/include)
 if (DEBUG)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -DDEBUG")
@@ -25,16 +25,24 @@ set(lib_src
 	./src/naquid.cpp
 	./src/interop/naquid_client.cpp
 	./src/interop/naquid_client_loop.cpp
+	./src/interop/naquid_config.cpp
+	./src/interop/naquid_dispatcher.cpp
 	./src/interop/naquid_loop.cpp
 	./src/interop/naquid_network_helper.cpp
+	./src/interop/naquid_packet_reader.cpp
+	./src/interop/naquid_server.cpp
+	./src/interop/naquid_server_loop.cpp
+	./src/interop/naquid_server_session.cpp
 	./src/interop/naquid_session.cpp
 	./src/interop/naquid_stream.cpp 
+	./src/interop/naquid_worker.cpp
 
-	./src/interop/compat/naquid_spdy_protocol.cpp 
-	./src/interop/compat/naquid_quic_socket_utils.cpp 
-	./src/interop/compat/naquid_url_canon_icu.cpp
 	./src/interop/compat/naquid_file_util.cpp
+	./src/interop/compat/naquid_quic_socket_utils.cpp 
 	./src/interop/compat/naquid_ref_counted.cpp
+	./src/interop/compat/naquid_spdy_protocol.cpp 
+	./src/interop/compat/naquid_string_util.cpp
+	./src/interop/compat/naquid_url_canon_icu.cpp
 )
 set(lib_mm_src
 	./src/interop/compat/naquid_foundation_util.mm

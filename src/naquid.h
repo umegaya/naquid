@@ -64,7 +64,7 @@ typedef void *(*nq_stream_reader_t)(void *, const char *, nq_size_t, int *);
 
 typedef nq_size_t (*nq_stream_writer_t)(void *, const void *, nq_size_t, nq_stream_t);
 
-typedef void (*nq_on_stream_notify_t)(void *, nq_stream_t, const void *, nq_size_t);
+typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
 
 typedef void (*nq_on_rpc_notify_t)(void *, nq_rpc_t, uint16_t, const void *, nq_size_t);
 
@@ -110,6 +110,8 @@ typedef struct {
 
 typedef struct {
 	nq_closure_t on_open, on_close;
+	const char *quic_secret;
+	int quic_cert_cache_size;
 } nq_svconf_t;
 
 //handlers

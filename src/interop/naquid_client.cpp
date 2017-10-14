@@ -74,13 +74,13 @@ bool NaquidClient::Reconnect() {
   QuicClientBase::Disconnect(); 
   return true;
 }
-nq::HandlerMap *NaquidClient::GetHandlerMap() {
-  return own_hander_map_ != nullptr ? own_hander_map_.get() : loop_->handler_map();
+const nq::HandlerMap *NaquidClient::GetHandlerMap() const {
+  return own_handler_map_ != nullptr ? own_handler_map_.get() : loop_->handler_map();
 }
 
 nq::HandlerMap* NaquidClient::ResetHandlerMap() {
-  own_hander_map_.reset(new nq::HandlerMap());
-  return own_hander_map_.get();
+  own_handler_map_.reset(new nq::HandlerMap());
+  return own_handler_map_.get();
 }
 QuicStream *NaquidClient::NewStream(const std::string &name) {
   auto s = static_cast<NaquidStream *>(bare_session()->CreateOutgoingDynamicStream());

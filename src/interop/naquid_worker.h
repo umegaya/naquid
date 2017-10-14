@@ -3,6 +3,8 @@
 #include <map>
 #include <thread>
 
+#include "MoodyCamel/concurrentqueue.h"
+
 #include "interop/naquid_server_loop.h"
 #include "interop/naquid_packet_reader.h"
 
@@ -20,28 +22,30 @@ class NaquidWorker {
   std::vector<std::pair<int, NaquidDispatcher*>> dispatchers_;
   bool overflow_supported_;
  public:
+  typedef moodycamel::ConcurrentQueue<NaquidPacket*> PacketQueue;
   NaquidWorker(int index, const NaquidServer &server) : 
-    index_(index), server_(server), loop_(), reader_(this), 
+    index_(index), server_(server), loop_(), reader_(), 
     thread_(), dispatchers_(), overflow_supported_(false) {}
-  void Start(NaquidServer::PacketQueue &queue) {
-    thread_ = std::thread([this, &queue]() { Run(queue); })
-    return NQ_OK;
+  void Start(PacketQueue &queue) {
+    thread_ = std::thread([this, &queue]() { Run(queue); });
   }
   void Process(NaquidPacket *p);
   bool Listen();
-  void Run(NaquidServer::PacketQueue &queue);
+  void Run(PacketQueue &queue);
   void Join() {
     if (thread_.joinable()) {
       thread_.join();
     }
   }
 
+  //accessor
   inline const NaquidServer &server() const { return server_; }
   inline NaquidPacketReader &reader() { return reader_; }
   inline NaquidServerLoop &loop() { return loop_; }
+  inline int index() { return index_; }
 
  protected:
-  static bool ToSocketAddress(nq_addr_t &addr, QuicSocketAddress &address);
+  static bool ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &address);
   nq::Fd CreateUDPSocketAndBind(const QuicSocketAddress& address);
-}
+};
 }

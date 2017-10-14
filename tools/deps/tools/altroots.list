@@ -1,8 +1,11 @@
 base/android/jni_generator/jni_generator_helper.h
+base/i18n/i18n_constants.cc
 base/strings/sys_string_conversions_mac.mm
 base/third_party/dmg_fp/dtoa_wrapper.cc
 base/third_party/dmg_fp/g_fmt.cc
 base/time/time_conversion_posix.cc
 base/time/time_exploded_posix.cc
 base/time/time_now_posix.cc
+net/cert/x509_certificate_bytes.cc
+net/cert/x509_certificate_nss.cc
 third_party/boringssl/err_data.c

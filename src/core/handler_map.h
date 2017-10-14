@@ -45,7 +45,7 @@ class HandlerMap {
   	map_[name] = he;
     return true;
   }
-  inline HandlerEntry *Find(const std::string &name) {
+  inline const HandlerEntry *Find(const std::string &name) const {
     auto it = map_.find(name);
     return it == map_.end() ? nullptr : &(it->second);
   }
