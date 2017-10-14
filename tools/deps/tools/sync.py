@@ -103,7 +103,7 @@ class DependencyTree(object):
         f = open(path2write, "w")
         f.write("#pragma once" + os.linesep)
         f.write("#define " + pp_symbol + os.linesep)
-        f.write("#include \"interop/compile_flags.h\"" + os.linesep)
+        f.write("#include \"core/compile_flags.h\"" + os.linesep)
         f.write("#undef " + pp_symbol + os.linesep)
         f.write("#include \"build/buildflag.h\"" + os.linesep)
         f.close()

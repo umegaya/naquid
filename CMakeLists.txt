@@ -22,30 +22,30 @@ endif()
 
 # srcs
 set(lib_src
-	./src/naquid.cpp
-	./src/interop/naquid_client.cpp
-	./src/interop/naquid_client_loop.cpp
-	./src/interop/naquid_config.cpp
-	./src/interop/naquid_dispatcher.cpp
-	./src/interop/naquid_loop.cpp
-	./src/interop/naquid_network_helper.cpp
-	./src/interop/naquid_packet_reader.cpp
-	./src/interop/naquid_server.cpp
-	./src/interop/naquid_server_loop.cpp
-	./src/interop/naquid_server_session.cpp
-	./src/interop/naquid_session.cpp
-	./src/interop/naquid_stream.cpp 
-	./src/interop/naquid_worker.cpp
+	./src/nq.cpp
+	./src/core/nq_client.cpp
+	./src/core/nq_client_loop.cpp
+	./src/core/nq_config.cpp
+	./src/core/nq_dispatcher.cpp
+	./src/core/nq_loop.cpp
+	./src/core/nq_network_helper.cpp
+	./src/core/nq_packet_reader.cpp
+	./src/core/nq_server.cpp
+	./src/core/nq_server_loop.cpp
+	./src/core/nq_server_session.cpp
+	./src/core/nq_session.cpp
+	./src/core/nq_stream.cpp 
+	./src/core/nq_worker.cpp
 
-	./src/interop/compat/naquid_file_util.cpp
-	./src/interop/compat/naquid_quic_socket_utils.cpp 
-	./src/interop/compat/naquid_ref_counted.cpp
-	./src/interop/compat/naquid_spdy_protocol.cpp 
-	./src/interop/compat/naquid_string_util.cpp
-	./src/interop/compat/naquid_url_canon_icu.cpp
+	./src/core/compat/nq_file_util.cpp
+	./src/core/compat/nq_quic_socket_utils.cpp 
+	./src/core/compat/nq_ref_counted.cpp
+	./src/core/compat/nq_spdy_protocol.cpp 
+	./src/core/compat/nq_string_util.cpp
+	./src/core/compat/nq_url_canon_icu.cpp
 )
 set(lib_mm_src
-	./src/interop/compat/naquid_foundation_util.mm
+	./src/core/compat/nq_foundation_util.mm
 )
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/net.cmake)
 # platforms

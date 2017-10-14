@@ -1,8 +1,8 @@
-#include "naquid.h"
+#include "nq.h"
 
-#include "interop/nq_client.h"
-#include "interop/nq_server.h"
-#include "interop/nq_stream.h"
+#include "core/nq_client.h"
+#include "core/nq_server.h"
+#include "core/nq_stream.h"
 
 using namespace net;
 
