@@ -339,7 +339,7 @@ int QuicSocketUtils::CreateUDPSocket(const QuicSocketAddress& address,
   int rc = setsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &get_overflow,
                       sizeof(get_overflow));
   if (rc < 0) {
-    QUIC_DLOG(WARNING) << "Socket overflow detection not supported";
+    QUIC_DLOG(WARNING) << "Socket overflow detection not supported: " << strerror(errno);
   } else {
     *overflow_supported = true;
   }
@@ -354,7 +354,7 @@ int QuicSocketUtils::CreateUDPSocket(const QuicSocketAddress& address,
 
   rc = SetGetAddressInfo(fd, address_family);
   if (rc < 0) {
-    LOG(ERROR) << "IP detection not supported" << strerror(errno);
+    LOG(ERROR) << "IP detection not supported: " << strerror(errno);
     return -1;
   }
 

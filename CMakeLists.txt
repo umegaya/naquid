@@ -23,6 +23,10 @@ endif()
 # srcs
 set(lib_src
 	./src/nq.cpp
+
+	./src/basis/timespec.cpp
+
+	./src/core/nq_at_exit.cpp
 	./src/core/nq_client.cpp
 	./src/core/nq_client_loop.cpp
 	./src/core/nq_config.cpp
@@ -66,7 +70,7 @@ set(src ${lib_src} ${net_src} ${common_src} ${zlib_src} ${ssl_src} ${pb_src})
 
 
 # target settings
-if (IOS OR OSXBUNDLE)
+if (IOS OR NQ_OSX_BUNDLE OR NQ_OSX)
 	find_library(core_foundation CoreFoundation)
 	find_library(cocoa Cocoa)
 	find_library(iokit IOKit)
@@ -78,11 +82,15 @@ if (IOS OR OSXBUNDLE)
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -miphoneos-version-min=7.0 -Wno-nullability-completeness")
 		add_library(nq STATIC ${nqsrc})
 		target_link_libraries(nq ${core_foundation} ${iokit} ${security})
-	else()
+	elseif (NQ_OSX_BUNDLE)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_KQUEUE__")
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -bundle")
 		add_executable(nq MACOSX_BUNDLE ${nqsrc}) 	
 		target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security})
+	elseif (NQ_OSX)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_KQUEUE__")
+		add_library(nq STATIC ${nqsrc})
+		target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security})		
 	endif()
 elseif (ANDROID)
 	set(nqsrc ${src} ${android_src})
@@ -91,7 +99,7 @@ elseif (ANDROID)
 	target_link_libraries(nq "-lc++_static -llog")
 elseif (WINDOWS)
 	# TODO(iyatomi): add windows build instruction
-else ()
+elseif (NQ_LINUX)
 	set(nqsrc ${src} ${linux_src})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_EPOLL__")
 	add_library(nq SHARED ${nqsrc})

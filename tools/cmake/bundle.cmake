@@ -1,2 +1,1 @@
-set(OSXBUNDLE True)
-set(DEBUG True) # temporary
+set(NQ_OSX_BUNDLE True)

@@ -130,20 +130,22 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   void EntryRequest(nq_msgid_t msgid, nq_closure_t cb, uint64_t timeout_duration_us = 30 * 1000 * 1000);
  private:
   std::string parse_buffer_;
-  nq_closure_t on_recv_;
+  nq_closure_t on_request_, on_notify_;
   nq::MsgIdFactory msgid_factory_;
   std::map<uint32_t, Request*> req_map_;
   NqLoop *loop_;
  public:
-  NqSimpleRPCStreamHandler(NqStream *stream, nq_closure_t on_recv) : 
-    NqStreamHandler(stream), parse_buffer_(), on_recv_(on_recv), msgid_factory_(), req_map_() {};
+  NqSimpleRPCStreamHandler(NqStream *stream, nq_closure_t on_request, nq_closure_t on_notify) : 
+    NqStreamHandler(stream), parse_buffer_(), 
+    on_request_(on_request), on_notify_(on_notify), msgid_factory_(), req_map_() {};
 
   static inline nq_rpc_t CastFrom(NqSimpleRPCStreamHandler *h) { return (nq_rpc_t)h; }
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override { ASSERT(false); }
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override;
-  void Send(uint16_t type, const void *p, nq_size_t len);
+  void Notify(uint16_t type, const void *p, nq_size_t len);
+  void Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqSimpleRPCStreamHandler);

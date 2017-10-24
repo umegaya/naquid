@@ -3,6 +3,8 @@ BUILD_SETTING_PATH=$(RELATIVE_PROJECT_ROOT)/tools/cmake
 CHROMIUM_ROOT=../chromium
 BUILDER_IMAGE=naquid/meta-builder
 LIB=nq
+# osx/linux
+TEST_OS=osx
 
 define ct_run
 docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) sh -c "cd /naquid && $1"
@@ -19,6 +21,10 @@ rebuild-builder: meta-builder builder
 bundle:
 	-@mkdir -p build/osx
 	cd build/osx && cmake -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/bundle.cmake $(RELATIVE_PROJECT_ROOT) && make -j4
+
+testlib:
+	-@mkdir -p build/t
+	cd build/t && cmake -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/testlib.cmake $(RELATIVE_PROJECT_ROOT) && make -j4
 
 linux_internal: 
 	-@mkdir -p build/linux
@@ -59,3 +65,6 @@ patch:
 	cd ./src/chromium && patch -p1 < ../../tools/patch/current.patch
 
 sync: inject patch
+
+testsv:
+	make -C test/e2e server

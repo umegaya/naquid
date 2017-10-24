@@ -38,6 +38,10 @@ void NqWorker::Run(PacketQueue &queue) {
   }
 }
 bool NqWorker::Listen() {
+  if (loop_.Open(dispatchers_.size()) < 0) {
+    ASSERT(false);
+    return false;
+  }
   for (auto &kv : server_.port_configs()) {
     //TODO(iyatomi): enable multiport server
     QuicSocketAddress address;
@@ -69,10 +73,33 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
     return -1;
   }
 
+  //set socket resuable
+  int flag = 1, rc = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
+  if (rc < 0) {
+    QUIC_LOG(ERROR) << "setsockopt(SO_REUSEPORT) failed: " << strerror(errno);
+    nq::Syscall::Close(fd);
+    return -1;    
+  }
+
   sockaddr_storage addr = address.generic_address();
-  int rc = bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  socklen_t slen;
+  switch(addr.ss_family) {
+    case AF_INET:
+      slen = sizeof(struct sockaddr_in);
+      break;
+    case AF_INET6:
+      slen = sizeof(struct sockaddr_in6);
+      break;
+    default:
+      ASSERT(false);
+      QUIC_LOG(ERROR) << "unsupported address family: " << addr.ss_family;
+      nq::Syscall::Close(fd);
+      return -1;
+  }
+  rc = bind(fd, reinterpret_cast<sockaddr*>(&addr), slen);
   if (rc < 0) {
     QUIC_LOG(ERROR) << "Bind failed: " << strerror(errno);
+    nq::Syscall::Close(fd);
     return -1;
   }
   QUIC_LOG(INFO) << "Listening on " << address.ToString();
@@ -82,6 +109,6 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
 bool NqWorker::ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &socket_address) {
   QuicServerId server_id;
   QuicConfig config;
-  return NqClientLoop::ParseUrl(addr.host, addr.port, server_id, socket_address, config);
+  return NqClientLoop::ParseUrl(addr.host, addr.port, AF_INET, server_id, socket_address, config);
 }
 }

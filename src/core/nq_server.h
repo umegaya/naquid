@@ -34,6 +34,7 @@ class NqServer {
   std::map<int, NqWorker*> workers_;
   std::mutex mutex_;
   std::condition_variable cond_;
+  std::thread shutdown_thread_;
 
  public:
 	NqServer(uint32_t n_worker) : alive_(true), n_worker_(n_worker), worker_queue_(nullptr) {}
@@ -71,22 +72,20 @@ class NqServer {
       cond_.wait(lock);
       Stop();
     } else {
-      std::thread([this]() {
+      shutdown_thread_ = std::thread([this]() {
         std::unique_lock<std::mutex> lock(mutex_);
         cond_.wait(lock);
-        Stop();        
+        Stop();
       });
     }
 		return NQ_OK;
 	}
   void Join() {
-    {
-      std::unique_lock<std::mutex> lock(mutex_);
-      cond_.notify_one();
-      //here, mutex_ should be acquired inside of Start() call (at blocking or waiter thread)
-    }
-    { //again wait for same mutex to ensure Stop() call is finished
-      std::unique_lock<std::mutex> lock(mutex_);
+    cond_.notify_one();
+    //here, mutex_ should be acquired inside of Start() call (at blocking or waiter thread)
+    std::unique_lock<std::mutex> lock(mutex_); //wait for Stop() call finished
+    if (shutdown_thread_.joinable()) {
+      shutdown_thread_.join(); //ensure shutdown thread finished
     }
   }
   PacketQueue &Q4(int idx) { return worker_queue_[idx]; }

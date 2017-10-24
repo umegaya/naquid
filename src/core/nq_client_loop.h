@@ -23,6 +23,7 @@ class NqClientLoop : public NqLoop {
                        NqClientConfig &config);
   static bool ParseUrl(const std::string &host, 
                        int port, 
+                       int address_family,
                        QuicServerId& server_id, 
                        QuicSocketAddress &address, 
                        QuicConfig &config);

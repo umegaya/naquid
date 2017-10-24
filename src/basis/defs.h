@@ -24,6 +24,7 @@ namespace nq {
 	typedef int Fd;
 	constexpr Fd INVALID_FD = -1;	
 }
+#elif defined(__ENABLE_IOCP__)
+//TODO(iyatomi): windows definition
 #else
-//TODO: windows definition?
 #endif

@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <time.h>
 
 #if defined(__cplusplus)
 extern "C" {
@@ -12,13 +13,15 @@ extern "C" {
 // Base type
 //
 // --------------------------
-typedef int32_t nq_result_t;
+typedef int16_t nq_result_t;
 
 typedef uint32_t nq_size_t;
 
 typedef uint64_t nq_cid_t;
 
-typedef uint64_t nq_time_t;
+typedef uint64_t nq_time_t;	//nano seconds timestamp
+
+typedef time_t nq_unix_time_t; //place holder for unix timestamp
 
 typedef uint32_t nq_msgid_t;
 
@@ -53,12 +56,13 @@ typedef void (*nq_logger_t)(const char *, size_t, bool);
 
 //closure
 typedef bool (*nq_on_conn_open_t)(void *, nq_conn_t);
-
+//connection closed. after this called, nq_stream_t created by given nq_conn_t, will be invalid.
+//nq_conn_t itself will be invalid if this callback return 0, retained otherwise. 
 typedef nq_time_t (*nq_on_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
 
 typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t);
-
-typedef nq_time_t (*nq_on_stream_close_t)(void *, nq_stream_t);
+//stream closed. after this called, nq_stream_t which given to this function will be invalid.
+typedef void (*nq_on_stream_close_t)(void *, nq_stream_t);
 
 typedef void *(*nq_stream_reader_t)(void *, const char *, nq_size_t, int *);
 
@@ -66,9 +70,11 @@ typedef nq_size_t (*nq_stream_writer_t)(void *, const void *, nq_size_t, nq_stre
 
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
 
+typedef void (*nq_on_rpc_request_t)(void *, nq_rpc_t, uint16_t, nq_msgid_t, const void *, nq_size_t);
+
 typedef void (*nq_on_rpc_notify_t)(void *, nq_rpc_t, uint16_t, const void *, nq_size_t);
 
-typedef void (*nq_on_rpc_result_t)(void *, nq_rpc_t, const void *, nq_size_t);
+typedef void (*nq_on_rpc_reply_t)(void *, nq_rpc_t, nq_result_t, const void *, nq_size_t);
 
 typedef nq_stream_t (*nq_create_stream_t)(void *, nq_conn_t);
 
@@ -85,8 +91,10 @@ typedef struct {
 		nq_stream_writer_t stream_writer;
 
 		nq_on_stream_record_t on_stream_record;
+		nq_on_rpc_request_t on_rpc_request;
+
+		nq_on_rpc_reply_t on_rpc_reply;
 		nq_on_rpc_notify_t on_rpc_notify;
-		nq_on_rpc_result_t on_rpc_result;
 
 		nq_create_stream_t create_stream;
 	};
@@ -123,7 +131,7 @@ typedef struct {
 } nq_stream_handler_t;
 
 typedef struct {
-	nq_closure_t on_rpc_notify, on_stream_open, on_stream_close;
+	nq_closure_t on_rpc_request, on_rpc_notify, on_stream_open, on_stream_close;
 } nq_rpc_handler_t;
 
 
@@ -216,11 +224,31 @@ extern nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
 extern void nq_rpc_close(nq_rpc_t rpc);
 //send arbiter byte array or object to stream peer. 
-extern void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_result);
-//rsend arbiter byte array or object to stream peer, without receving reply
+extern void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply);
+//send arbiter byte array or object to stream peer, without receving reply
 extern void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen);
+//send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
+extern void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
 
 
+
+// --------------------------
+//
+// time API
+//
+// --------------------------
+static inline nq_time_t nq_time_sec(uint64_t n) { return ((n) * 1000 * 1000 * 1000); }
+static inline nq_time_t nq_time_msec(uint64_t n) { return ((n) * 1000 * 1000); }
+static inline nq_time_t nq_time_usec(uint64_t n) { return ((n) * 1000); }
+static inline nq_time_t nq_time_nsec(uint64_t n) { return (n); }
+
+extern nq_time_t nq_time_now();
+
+extern nq_unix_time_t nq_time_unix();
+
+extern nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
+
+extern nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
 
 #if defined(__cplusplus)
 }

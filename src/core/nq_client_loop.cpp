@@ -1,13 +1,15 @@
 #include "core/nq_client_loop.h"
 
+#include "net/base/sockaddr_storage.h"
+
 #include "core/nq_client.h"
 
 namespace net {
 void NqClientLoop::Close() {
+  NqLoop::Close();
   for (auto &kv : client_map_) {
     delete kv.second;
   }
-  NqLoop::Close();
 }
 //called from diseonnecting alarm
 void NqClientLoop::RemoveClient(NqClient *cl) {
@@ -21,7 +23,7 @@ NqClient *NqClientLoop::Create(const std::string &host,
                                        NqClientConfig &config) {
   QuicServerId server_id;
   QuicSocketAddress server_address;
-  if (!ParseUrl(host, port, server_id, server_address, config)) {
+  if (!ParseUrl(host, port, AF_UNSPEC, server_id, server_address, config)) {
     return nullptr;
   }
   auto c = new NqClient(
@@ -36,23 +38,29 @@ NqClient *NqClientLoop::Create(const std::string &host,
   return c;
 }
 /* static */
-bool NqClientLoop::ParseUrl(const std::string &host, int port, QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
+bool NqClientLoop::ParseUrl(const std::string &host, int port, int address_family, 
+                            QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
   if (host.empty()) {
     return false;
   } else if (port == 0) {
     port = 443;
   }
+  if (address_family == 0) {
+    address_family = AF_UNSPEC; //any
+  }
   struct addrinfo filter, *resolved;
   filter.ai_socktype = SOCK_DGRAM;
-  filter.ai_family = AF_UNSPEC;
+  filter.ai_family = address_family;
   filter.ai_protocol = 0;
   filter.ai_flags = 0;
   if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &filter, &resolved) != 0) {
     return false;
   }
   try {
+    SockaddrStorage ss;
+    memcpy(ss.addr, resolved->ai_addr, resolved->ai_addrlen);
     server_id = QuicServerId(host, port, PRIVACY_MODE_ENABLED); //TODO: control privacy mode from url
-    address = QuicSocketAddress(*resolved->ai_addr);
+    address = QuicSocketAddress(ss.addr_storage);
     freeaddrinfo(resolved);
     return true;
   } catch (...) {
