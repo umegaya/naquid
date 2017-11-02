@@ -28,7 +28,9 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config, NqWorker &wor
 void NqDispatcher::CleanUpSession(SessionMap::iterator it,
                                   QuicConnection* connection,
                                   bool should_close_statelessly) {
-  server_map_.Remove(static_cast<NqServerSession *>(it->second.get())->session_index());
+  auto idx = static_cast<NqServerSession *>(it->second.get())->session_index();
+  server_map_.Remove(idx);
+  server_map_.Deactivate(idx); //make connection invalid 
   QuicDispatcher::CleanUpSession(it, connection, should_close_statelessly);
 }
 
@@ -86,6 +88,7 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
 
     auto s = new NqServerSession(connection, this, it->second);
     server_map_.Add(s);
+    server_map_.Activate(s->session_index()); //make connection valid
     return s;
 }
 

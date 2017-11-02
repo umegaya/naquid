@@ -37,6 +37,7 @@ class NqServerSession : public NqSession,
   NqLoop *GetLoop() override { return dispatcher_->loop(); }
   NqBoxer *GetBoxer() override { return dispatcher_; }
   NqSessionIndex SessionIndex() const override { return session_index_; }
+  uint64_t ReconnectDurationUS() const override { return 0; }
 
  private:
   NqDispatcher *dispatcher_;

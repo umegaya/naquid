@@ -223,6 +223,8 @@ extern NQ_THREADSAFE void nq_conn_reset(nq_conn_t conn);
 extern NQ_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
 //check conn is valid. invalid means fail to create or closed, or temporary disconnected (will reconnect soon).
 extern NQ_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn);
+//get reconnect wait duration in us. 0 means does not wait reconnection
+extern NQ_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn);
 
 
 

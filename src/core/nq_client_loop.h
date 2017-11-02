@@ -37,6 +37,7 @@ class NqClientLoop : public NqLoop,
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
   inline void set_main_thread() { thread_id_ = std::this_thread::get_id(); }
   inline const NqSessionContainer<NqClient> &client_map() const { return client_map_; }
+  inline NqSessionContainer<NqClient> &client_map() { return client_map_; }
 
   static inline NqClientLoop *FromHandle(nq_client_t cl) { return (NqClientLoop *)cl; }
   static bool ParseUrl(const std::string &host, 
@@ -56,9 +57,9 @@ class NqClientLoop : public NqLoop,
   bool Valid(uint64_t serial, OpTarget target) const override {
     switch (target) {
     case Conn:
-      return client_map().Has(NqConnSerialCodec::ClientSessionIndex(serial));
+      return client_map().Active(NqConnSerialCodec::ClientSessionIndex(serial));
     case Stream:
-      return client_map().Has(NqStreamSerialCodec::ClientSessionIndex(serial));
+      return client_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
     default:
       ASSERT(false);
       return false;

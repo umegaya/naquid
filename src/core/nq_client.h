@@ -46,7 +46,8 @@ class NqClient : public QuicClientBase,
     NqClientStream *FindOrCreateStream(
       NqClientSession *session, 
       NqStreamNameId name_id, 
-      NqStreamIndexPerNameId index_per_name_id);
+      NqStreamIndexPerNameId index_per_name_id, 
+      bool connected);
     
     inline const std::string &Find(NqStreamNameId id) const {
       static std::string empty_;
@@ -118,6 +119,7 @@ class NqClient : public QuicClientBase,
   bool IsClient() const override { return true; }
   void Disconnect() override;
   bool Reconnect() override;
+  uint64_t ReconnectDurationUS() const override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
   QuicStream* NewStream(const std::string &name) override;

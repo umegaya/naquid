@@ -44,6 +44,8 @@ std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* c
 void NqClient::InitializeSession() {
   QuicClientBase::InitializeSession();
   nq_session()->GetClientCryptoStream()->CryptoConnect();
+  //make connection invalid
+  loop_->client_map().Activate(session_index_);
 }
 
 
@@ -69,13 +71,16 @@ void NqClient::OnClose(QuicErrorCode error,
                                               close_by_peer_or_self == ConnectionCloseSource::FROM_PEER));
   //TODO: schedule reconnection somehow, if chromium stack does not do it
   if (next_connect_us > 0 && !destroyed_) {
+    next_reconnect_us_ts_ = loop_->NowInUsec() + next_connect_us;
     alarm_.reset(alarm_factory()->CreateAlarm(new ReconnectAlarm(this)));
-    alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec() + next_connect_us));
+    alarm_->Set(NqLoop::ToQuicTime(next_reconnect_us_ts_));
   } else {
     alarm_.reset(alarm_factory()->CreateAlarm(this));
     alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
     //cannot touch this client memory afterward. alarm invocation automatically delete the object.
   }
+  //make connection valid
+  loop_->client_map().Deactivate(session_index_);
   return;
 }
 void NqClient::Disconnect() {
@@ -85,6 +90,10 @@ void NqClient::Disconnect() {
 bool NqClient::Reconnect() {
   QuicClientBase::Disconnect(); 
   return true;
+}
+uint64_t NqClient::ReconnectDurationUS() const {
+  auto now = loop_->NowInUsec();
+  return now < next_reconnect_us_ts_ ? (next_reconnect_us_ts_ - now) : 0;
 }
 const nq::HandlerMap *NqClient::GetHandlerMap() const {
   return own_handler_map_ != nullptr ? own_handler_map_.get() : loop_->handler_map();
@@ -123,7 +132,8 @@ bool NqClient::StreamManager::OnOpen(const std::string &name, NqClientStream *s)
 NqClientStream *NqClient::StreamManager::FindOrCreateStream(
       NqClientSession *session, 
       NqStreamNameId name_id, 
-      NqStreamIndexPerNameId index_per_name_id) {
+      NqStreamIndexPerNameId index_per_name_id,
+      bool connected) {
   auto it = map_.find(name_id);
   if (it == map_.end()) { 
     ASSERT(false); 
@@ -131,7 +141,7 @@ NqClientStream *NqClient::StreamManager::FindOrCreateStream(
   }
   ASSERT(it->second.streams_.size() > index_per_name_id);
   auto s = it->second.streams_[index_per_name_id];
-  if (s == nullptr) {
+  if (s == nullptr && connected) {
     s = static_cast<NqClientStream *>(session->CreateOutgoingDynamicStream());
     s->set_protocol(it->second.name_);
     s->set_name_id(name_id);
@@ -143,7 +153,8 @@ NqClientStream *NqClient::StreamManager::FindOrCreateStream(
 }
     
 NqClientStream *NqClient::FindOrCreateStream(NqStreamNameId name_id, NqStreamIndexPerNameId index_per_name_id) {
-  return stream_manager_.FindOrCreateStream(nq_session(), name_id, index_per_name_id);
+  return stream_manager_.FindOrCreateStream(
+    nq_session(), name_id, index_per_name_id, loop_->client_map().Active(session_index_));
 }
 QuicStream *NqClient::NewStream(const std::string &name) {
   auto s = static_cast<NqClientStream *>(nq_session()->CreateOutgoingDynamicStream());

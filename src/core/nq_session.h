@@ -28,6 +28,7 @@ class NqSession : public QuicSession {
 
     virtual void Disconnect() = 0;
     virtual bool Reconnect() = 0; //only supported for client 
+    virtual uint64_t ReconnectDurationUS() const = 0;
     virtual bool IsClient() const = 0;
     virtual QuicStream *NewStream(const std::string &name) = 0;
     virtual QuicCryptoStream *NewCryptoStream(NqSession *session) = 0;

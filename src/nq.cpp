@@ -129,7 +129,9 @@ bool nq_conn_is_valid(nq_conn_t conn) {
 nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
 	return NqBoxer::Unbox(conn)->ResetHandlerMap()->ToHandle();
 }
-
+uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
+  return NqBoxer::Unbox(conn)->ReconnectDurationUS();
+}
 
 
 // --------------------------

@@ -77,9 +77,9 @@ class NqDispatcher : public QuicDispatcher,
   bool Valid(uint64_t serial, OpTarget target) const override {
     switch (target) {
     case Conn:
-      return server_map().Has(NqConnSerialCodec::ServerSessionIndex(serial));
+      return server_map().Active(NqConnSerialCodec::ServerSessionIndex(serial));
     case Stream:
-      return server_map().Has(NqStreamSerialCodec::ServerSessionIndex(serial));
+      return server_map().Active(NqStreamSerialCodec::ServerSessionIndex(serial));
     default:
       ASSERT(false);
       return false;
