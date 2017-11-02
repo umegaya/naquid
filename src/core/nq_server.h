@@ -16,6 +16,7 @@ namespace net {
 class NqServer {
  public:
 	typedef NqWorker::PacketQueue PacketQueue;
+  typedef NqWorker::InvokeQueue InvokeQueue;
   struct PortConfig : public NqServerConfig {
     nq_addr_t address_;
     nq::HandlerMap handler_map_;
@@ -29,7 +30,8 @@ class NqServer {
  protected:
   bool alive_;
   uint32_t n_worker_;
-	PacketQueue *worker_queue_;
+	std::unique_ptr<PacketQueue[]> worker_queue_;
+  std::map<int, std::unique_ptr<InvokeQueue[]>> invoke_queues_list_;
 	std::map<int, PortConfig> port_configs_;
   std::map<int, NqWorker*> workers_;
   std::mutex mutex_;
@@ -37,12 +39,17 @@ class NqServer {
   std::thread shutdown_thread_;
 
  public:
-	NqServer(uint32_t n_worker) : alive_(true), n_worker_(n_worker), worker_queue_(nullptr) {}
+	NqServer(uint32_t n_worker) : 
+    alive_(true), n_worker_(n_worker), worker_queue_(nullptr), invoke_queues_list_() {}
   ~NqServer() {}
   nq::HandlerMap *Open(const nq_addr_t *addr, const nq_svconf_t *conf) {
     if (port_configs_.find(addr->port) != port_configs_.end()) {
       return nullptr; //already port used
     } 
+    auto it = invoke_queues_list_.find(addr->port);
+    if (it == invoke_queues_list_.end()) {
+      invoke_queues_list_[addr->port].reset(new InvokeQueue[n_worker_]);
+    }
     auto pc = (conf == nullptr) ? 
       port_configs_.emplace(std::piecewise_construct, 
                             std::forward_as_tuple(addr->port), std::forward_as_tuple(*addr)) : 
@@ -57,7 +64,7 @@ class NqServer {
   }
 	int Start(bool block) {
     if (!alive_) { return NQ_OK; }
-		worker_queue_ = new PacketQueue[n_worker_];
+		worker_queue_.reset(new PacketQueue[n_worker_]);
 		if (worker_queue_ == nullptr) {
 			return NQ_EALLOC;
 		}
@@ -91,7 +98,14 @@ class NqServer {
   PacketQueue &Q4(int idx) { return worker_queue_[idx]; }
   inline bool alive() const { return alive_; }
   inline uint32_t n_worker() const { return n_worker_; }
+  inline InvokeQueue *InvokeQueuesFromPort(int port) { 
+    auto it = invoke_queues_list_.find(port);
+    return it != invoke_queues_list_.end() ? it->second.get() : nullptr; 
+  }
   inline const std::map<int, PortConfig> &port_configs() const { return port_configs_; }
+  inline nq_server_t ToHandle() { return (nq_server_t)this; }
+  static inline NqServer *FromHandle(nq_server_t sv) { return (NqServer *)sv; }
+
  protected:
   void Stop() {
     //TODO: wait for conditional variable
@@ -99,10 +113,6 @@ class NqServer {
     for (auto &kv : workers_) {
       kv.second->Join();
     } 
-    if (worker_queue_ != nullptr) {
-      delete []worker_queue_;
-      worker_queue_ = nullptr;
-    }
   }
   int StartWorker(int index) {
     auto l = new NqWorker(index, *this);

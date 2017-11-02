@@ -4,14 +4,35 @@
 #include "basis/endian.h"
 #include "core/nq_loop.h"
 #include "core/nq_session.h"
+#include "core/nq_client.h"
 
 namespace net {
 
-NqStream::NqStream(QuicStreamId id, NqSession* nq_session, bool establish_side) : 
-  QuicStream(id, nq_session), handler_(nullptr), establish_side_(establish_side) {
+NqStream::NqStream(QuicStreamId id, NqSession* nq_session, 
+                   bool establish_side, SpdyPriority priority) : 
+  QuicStream(id, nq_session), 
+  handler_(nullptr), 
+  priority_(priority), 
+  establish_side_(establish_side) {
+  nq_session->RegisterStreamPriority(id, priority);
+}
+void NqStream::InitHandle() { 
+  handle_ = nq_session()->delegate()->GetBoxer()->Box(this); 
+}
+NqLoop *NqStream::GetLoop() { 
+  return nq_session()->delegate()->GetLoop(); 
 }
 NqSession *NqStream::nq_session() { 
   return static_cast<NqSession *>(session()); 
+}
+const NqSession *NqStream::nq_session() const { 
+  return static_cast<const NqSession *>(session()); 
+}
+NqSessionIndex NqStream::session_index() const { 
+  return nq_session()->delegate()->SessionIndex(); 
+}
+nq_conn_t NqStream::conn() { 
+  return nq_session()->conn(); 
 }
 bool NqStream::set_protocol(const std::string &name) {
   if (!establish_side()) {
@@ -95,6 +116,26 @@ void NqStream::OnDataAvailable() {
 
 
 
+void NqClientStream::OnClose() {
+  auto c = static_cast<NqClient *>(nq_session()->delegate());
+  c->stream_manager().OnClose(this);
+  NqStream::OnClose();
+}
+
+
+
+void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
+  if (!proto_sent_) { //TODO: use unlikely
+    const auto& name = stream_->protocol();
+    stream_->WriteOrBufferData(QuicStringPiece(name.c_str(), name.length()), false, nullptr);
+    OnOpen(); //client stream side OnOpen
+    proto_sent_ = true;
+  }
+  stream_->WriteOrBufferData(QuicStringPiece(p, len), false, nullptr);
+}
+
+
+
 constexpr size_t len_buff_len = nq::LengthCodec::EncodeLength(sizeof(nq_size_t));
 void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
   //greedy read and called back
@@ -103,7 +144,7 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	size_t plen = parse_buffer_.length();
 	nq_size_t read_ofs, reclen = nq::LengthCodec::Decode(&read_ofs, pstr, plen);
 	if (reclen > 0 && (reclen + read_ofs) <= plen) {
-	  nq_closure_call(on_recv_, on_stream_record, CastFrom(this), ToCStr(pstr + read_ofs), reclen);
+	  nq_closure_call(on_recv_, on_stream_record, stream_->ToHandle<nq_stream_t>(), pstr + read_ofs, reclen);
 	  parse_buffer_.erase(0, reclen + read_ofs);
 	} else if (reclen == 0 && plen > len_buff_len) {
 		//broken payload. should resolve payload length
@@ -111,6 +152,8 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	}
 }
 void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
+  QuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
 	char len_buff[len_buff_len];
 	auto enc_len = nq::LengthCodec::Encode(len, len_buff, sizeof(len_buff));
 	WriteBytes(len_buff, enc_len);
@@ -123,7 +166,7 @@ void NqRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
   int reclen;
   void *rec = nq_closure_call(reader_, stream_reader, ToCStr(p), len, &reclen);
   if (rec != nullptr) {
-    nq_closure_call(on_recv_, on_stream_record, CastFrom(this), rec, reclen);
+    nq_closure_call(on_recv_, on_stream_record, stream_->ToHandle<nq_stream_t>(), rec, reclen);
   } else if (reclen < 0) {
     stream_->Disconnect();    
   }
@@ -135,9 +178,12 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, u
   auto req = new Request(this, msgid, cb);
   req_map_[msgid] = req;
   auto alarm = loop_->CreateAlarm(req);
-  alarm->Set(NqLoop::ToQuicTime(loop_->NowInUsec() + timeout_duration_us));
+  auto now = loop_->NowInUsec();
+  alarm->Set(NqLoop::ToQuicTime(now + timeout_duration_us));
+  //auto end = (alarm->deadline() - QuicTime::Zero()).ToMicroseconds();
+  //TRACE("entry req: start %llu end %llu\n", now, end);
+  req->alarm_ = alarm;
 }
-
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
@@ -157,18 +203,23 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
       if (type <= 0) {
         auto it = req_map_.find(msgid);
         if (it != req_map_.end()) {
+          auto req = it->second;
+          req_map_.erase(it);
           //reply from serve side
-          nq_closure_call(it->second->on_data_, on_rpc_reply, CastFrom(this), type, ToPV(pstr + 4), reclen - 4);
+          nq_closure_call(req->on_data_, on_rpc_reply, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr + 4), reclen - 4);
+          req->alarm_->Cancel(); //cancel firing alarm
+          delete req->alarm_; //it deletes req itself
         } else {
           //probably timedout. caller should already be received timeout error
+          //req object deleted in OnAlarm
         }
       } else {
         //request
-        nq_closure_call(on_request_, on_rpc_request, CastFrom(this), type, msgid, ToPV(pstr + 4), reclen - 4);
+        nq_closure_call(on_request_, on_rpc_request, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr + 4), reclen - 4);
       }
     } else if (type > 0) {
       //notify
-      nq_closure_call(on_notify_, on_rpc_notify, CastFrom(this), type, ToPV(pstr + 4), reclen - 4);
+      nq_closure_call(on_notify_, on_rpc_notify, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr + 4), reclen - 4);
     } else {
       ASSERT(false);
     }
@@ -179,6 +230,8 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   }
 }
 void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t len) {
+  QuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   //pack and send buffer
   char len_buff[len_buff_len];
@@ -190,6 +243,8 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
   WriteBytes(ToCStr(p), len);  
 }
 void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
+  QuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   nq_msgid_t msgid = msgid_factory_.New();
   //pack and send buffer
@@ -204,6 +259,8 @@ void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len,
   EntryRequest(msgid, cb);
 }
 void NqSimpleRPCStreamHandler::Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len) {
+  QuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);
   //pack and send buffer
   char len_buff[len_buff_len];

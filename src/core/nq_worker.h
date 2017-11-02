@@ -7,6 +7,7 @@
 
 #include "core/nq_server_loop.h"
 #include "core/nq_packet_reader.h"
+#include "core/nq_boxer.h"
 
 namespace net {
 class NqServer;
@@ -23,14 +24,15 @@ class NqWorker {
   bool overflow_supported_;
  public:
   typedef moodycamel::ConcurrentQueue<NqPacket*> PacketQueue;
+  typedef NqBoxer::Processor InvokeQueue;
   NqWorker(uint32_t index, const NqServer &server) : 
     index_(index), server_(server), loop_(), reader_(), 
     thread_(), dispatchers_(), overflow_supported_(false) {}
-  void Start(PacketQueue &queue) {
-    thread_ = std::thread([this, &queue]() { Run(queue); });
+  void Start(PacketQueue &pq) {
+    thread_ = std::thread([this, &pq]() { Run(pq); });
   }
   void Process(NqPacket *p);
-  bool Listen();
+  bool Listen(InvokeQueue **iq, NqDispatcher **ds);
   void Run(PacketQueue &queue);
   void Join() {
     if (thread_.joinable()) {
@@ -43,6 +45,7 @@ class NqWorker {
   inline NqPacketReader &reader() { return reader_; }
   inline NqServerLoop &loop() { return loop_; }
   inline uint32_t index() { return index_; }
+  inline std::thread::id thread_id() const { return thread_.get_id(); }
 
  protected:
   static bool ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &address);

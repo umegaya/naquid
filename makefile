@@ -68,3 +68,6 @@ sync: inject patch
 
 testsv:
 	make -C test/e2e server
+
+testcl:
+	make -C test/e2e client

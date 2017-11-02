@@ -12,15 +12,15 @@
 
 namespace nq {
 struct Endian {
-  static constexpr uint32_t checker_ = 0x00000001;
+  static uint32_t checker_;
   static inline bool isLittleEndian() {
-      return ((const char *)checker_)[0] == 1;
+      return ((const char *)(&checker_))[0] == 1;
   }
   static inline bool isBigEndian() {
-      return ((const char *)checker_)[3] == 1;
+      return ((const char *)(&checker_))[3] == 1;
   }
   static inline bool isPDBEndian() {
-      return ((const char *)checker_)[1] == 1;
+      return ((const char *)(&checker_))[1] == 1;
   }
 
   static inline uint16_t NetbytesToHost16(const char *b) {

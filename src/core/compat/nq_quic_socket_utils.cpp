@@ -109,6 +109,12 @@ bool QuicSocketUtils::GetTtlFromMsghdr(struct msghdr* hdr, int* ttl) {
 
 // static
 int QuicSocketUtils::SetGetAddressInfo(int fd, int address_family) {
+#if defined(OS_MACOSX)
+  if (address_family == AF_INET6) {
+    //for osx, IP_PKTINFO for ipv6 will not work. (at least at Sierra)
+    return 0;
+  }
+#endif
   int get_local_ip = 1;
   int rc = setsockopt(fd, IPPROTO_IP, IP_PKTINFO, &get_local_ip,
                       sizeof(get_local_ip));

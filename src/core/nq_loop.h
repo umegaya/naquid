@@ -14,9 +14,9 @@
 
 namespace net {
 class NqLoop : public nq::Loop,
-				           public QuicConnectionHelperInterface,
-				           public QuicAlarmFactory,
-                   public QuicClock {
+               public QuicConnectionHelperInterface,
+               public QuicAlarmFactory,
+               public QuicClock {
  public:
   NqLoop() : nq::Loop(), 
                    approx_now_in_usec_(0),

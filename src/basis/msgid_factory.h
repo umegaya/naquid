@@ -5,16 +5,21 @@
 #include "basis/defs.h"
 
 namespace nq {
+template <typename NUMBER>
 class MsgIdFactory {
-  std::atomic<uint16_t> seed_;
+  std::atomic<NUMBER> seed_;
+  //0xFFFFFF....
+  static const NUMBER kLimit = 
+    (((NUMBER)0x80) << (8 * (sizeof(NUMBER) - 1))) + 
+    ((((NUMBER)0x80) << (8 * (sizeof(NUMBER) - 1))) - 100);
  public:
   MsgIdFactory() : seed_(0) {}
 
-  nq_msgid_t New() {
+  NUMBER New() {
     while (true) {
-      uint16_t expect = seed_;
+      NUMBER expect = seed_;
       uint16_t desired = expect + 1;
-      if (desired >= 65000) {
+      if (desired >= kLimit) {
         desired = 1;
       }
       if (atomic_compare_exchange_weak(&seed_, &expect, desired)) {

@@ -12,6 +12,23 @@ extern base::AtExitManager *nq_at_exit_manager();
 
 using namespace net;
 
+
+
+// --------------------------
+//
+// helper
+//
+// --------------------------
+template <class H> 
+H INVALID_HANDLE(const char *msg) {
+  H h;
+  h.p = const_cast<char *>(msg);
+  h.s = 0;
+  return h;
+}
+
+
+
 // --------------------------
 //
 // client API
@@ -22,23 +39,30 @@ nq_client_t nq_client_create(int max_nfd) {
 	if (l->Open(max_nfd) < 0) {
 		return nullptr;
 	}
-	return (nq_client_t)l;
+	return l->ToHandle();
 }
 void nq_client_destroy(nq_client_t cl) {
-	((NqClientLoop *)cl)->Close();	
-	delete ((NqClientLoop *)cl);
+	delete NqClientLoop::FromHandle(cl);
 }
 void nq_client_poll(nq_client_t cl) {
-	((NqClientLoop *)cl)->Poll();
+	NqClientLoop::FromHandle(cl)->Poll();
 }
 nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
-	NqClientConfig cf(*conf);
-	auto c = ((NqClientLoop *)cl)->Create(addr->host, addr->port, cf);
-	return (nq_conn_t)c;
+  auto loop = NqClientLoop::FromHandle(cl);
+  auto cf = NqClientConfig(*conf);
+	auto c = loop->Create(addr->host, addr->port, cf);
+  if (c == nullptr) {
+    return INVALID_HANDLE<nq_conn_t>("fail to create client");
+  }
+  return loop->Box(c);
 }
 nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
-	return (nq_hdmap_t)((NqClientLoop *)cl)->mutable_handler_map();	
+	return NqClientLoop::FromHandle(cl)->mutable_handler_map()->ToHandle();
 }
+void nq_client_set_thread(nq_client_t cl) {
+  NqClientLoop::FromHandle(cl)->set_main_thread();
+}
+
 
 
 
@@ -49,19 +73,19 @@ nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
 // --------------------------
 nq_server_t nq_server_create(int n_worker) {
 	auto sv = new NqServer(n_worker);
-	return (nq_server_t)sv;
+	return sv->ToHandle();
 }
 nq_hdmap_t nq_server_listen(nq_server_t sv, const nq_addr_t *addr, const nq_svconf_t *conf) {
 	auto aem = nq_at_exit_manager();
-	auto psv = (NqServer *)sv;
-	return (nq_hdmap_t)psv->Open(addr, conf);
+	auto psv = NqServer::FromHandle(sv);
+	return psv->Open(addr, conf)->ToHandle();
 }
 void nq_server_start(nq_server_t sv, bool block) {
-	auto psv = (NqServer *)sv;
+	auto psv = NqServer::FromHandle(sv);
 	psv->Start(block);
 }
 void nq_server_join(nq_server_t sv) {
-	auto psv = (NqServer *)sv;
+	auto psv = NqServer::FromHandle(sv);
 	psv->Join();
 	delete psv;
 }
@@ -74,13 +98,13 @@ void nq_server_join(nq_server_t sv) {
 //
 // --------------------------
 bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler) {
-	return ((nq::HandlerMap *)h)->AddEntry(name, handler);
+	return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
 }
 bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc_handler_t handler) {
-	return ((nq::HandlerMap *)h)->AddEntry(name, handler);
+	return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
 }
 bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t factory) {
-	return ((nq::HandlerMap *)h)->AddEntry(name, factory);
+	return nq::HandlerMap::FromHandle(h)->AddEntry(name, factory);
 }
 
 
@@ -91,19 +115,19 @@ bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t
 //
 // --------------------------
 void nq_conn_close(nq_conn_t conn) {
-	auto d = (NqSession::Delegate *)conn;
-	d->Disconnect();
+  NqBoxer::From(conn)->InvokeConn(conn.s,NqBoxer::OpCode::Disconnect);
 }
-int nq_conn_reset(nq_conn_t conn) {
-	auto d = (NqSession::Delegate *)conn;
-	return d->Reconnect() ? NQ_OK : NQ_NOT_SUPPORT;	
+void nq_conn_reset(nq_conn_t conn) {
+  NqBoxer::From(conn)->InvokeConn(conn.s,NqBoxer::OpCode::Reconnect);
 } 
 bool nq_conn_is_client(nq_conn_t conn) {
-	auto d = (NqSession::Delegate *)conn;
-	return d->IsClient();		
+	return NqBoxer::From(conn)->IsClient();
+}
+bool nq_conn_is_valid(nq_conn_t conn) {
+  return NqBoxer::From(conn)->Valid(conn);
 }
 nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
-	return (nq_hdmap_t)((NqSession::Delegate*)conn)->ResetHandlerMap();
+	return NqBoxer::Unbox(conn)->ResetHandlerMap()->ToHandle();
 }
 
 
@@ -114,16 +138,31 @@ nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
 //
 // --------------------------
 nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
-	return (nq_stream_t)((NqSession::Delegate *)conn)->NewStream(name);
+  NqSession::Delegate *d;
+  return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
+    d->NewStreamCast<NqStream>(name)->ToHandle<nq_stream_t>() : 
+    INVALID_HANDLE<nq_stream_t>("fail to unbox");
+}
+nq_conn_t nq_stream_conn(nq_stream_t s) {
+  auto b = NqBoxer::From(s);
+  nq_conn_t c = {
+    .p = s.p, 
+    .s = b->IsClient() ? 
+      NqConnSerialCodec::FromClientStreamSerial(s.s) :
+      NqConnSerialCodec::FromServerStreamSerial(s.s) 
+  };
+  return c;
+}
+bool nq_stream_is_valid(nq_stream_t s) {
+  return NqBoxer::From(s)->Valid(s);
 }
 void nq_stream_close(nq_stream_t s) {
-	auto h = (NqStreamHandler *)s;
-	h->Disconnect();
+	NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Disconnect);
 }
 void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
-	auto h = (NqStreamHandler *)s;
-	h->Send(data, datalen);
+  NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Send, data, datalen);
 }
+
 
 
 
@@ -133,23 +172,35 @@ void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
 //
 // --------------------------
 nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {
-	return (nq_rpc_t)((NqSession::Delegate *)conn)->NewStream(name);
+  NqSession::Delegate *d;
+  return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
+    d->NewStreamCast<NqStream>(name)->ToHandle<nq_rpc_t>() : 
+    INVALID_HANDLE<nq_rpc_t>("fail to unbox");
+}
+nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
+  auto b = NqBoxer::From(rpc);
+  nq_conn_t c = {
+    .p = rpc.p, 
+    .s = b->IsClient() ? 
+      NqConnSerialCodec::FromClientStreamSerial(rpc.s) :
+      NqConnSerialCodec::FromServerStreamSerial(rpc.s) 
+  };
+  return c;
+}
+bool nq_rpc_is_valid(nq_rpc_t rpc) {
+  return NqBoxer::From(rpc)->Valid(rpc);
 }
 void nq_rpc_close(nq_rpc_t rpc) {
-	auto h = (NqSimpleRPCStreamHandler *)rpc;
-	h->Disconnect();
+  NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Disconnect);
 }
 void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
-	auto h = (NqSimpleRPCStreamHandler *)rpc;
-	h->Send(type, data, datalen, on_reply);
+  NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Call, type, data, datalen, on_reply);
 }
 void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen) {
-	auto h = (NqSimpleRPCStreamHandler *)rpc;
-	h->Notify(type, data, datalen);
+  NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Notify, type, data, datalen);
 }
 void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
-	auto h = (NqSimpleRPCStreamHandler *)rpc;
-	h->Reply(result, msgid, data, datalen);
+  NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen);
 }
 
 

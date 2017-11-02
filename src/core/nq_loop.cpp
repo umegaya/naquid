@@ -44,12 +44,14 @@ class NqAlarm : public QuicAlarm {
  public:
   NqAlarm(NqLoop *loop, QuicArenaScopedPtr<Delegate> delegate)
       : QuicAlarm(std::move(delegate)), loop_(loop), timeout_in_us_(0) {}
+  ~NqAlarm() { TRACE("delete alarm %p\n", this); }
 
   inline void OnAlarm() { Fire(); }
  protected:
   void SetImpl() override {
     DCHECK(deadline().IsInitialized());
     timeout_in_us_ = (deadline() - QuicTime::Zero()).ToMicroseconds();
+    TRACE("to in us %llu\n", timeout_in_us_);
     loop_->AlarmMap().insert(std::make_pair(timeout_in_us_, this));
   }
 
@@ -70,6 +72,8 @@ class NqAlarm : public QuicAlarm {
       loop_->AlarmMap().erase(it);
     }
   }
+  //TODO(iyatomi): there is a way to optimize update?
+  //void UpdateImpl() override;
 
   NqLoop* loop_;
   uint64_t timeout_in_us_;
@@ -92,17 +96,22 @@ QuicArenaScopedPtr<QuicAlarm> NqLoop::CreateAlarm(
 // polling
 void NqLoop::Poll() {
   nq::Loop::Poll();
-  approx_now_in_usec_ = NowInUsec();  
+  approx_now_in_usec_ = NowInUsec();
+  auto current = approx_now_in_usec_;
   for (auto it = alarm_map_.begin(); it != alarm_map_.end();) {
-    if (it->first > approx_now_in_usec_) {
+    //prevent infinite looping when OnAlarm keep on re-assigning alarm to the alarm_map_.
+    if (it->first > current) {
       break;
     }
+    TRACE("alarm fired %llu %llu\n", it->first, current);
     NqAlarm* cb = static_cast<NqAlarm*>(it->second);
     cb->OnAlarm();
     auto it_prev = it;
     it++;
     alarm_map_.erase(it_prev);
-    delete cb;
+    //add small duration to avoid infinite loop 
+    //(eg. OnAlarm adds new alarm that adds new alarm on OnAlarm again)
+    approx_now_in_usec_++; 
   }
 }
 }  // namespace net

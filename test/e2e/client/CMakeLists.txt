@@ -14,6 +14,11 @@ file(GLOB_RECURSE src [
 	"./main.cpp" 
 ])
 
+find_library(core_foundation CoreFoundation)
+find_library(cocoa Cocoa)
+find_library(iokit IOKit)
+find_library(security Security)
+
 link_directories(../../../build/t)
 add_executable(client ${src})
-target_link_libraries(server nq)
+target_link_libraries(client nq ${core_foundation} ${cocoa} ${iokit} ${security})

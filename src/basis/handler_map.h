@@ -49,5 +49,8 @@ class HandlerMap {
     auto it = map_.find(name);
     return it == map_.end() ? nullptr : &(it->second);
   }
+
+  inline nq_hdmap_t ToHandle() { return (nq_hdmap_t)this; }
+  static inline HandlerMap *FromHandle(nq_hdmap_t hdm) { return (HandlerMap *)hdm; }
 };
 }

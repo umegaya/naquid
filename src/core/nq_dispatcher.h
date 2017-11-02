@@ -8,21 +8,29 @@
 #include "net/quic/core/crypto/quic_compressed_certs_cache.h"
 
 #include "core/nq_worker.h"
+#include "core/nq_boxer.h"
+#include "core/nq_serial_codec.h"
 
 namespace net {
 class NqWorker;
+class NqServerSession;
 class NqServerConfig;
 class NqDispatcher : public QuicDispatcher, 
-                         public nq::IoProcessor,
-                         public QuicCryptoServerStream::Helper,
-                         public NqPacketReader::Delegate {
+                     public nq::IoProcessor,
+                     public QuicCryptoServerStream::Helper,
+                     public NqPacketReader::Delegate,
+                     public NqBoxer {
+  typedef NqWorker::InvokeQueue InvokeQueue;
+  
   int port_; 
   uint32_t index_, n_worker_;
   const NqServer &server_;
+  InvokeQueue *invoke_queues_;
   NqServerLoop &loop_;
   NqPacketReader &reader_;
   QuicCompressedCertsCache cert_cache_;
-  std::map<QuicConnectionId, std::unique_ptr<QuicConnection>> conn_map_;
+  NqSessionContainer<NqServerSession> server_map_;
+  std::thread::id thread_id_;
  public:
   //TODO(iyatomi): find proper cache size
   static const int kDefaultCertCacheSize = 16; 
@@ -32,6 +40,13 @@ class NqDispatcher : public QuicDispatcher,
     reader_.Pool(const_cast<char *>(p->data()), p);
   }
   inline QuicCompressedCertsCache *cert_cache() { return &cert_cache_; }
+  inline NqLoop *loop() { return &loop_; }
+  inline InvokeQueue *invoke_queues() { return invoke_queues_; }
+  inline NqSessionIndex new_session_index() { return server_map_.NewIndex(); }
+  inline const NqSessionContainer<NqServerSession> &server_map() const { return server_map_; }
+  inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
+
+
   //implements nq::IoProcessor
   void OnEvent(nq::Fd fd, const Event &e) override;
   void OnClose(nq::Fd fd) override {}
@@ -49,9 +64,27 @@ class NqDispatcher : public QuicDispatcher,
   // acceptable according to the visitor's policy. Otherwise, returns false
   // and populates |error_details|.
   bool CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                                    const QuicSocketAddress& self_address,
-                                    std::string* error_details) const override;
+                            const QuicSocketAddress& self_address,
+                            std::string* error_details) const override;
 
+  //implements NqBoxer
+  void Enqueue(Op *op) override;
+  nq_conn_t Box(NqSession::Delegate *d) override;
+  nq_stream_t Box(NqStream *s) override;
+  NqBoxer::UnboxResult Unbox(uint64_t serial, NqSession::Delegate **unboxed) override;
+  NqBoxer::UnboxResult Unbox(uint64_t serial, NqStream **unboxed) override;
+  bool IsClient() const override { return false; }
+  bool Valid(uint64_t serial, OpTarget target) const override {
+    switch (target) {
+    case Conn:
+      return server_map().Has(NqConnSerialCodec::ServerSessionIndex(serial));
+    case Stream:
+      return server_map().Has(NqStreamSerialCodec::ServerSessionIndex(serial));
+    default:
+      ASSERT(false);
+      return false;
+    }
+  }
 
  protected:
   //implements QuicDispatcher
@@ -59,5 +92,8 @@ class NqDispatcher : public QuicDispatcher,
     QuicConnectionId connection_id,
     const QuicSocketAddress& client_address,
     QuicStringPiece alpn) override;
+  void CleanUpSession(SessionMap::iterator it,
+                      QuicConnection* connection,
+                      bool should_close_statelessly) override;
 };
 }

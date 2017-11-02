@@ -25,10 +25,12 @@ set(lib_src
 	./src/nq.cpp
 
 	./src/basis/timespec.cpp
+	./src/basis/endian.cpp
 
 	./src/core/nq_at_exit.cpp
 	./src/core/nq_client.cpp
 	./src/core/nq_client_loop.cpp
+	./src/core/nq_client_session.cpp
 	./src/core/nq_config.cpp
 	./src/core/nq_dispatcher.cpp
 	./src/core/nq_loop.cpp

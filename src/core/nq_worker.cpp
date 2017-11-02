@@ -1,5 +1,6 @@
 #include "core/nq_worker.h"
 
+#include "basis/syscall.h"
 #include "core/nq_client_loop.h"
 #include "core/nq_dispatcher.h"
 #include "core/nq_server_session.h"
@@ -15,33 +16,40 @@ void NqWorker::Process(NqPacket *p) {
   }
   ASSERT(false);
 }
-void NqWorker::Run(PacketQueue &queue) {
-  if (!Listen()) {
+void NqWorker::Run(PacketQueue &pq) {
+  int n_dispatcher = server_.port_configs().size();
+  InvokeQueue *iq[n_dispatcher];
+  NqDispatcher *ds[n_dispatcher];
+  if (!Listen(iq, ds)) {
     return;
   }
   NqPacket *p;
   while (server_.alive()) {
     //consume queue
-    while (queue.try_dequeue(p)) {
+    while (pq.try_dequeue(p)) {
       //pass packet to corresponding session
       Process(p);
     }
-    //wait incoming event
+    //wait and process incoming event
+    for (int i = 0; i < n_dispatcher; i++) {
+      iq[i]->Poll(ds[i]);
+    }
     loop_.Poll();
   }
   //last consume queue
   //TODO(iyatomi): packet from another worker may dropped.
   //somehow checking all the thread breaks main loop, before entering this last loop
-  while (queue.try_dequeue(p)) {
+  while (pq.try_dequeue(p)) {
     //pass packet to corresponding session
     Process(p);
   }
 }
-bool NqWorker::Listen() {
-  if (loop_.Open(dispatchers_.size()) < 0) {
+bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
+  if (loop_.Open(server_.port_configs().size()) < 0) {
     ASSERT(false);
     return false;
   }
+  int port_index = 0;
   for (auto &kv : server_.port_configs()) {
     //TODO(iyatomi): enable multiport server
     QuicSocketAddress address;
@@ -61,6 +69,9 @@ bool NqWorker::Listen() {
       ASSERT(false);
       return false;
     }
+    ds[port_index] = d;
+    iq[port_index] = d->invoke_queues() + index_;
+    port_index++;
     dispatchers_.push_back(std::pair<int, NqDispatcher*>(kv.first, d));
   }
   return true;
@@ -82,19 +93,10 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
   }
 
   sockaddr_storage addr = address.generic_address();
-  socklen_t slen;
-  switch(addr.ss_family) {
-    case AF_INET:
-      slen = sizeof(struct sockaddr_in);
-      break;
-    case AF_INET6:
-      slen = sizeof(struct sockaddr_in6);
-      break;
-    default:
-      ASSERT(false);
-      QUIC_LOG(ERROR) << "unsupported address family: " << addr.ss_family;
-      nq::Syscall::Close(fd);
-      return -1;
+  socklen_t slen = nq::Syscall::GetSockAddrLen(addr.ss_family);
+  if (slen == 0) {
+    nq::Syscall::Close(fd);
+    return -1;
   }
   rc = bind(fd, reinterpret_cast<sockaddr*>(&addr), slen);
   if (rc < 0) {
@@ -109,6 +111,6 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
 bool NqWorker::ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &socket_address) {
   QuicServerId server_id;
   QuicConfig config;
-  return NqClientLoop::ParseUrl(addr.host, addr.port, AF_INET, server_id, socket_address, config);
+  return NqClientLoop::ParseUrl(addr.host, addr.port, 0, server_id, socket_address, config);
 }
 }

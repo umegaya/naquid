@@ -96,7 +96,12 @@ namespace internal {
 			fd_ = ::kqueue();
 			return fd_ < 0 ? NQ_ESYSCALL : NQ_OK;
 		}
-		inline void Close() { Syscall::Close(fd_); }
+		inline void Close() { 
+      if (fd_ != INVALID_FD) { 
+        Syscall::Close(fd_); 
+        fd_ = INVALID_FD;
+      }
+    }
 		inline int Errno() { return Syscall::Errno(); }
 		inline bool EAgain() { return Syscall::EAgain(); }
 		inline int Add(Fd d, uint32_t flag) {

@@ -19,7 +19,18 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config, NqWorker &wor
 	port_(port), index_(worker.index()), n_worker_(worker.server().n_worker()), 
   server_(worker.server()), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
-  conn_map_() {}
+  server_map_(), thread_id_(worker.thread_id()) {
+  invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
+  ASSERT(invoke_queues_ != nullptr);
+}
+
+//implement QuicDistpacher
+void NqDispatcher::CleanUpSession(SessionMap::iterator it,
+                                  QuicConnection* connection,
+                                  bool should_close_statelessly) {
+  server_map_.Remove(static_cast<NqServerSession *>(it->second.get())->session_index());
+  QuicDispatcher::CleanUpSession(it, connection, should_close_statelessly);
+}
 
 //implements nq::IoProcessor
 void NqDispatcher::OnEvent(nq::Fd fd, const Event &e) {
@@ -73,8 +84,78 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
       CreatePerConnectionWriter(),
       /* owns_writer= */ true, Perspective::IS_SERVER, GetSupportedVersions());
 
-    conn_map_[connection_id] = std::unique_ptr<QuicConnection>(connection);
+    auto s = new NqServerSession(connection, this, it->second);
+    server_map_.Add(s);
+    return s;
+}
 
-    return new NqServerSession(connection, this, it->second);
+//implements NqBoxer
+void NqDispatcher::Enqueue(Op *op) {
+  int windex;
+  switch (op->target_) {
+  case NqBoxer::Conn:
+    windex = NqConnSerialCodec::ServerWorkerIndex(op->serial_);
+    break;
+  case NqBoxer::Stream:
+    windex = NqStreamSerialCodec::ServerWorkerIndex(op->serial_);
+    break;
+  default:
+    ASSERT(false);
+    return;
+  }
+  invoke_queues_[windex].enqueue(op);
+}
+nq_conn_t NqDispatcher::Box(NqSession::Delegate *d) {
+  auto ss = static_cast<NqServerSession *>(d);
+  return {
+    .p = static_cast<NqBoxer*>(this),
+    .s = NqConnSerialCodec::ServerEncode(
+      ss->session_index(),
+      ss->connection_id(),
+      n_worker_
+    ),
+  };
+}
+nq_stream_t NqDispatcher::Box(NqStream *s) {
+  auto ss = static_cast<NqServerSession *>(s->nq_session());
+  return {
+    .p = static_cast<NqBoxer*>(this),
+    .s = NqStreamSerialCodec::ServerEncode(
+      ss->session_index(),
+      ss->connection_id(),
+      s->id(),
+      n_worker_
+    ),
+  };
+}
+NqBoxer::UnboxResult 
+NqDispatcher::Unbox(uint64_t serial, NqSession::Delegate **unboxed) {
+  if (!main_thread()) {
+    return NqBoxer::UnboxResult::NeedTransfer;
+  }
+  auto index = NqConnSerialCodec::ServerSessionIndex(serial);
+  auto it = server_map_.find(index);
+  if (it != server_map_.end()) {
+    *unboxed = it->second;
+    return NqBoxer::UnboxResult::Ok;
+  }
+  return NqBoxer::UnboxResult::SerialExpire;  
+}
+NqBoxer::UnboxResult
+NqDispatcher::Unbox(uint64_t serial, NqStream **unboxed) {
+  if (!main_thread()) {
+    return NqBoxer::UnboxResult::NeedTransfer;
+  }
+  auto index = NqStreamSerialCodec::ServerSessionIndex(serial);
+  auto it = server_map_.find(index);
+  if (it != server_map_.end()) {
+    auto stream_id = NqStreamSerialCodec::ServerStreamId(serial);
+    *unboxed = it->second->FindStream(stream_id);
+    if (*unboxed != nullptr) {
+      return NqBoxer::UnboxResult::Ok;
+    }
+  }
+  return NqBoxer::UnboxResult::SerialExpire;
 }
 }
+

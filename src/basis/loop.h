@@ -29,6 +29,7 @@ namespace nq {
 		inline void Close() {
 			if (processors_ != nullptr) {
 				delete []processors_;
+        processors_ = nullptr;
 			}
 			LoopImpl::Close();
 		}

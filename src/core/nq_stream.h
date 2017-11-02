@@ -4,36 +4,83 @@
 
 #include "net/quic/core/quic_stream.h"
 #include "net/quic/core/quic_alarm.h"
+#include "net/quic/core/quic_spdy_stream.h"
 
 #include "basis/closure.h"
 #include "basis/msgid_factory.h"
 #include "core/nq_loop.h"
+#include "core/nq_serial_codec.h"
 
 namespace net {
 
 class NqSession;
+class NqClientSession;
+class NqBoxer;
 class NqStreamHandler;
 
 class NqStream : public QuicStream {
   std::unique_ptr<NqStreamHandler> handler_;
   std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name
+  SpdyPriority priority_;
+  nq_stream_t handle_;
   bool establish_side_;
  public:
-  NqStream(QuicStreamId id, NqSession* nq_session, bool establish_side);
+  NqStream(QuicStreamId id, 
+           NqSession* nq_session, 
+           bool establish_side, 
+           SpdyPriority priority = kDefaultPriority);
   ~NqStream() override {}
+
+  NqLoop *GetLoop();
 
   void OnDataAvailable() override;
   void OnClose() override;
 
-  NqStreamHandler *CreateStreamHandler(const std::string &name);
   void Disconnect();
 
   inline const std::string &protocol() const { return buffer_; }
   inline bool establish_side() const { return establish_side_; }
   bool set_protocol(const std::string &name);
+  NqSessionIndex session_index() const;
+  nq_conn_t conn();
+
+  void InitHandle();
+  template <class T> inline T *Handler() const { return static_cast<T *>(handler_.get()); }
+  template <class H> inline H ToHandle() { return { .p = handle_.p, .s = handle_.s }; }
 
  protected:
+  friend class NqStreamHandler;
+  friend class NqDispatcher;
   NqSession *nq_session();
+  const NqSession *nq_session() const;
+  NqStreamHandler *CreateStreamHandler(const std::string &name);
+};
+
+class NqClientStream : public NqStream {
+  NqStreamNameId name_id_;
+  NqStreamIndexPerNameId index_per_name_id_;
+ public:
+  NqClientStream(QuicStreamId id, 
+           NqSession* nq_session, 
+           bool establish_side, 
+           SpdyPriority priority = kDefaultPriority) : 
+    NqStream(id, nq_session, establish_side, priority) {}
+
+  void OnClose() override;
+
+  inline NqStreamNameId name_id() const { return name_id_; }
+  inline NqStreamIndexPerNameId index_per_name_id() const { return index_per_name_id_; }
+  inline void set_name_id(NqStreamNameId id) { name_id_ = id; }
+  inline void set_index_per_name_id(NqStreamIndexPerNameId idx) { index_per_name_id_ = idx; }
+
+};
+class NqServerStream : public NqStream {
+ public:
+  NqServerStream(QuicStreamId id, 
+           NqSession* nq_session, 
+           bool establish_side, 
+           SpdyPriority priority = kDefaultPriority) : 
+    NqStream(id, nq_session, establish_side, priority) {}
 };
 
 
@@ -52,26 +99,20 @@ public:
   virtual void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) = 0;
 
   //operation
-  inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, CastFrom(this)); }
-  inline void OnClose() { nq_closure_call(on_close_, on_stream_close, CastFrom(this)); }
+  inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>()); }
+  inline void OnClose() { nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); }
   inline void SetLifeCycleCallback(nq_closure_t on_open, nq_closure_t on_close) {
     on_open_ = on_open;
     on_close_ = on_close;
   }
   inline void Disconnect() { stream_->Disconnect(); }
   inline void ProtoSent() { proto_sent_ = true; }
-  inline void WriteBytes(const char *p, nq_size_t len) {
-    if (!proto_sent_) { //TODO: use unlikely
-      const auto& name = stream_->protocol();
-      stream_->WriteOrBufferData(QuicStringPiece(name.c_str(), name.length()), false, nullptr);
-      OnOpen(); //client stream side OnOpen
-      proto_sent_ = true;
-    }
-    stream_->WriteOrBufferData(QuicStringPiece(p, len), false, nullptr);
-  }
-  static inline nq_stream_t CastFrom(NqStreamHandler *h) { return (nq_stream_t)h; }
+  void WriteBytes(const char *p, nq_size_t len);
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
+
+ protected:
+  NqSession *nq_session() { return stream_->nq_session(); }
 };
 
 // A QUIC stream that separated with encoded length
@@ -100,7 +141,7 @@ class NqRawStreamHandler : public NqStreamHandler {
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override {
-    nq_closure_call(writer_, stream_writer, p, len, CastFrom(this));
+    nq_closure_call(writer_, stream_writer, p, len, stream_->ToHandle<nq_stream_t>());
   }
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
 
@@ -115,31 +156,35 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     Request(NqSimpleRPCStreamHandler *stream, 
             nq_msgid_t msgid,
             nq_closure_t on_data) : 
-            stream_(stream), msgid_(msgid), on_data_(on_data) {}
+            stream_(stream), alarm_(nullptr), on_data_(on_data), msgid_(msgid) {}
+    ~Request() {}
     void OnAlarm() override { 
       auto it = stream_->req_map_.find(msgid_);
       if (it != stream_->req_map_.end()) {
         stream_->req_map_.erase(it);
       }
+      delete alarm_; //it deletes Requet object itself
     }
-   public:
+   private:
+    friend class NqSimpleRPCStreamHandler;
     NqSimpleRPCStreamHandler *stream_; 
-    nq_msgid_t msgid_, padd_[3];
+    QuicAlarm *alarm_;
     nq_closure_t on_data_;
+    nq_msgid_t msgid_/*, padd_[3]*/;
   };
   void EntryRequest(nq_msgid_t msgid, nq_closure_t cb, uint64_t timeout_duration_us = 30 * 1000 * 1000);
  private:
   std::string parse_buffer_;
   nq_closure_t on_request_, on_notify_;
-  nq::MsgIdFactory msgid_factory_;
+  nq::MsgIdFactory<nq_msgid_t> msgid_factory_;
   std::map<uint32_t, Request*> req_map_;
   NqLoop *loop_;
  public:
   NqSimpleRPCStreamHandler(NqStream *stream, nq_closure_t on_request, nq_closure_t on_notify) : 
     NqStreamHandler(stream), parse_buffer_(), 
-    on_request_(on_request), on_notify_(on_notify), msgid_factory_(), req_map_() {};
+    on_request_(on_request), on_notify_(on_notify), msgid_factory_(), req_map_(),
+    loop_(stream->GetLoop()) {};
 
-  static inline nq_rpc_t CastFrom(NqSimpleRPCStreamHandler *h) { return (nq_rpc_t)h; }
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override { ASSERT(false); }

@@ -215,6 +215,7 @@ void QuicCryptoClientHandshaker::DoHandshakeLoop(
 
   QuicAsyncStatus rv = QUIC_SUCCESS;
   do {
+    fprintf(stderr, "next state %u\n", next_state_);
     CHECK_NE(STATE_NONE, next_state_);
     const State state = next_state_;
     next_state_ = STATE_IDLE;
@@ -290,6 +291,7 @@ void QuicCryptoClientHandshaker::DoSendCHLO(
           QUIC_CRYPTO_HANDSHAKE_STATELESS_REJECT, "stateless reject received",
           ConnectionCloseBehavior::SILENT_CLOSE);
     }
+    fprintf(stderr, "CHLO1");
     return;
   }
 
@@ -301,6 +303,7 @@ void QuicCryptoClientHandshaker::DoSendCHLO(
         QUIC_CRYPTO_TOO_MANY_REJECTS,
         QuicStrCat("More than ", QuicCryptoClientStream::kMaxClientHellos,
                    " rejects"));
+    fprintf(stderr, "CHLO2");
     return;
   }
   num_client_hellos_++;
@@ -330,12 +333,14 @@ void QuicCryptoClientHandshaker::DoSendCHLO(
                         << ") has no room for framing overhead.";
       stream_->CloseConnectionWithDetails(QUIC_INTERNAL_ERROR,
                                           "max_packet_size too smalll");
+    fprintf(stderr, "CHLO3");
       return;
     }
     if (kClientHelloMinimumSize > max_packet_size - kFramingOverhead) {
       QUIC_DLOG(DFATAL) << "Client hello won't fit in a single packet.";
       stream_->CloseConnectionWithDetails(QUIC_INTERNAL_ERROR,
                                           "CHLO too large");
+    fprintf(stderr, "CHLO4");
       return;
     }
     // TODO(rch): Remove this when we remove:
@@ -345,6 +350,7 @@ void QuicCryptoClientHandshaker::DoSendCHLO(
     next_state_ = STATE_RECV_REJ;
     CryptoUtils::HashHandshakeMessage(out, &chlo_hash_, Perspective::IS_CLIENT);
     SendHandshakeMessage(out);
+    fprintf(stderr, "CHLO5");
     return;
   }
 
@@ -369,6 +375,7 @@ void QuicCryptoClientHandshaker::DoSendCHLO(
     // chance to send us another in the future.
     cached->InvalidateServerConfig();
     stream_->CloseConnectionWithDetails(error, error_details);
+    fprintf(stderr, "CHLO6");
     return;
   }
   CryptoUtils::HashHandshakeMessage(out, &chlo_hash_, Perspective::IS_CLIENT);

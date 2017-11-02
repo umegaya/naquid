@@ -2,6 +2,9 @@
 
 #include "net/tools/quic/quic_default_packet_writer.h"
 
+#include "basis/syscall.h"
+#include "core/nq_client_loop.h"
+
 namespace net {
 
 namespace {
@@ -12,6 +15,7 @@ NqNetworkHelper::NqNetworkHelper(
     NqLoop* loop,
     QuicClientBase* client)
     : loop_(loop),
+      fd_(-1),
       packets_dropped_(0),
       overflow_supported_(false),
       packet_reader_(new QuicPacketReader()),
@@ -45,7 +49,11 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
   }
 
   sockaddr_storage addr = address_.generic_address();
-  int rc = bind(fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  socklen_t slen = nq::Syscall::GetSockAddrLen(addr.ss_family);
+  if (slen == 0) {
+    return false;
+  }
+  int rc = bind(fd_, reinterpret_cast<sockaddr*>(&addr), slen);
   if (rc < 0) {
     QUIC_LOG(ERROR) << "Bind failed: " << strerror(errno);
     return false;
@@ -86,6 +94,7 @@ void NqNetworkHelper::OnClose(Fd /*fd*/) {}
 int NqNetworkHelper::OnOpen(Fd /*fd*/) {  return NQ_OK; }
 void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
   if (NqLoop::Readable(event)) {
+    TRACE("readable %d\n", fd);
     bool more_to_read = true;
     while (client_->connected() && more_to_read) {
       more_to_read = packet_reader_->ReadAndDispatchPackets(
@@ -95,10 +104,12 @@ void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
     }
   }
   if (client_->connected() && NqLoop::Writable(event)) {
+    TRACE("writable %d\n", fd);
     client_->writer()->SetWritable();
     client_->session()->connection()->OnCanWrite();
   }
   if (NqLoop::Closed(event)) {
+    TRACE("closed %d\n", fd);
     QUIC_DLOG(INFO) << "looperr";
   }
 }

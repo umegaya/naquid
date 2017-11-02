@@ -8,6 +8,17 @@
 extern "C" {
 #endif
 
+
+
+// --------------------------
+//
+// Annotation
+//
+// --------------------------
+#define NQ_THREADSAFE
+
+
+
 // --------------------------
 //
 // Base type
@@ -23,7 +34,7 @@ typedef uint64_t nq_time_t;	//nano seconds timestamp
 
 typedef time_t nq_unix_time_t; //place holder for unix timestamp
 
-typedef uint32_t nq_msgid_t;
+typedef uint16_t nq_msgid_t;
 
 typedef uint32_t nq_stream_id_t;
 
@@ -31,13 +42,22 @@ typedef struct nq_client_tag *nq_client_t; //NqClientLoop
 
 typedef struct nq_server_tag *nq_server_t; //NqServer
 
-typedef struct nq_conn_tag *nq_conn_t; //NqSession::Delegate
-
 typedef struct nq_hdmap_tag *nq_hdmap_t; //nq::HandlerMap
 
-typedef struct nq_stream_tag *nq_stream_t; //NqStreamHandler
+typedef struct nq_conn_tag {
+    void *p;    //NqBoxer
+    uint64_t s; 
+} nq_conn_t;
 
-typedef struct nq_rpc_tag *nq_rpc_t; //NqSimpleRpcStreamHandler
+typedef struct nq_stream_tag {
+    void *p;    //NqBoxer
+    uint64_t s; 
+} nq_stream_t; 
+
+typedef struct nq_rpc_tag { //this is essentially same as nq_stream, but would helpful to prevent misuse of rpc/stream
+    void *p;
+    uint64_t s; 
+} nq_rpc_t; 
 
 typedef enum {
 	NQ_OK = 0,
@@ -45,6 +65,7 @@ typedef enum {
 	NQ_ETIMEOUT = -2,
 	NQ_EALLOC = -3,
 	NQ_NOT_SUPPORT = -4,
+	NQ_GOAWAY = -5,
 } nq_error_t;
 
 typedef struct {
@@ -76,7 +97,7 @@ typedef void (*nq_on_rpc_notify_t)(void *, nq_rpc_t, uint16_t, const void *, nq_
 
 typedef void (*nq_on_rpc_reply_t)(void *, nq_rpc_t, nq_result_t, const void *, nq_size_t);
 
-typedef nq_stream_t (*nq_create_stream_t)(void *, nq_conn_t);
+typedef void *(*nq_create_stream_t)(void *, nq_conn_t);
 
 typedef struct {
 	void *arg;
@@ -148,9 +169,12 @@ extern void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.
 extern void nq_client_destroy(nq_client_t cl);
 // create conn from client. server side can get from argument of on_accept handler
+// return invalid conn on error
 extern nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
 // get handler map of the client. 
 extern nq_hdmap_t nq_client_hdmap(nq_client_t cl);
+// set thread id that calls nq_client_poll
+extern void nq_client_set_thread(nq_client_t cl);
 
 
 
@@ -192,11 +216,13 @@ extern bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_fa
 //can change handler map of connection, which is usually inherit from nq_client_t or nq_server_t
 extern nq_hdmap_t nq_conn_hdmap(nq_conn_t conn);
 //close and destroy conn/associated stream eventually, so never touch conn/stream/rpc after calling this API.
-extern void nq_conn_close(nq_conn_t conn); 
+extern NQ_THREADSAFE void nq_conn_close(nq_conn_t conn); 
 //this just restart connection, never destroy. but associated stream/rpc all destroyed. (client only)
-extern int nq_conn_reset(nq_conn_t conn); 
+extern NQ_THREADSAFE void nq_conn_reset(nq_conn_t conn); 
 //check connection is client mode or not.
-extern bool nq_conn_is_client(nq_conn_t conn);
+extern NQ_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
+//check conn is valid. invalid means fail to create or closed, or temporary disconnected (will reconnect soon).
+extern NQ_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn);
 
 
 
@@ -205,12 +231,17 @@ extern bool nq_conn_is_client(nq_conn_t conn);
 // stream API 
 //
 // --------------------------
-//create single stream from conn, which has type specified by "name".
-extern nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name);
+//create single stream from conn, which has type specified by "name". need to use valid conn and call from owner thread of it
+//return invalid stream on error
+extern NQ_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name);
+//get parent conn from rpc
+extern NQ_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s);
+//check stream is valid. sugar for nq_conn_is_valid(nq_stream_conn(s));
+extern NQ_THREADSAFE bool nq_stream_is_valid(nq_stream_t s);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
-extern void nq_stream_close(nq_stream_t s);
+extern NQ_THREADSAFE void nq_stream_close(nq_stream_t s);
 //send arbiter byte array/arbiter object to stream peer. 
-extern void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
+extern NQ_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
 
 
 
@@ -219,16 +250,21 @@ extern void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
 // rpc API
 //
 // --------------------------
-//create single rpc stream from conn, which has type specified by "name".
-extern nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name);
+//create single rpc stream from conn, which has type specified by "name". need to use valid conn and call from owner thread of it
+//return invalid stream on error
+extern NQ_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name);
+//get parent conn from rpc
+extern NQ_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc);
+//check rpc is valid. sugar for nq_conn_is_valid(nq_rpc_conn(rpc));
+extern NQ_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
-extern void nq_rpc_close(nq_rpc_t rpc);
+extern NQ_THREADSAFE void nq_rpc_close(nq_rpc_t rpc);
 //send arbiter byte array or object to stream peer. 
-extern void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply);
+extern NQ_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply);
 //send arbiter byte array or object to stream peer, without receving reply
-extern void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen);
+extern NQ_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen);
 //send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
-extern void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
+extern NQ_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
 
 
 
@@ -237,18 +273,21 @@ extern void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, con
 // time API
 //
 // --------------------------
-static inline nq_time_t nq_time_sec(uint64_t n) { return ((n) * 1000 * 1000 * 1000); }
-static inline nq_time_t nq_time_msec(uint64_t n) { return ((n) * 1000 * 1000); }
-static inline nq_time_t nq_time_usec(uint64_t n) { return ((n) * 1000); }
-static inline nq_time_t nq_time_nsec(uint64_t n) { return (n); }
+static inline NQ_THREADSAFE nq_time_t nq_time_sec(uint64_t n) { return ((n) * 1000 * 1000 * 1000); }
 
-extern nq_time_t nq_time_now();
+static inline NQ_THREADSAFE nq_time_t nq_time_msec(uint64_t n) { return ((n) * 1000 * 1000); }
 
-extern nq_unix_time_t nq_time_unix();
+static inline NQ_THREADSAFE nq_time_t nq_time_usec(uint64_t n) { return ((n) * 1000); }
 
-extern nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
+static inline NQ_THREADSAFE nq_time_t nq_time_nsec(uint64_t n) { return (n); }
 
-extern nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
+extern NQ_THREADSAFE nq_time_t nq_time_now();
+
+extern NQ_THREADSAFE nq_unix_time_t nq_time_unix();
+
+extern NQ_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
+
+extern NQ_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
 
 #if defined(__cplusplus)
 }

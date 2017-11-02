@@ -3,24 +3,18 @@
 #include "net/quic/platform/api/quic_ptr_util.h"
 
 #include "core/nq_stream.h"
+#include "core/nq_boxer.h"
 
 namespace net {
 
 NqSession::NqSession(QuicConnection* connection,
-                                 Delegate* delegate,
-                                 const QuicConfig& config) : 
+                     Delegate* delegate,
+                     const QuicConfig& config) : 
   QuicSession(connection, nullptr, config), delegate_(delegate) {
+  //chromium implementation treat initial value (3) as special stream (header stream for QPDY)
+  auto id = GetNextOutgoingStreamId();
+  ASSERT(id == kHeadersStreamId);
   crypto_stream_.reset(delegate_->NewCryptoStream(this));
-}
-QuicStream* NqSession::CreateIncomingDynamicStream(QuicStreamId id) {
-  auto s = new NqStream(id, this, false);
-  ActivateStream(QuicWrapUnique(s));
-  return s;
-}
-QuicStream* NqSession::CreateOutgoingDynamicStream() {
-  auto s = new NqStream(GetNextOutgoingStreamId(), this, true);
-  ActivateStream(QuicWrapUnique(s));
-  return s;
 }
 QuicCryptoStream* NqSession::GetMutableCryptoStream() {
   return crypto_stream_.get();
@@ -28,6 +22,9 @@ QuicCryptoStream* NqSession::GetMutableCryptoStream() {
 const QuicCryptoStream* NqSession::GetCryptoStream() const {
   return crypto_stream_.get();
 }
+
+//NqSession::Delegate
+nq_conn_t NqSession::Delegate::BoxSelf() { return GetBoxer()->Box(this); }
 
 //implements QuicConnectionVisitorInterface
 void NqSession::OnConnectionClosed(QuicErrorCode error,
