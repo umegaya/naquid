@@ -22,6 +22,7 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config, NqWorker &wor
   server_map_(), thread_id_(worker.thread_id()) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
+  TRACE("dispatcher index %d\n", index_);
 }
 
 //implement QuicDistpacher
@@ -52,6 +53,7 @@ void NqDispatcher::OnRecv(NqPacket *packet) {
   if (conn_id == 0) { 
     return; 
   }
+  TRACE("conn_id = %llu @ %d\n", conn_id, index_);
   auto idx = conn_id % n_worker_;
   if (index_ == idx) {
     //TODO(iyatomi): if idx is same as current index, directly process packet here
@@ -87,6 +89,7 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
       /* owns_writer= */ true, Perspective::IS_SERVER, GetSupportedVersions());
 
     auto s = new NqServerSession(connection, this, it->second);
+    s->Initialize();
     server_map_.Add(s);
     server_map_.Activate(s->session_index()); //make connection valid
     return s;

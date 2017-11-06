@@ -18,6 +18,8 @@
 #include "net/quic/platform/api/quic_logging.h"
 #include "net/quic/platform/api/quic_socket_address.h"
 
+#include "basis/defs.h"
+
 #ifndef SO_RXQ_OVFL
 #define SO_RXQ_OVFL 40
 #endif
@@ -183,6 +185,8 @@ int QuicSocketUtils::ReadPacket(int fd,
   hdr.msg_control = cmsg;
   hdr.msg_controllen = arraysize(cbuf);
 
+  TRACE("b4 recvmsg %d\n", errno);
+
   int bytes_read = recvmsg(fd, &hdr, 0);
 
   // Return before setting dropped packets: if we get EAGAIN, it will
@@ -190,9 +194,8 @@ int QuicSocketUtils::ReadPacket(int fd,
   if (bytes_read < 0 && errno != 0) {
     if (errno != EAGAIN) {
       LOG(ERROR) << "Error reading " << strerror(errno);
-      return -1;
     }
-    return 0;
+    return -1;
   }
 
   if (hdr.msg_controllen >= arraysize(cbuf)) {
@@ -260,6 +263,7 @@ WriteResult QuicSocketUtils::WritePacket(
     size_t buf_len,
     const QuicIpAddress& self_address,
     const QuicSocketAddress& peer_address) {
+  TRACE("QuicSocketUtils::WritePacket %d %zu bytes\n", fd, buf_len);
   sockaddr_storage raw_address = peer_address.generic_address();
   iovec iov = {const_cast<char*>(buffer), buf_len};
 

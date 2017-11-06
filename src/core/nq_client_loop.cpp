@@ -76,7 +76,7 @@ NqClient *NqClientLoop::Create(const std::string &host,
   if (!ParseUrl(host, port, 0, server_id, server_address, config)) {
     return nullptr;
   }
-  auto supported_versions = AllSupportedVersions();
+  auto supported_versions = AllSupportedVersions();//versions_.GetSupportedVersions();
   auto c = new NqClient(
     server_address,
     server_id, 

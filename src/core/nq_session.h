@@ -61,14 +61,17 @@ class NqSession : public QuicSession {
   inline nq_conn_t conn() { return delegate_->BoxSelf(); }
   inline const nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
 
-  //implements QuicSession
-  QuicCryptoStream *GetMutableCryptoStream() override;
-  const QuicCryptoStream *GetCryptoStream() const override;
-
   //implements QuicConnectionVisitorInterface
   void OnConnectionClosed(QuicErrorCode error,
                           const std::string& error_details,
                           ConnectionCloseSource source) override;
   void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
+
+ protected:
+  //implements QuicSession
+  QuicCryptoStream *GetMutableCryptoStream() override;
+  const QuicCryptoStream *GetCryptoStream() const override;
+
+  void init_crypto_stream() { crypto_stream_.reset(delegate_->NewCryptoStream(this)); }
 };
 }

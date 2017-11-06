@@ -9,9 +9,11 @@ static const int kRpcPing = 1;
 
 /* conn callback */
 bool on_conn_open(void *, nq_conn_t) {
+  TRACE("userland: on_conn_open\n");
   return true;
 }
 nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char*, bool) {
+  TRACE("userland: on_conn_close\n");
   return 0;
 }
 

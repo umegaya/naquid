@@ -18,7 +18,7 @@ NqNetworkHelper::NqNetworkHelper(
       fd_(-1),
       packets_dropped_(0),
       overflow_supported_(false),
-      packet_reader_(new QuicPacketReader()),
+      packet_reader_(new NqPacketReader()),
       client_(client) {}
 
 NqNetworkHelper::~NqNetworkHelper() {
@@ -97,7 +97,7 @@ void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
     TRACE("readable %d\n", fd);
     bool more_to_read = true;
     while (client_->connected() && more_to_read) {
-      more_to_read = packet_reader_->ReadAndDispatchPackets(
+      more_to_read = packet_reader_->Read(
           fd, GetLatestClientAddress().port(),
           *client_->helper()->GetClock(), this,
           overflow_supported_ ? &packets_dropped_ : nullptr);
@@ -122,11 +122,9 @@ QuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
   return address_;
 }
 
-void NqNetworkHelper::ProcessPacket(
-    const QuicSocketAddress& self_address,
-    const QuicSocketAddress& peer_address,
-    const QuicReceivedPacket& packet) {
-  client_->session()->ProcessUdpPacket(self_address, peer_address, packet);
+void NqNetworkHelper::OnRecv(NqPacketReader::Packet *p) {
+  //self == server, peer == client
+  client_->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
 }
 
 }  // namespace net

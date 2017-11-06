@@ -169,11 +169,12 @@ extern void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.
 extern void nq_client_destroy(nq_client_t cl);
 // create conn from client. server side can get from argument of on_accept handler
-// return invalid conn on error
+// return invalid conn on error, can check with nq_conn_is_valid. 
 extern nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
 // get handler map of the client. 
 extern nq_hdmap_t nq_client_hdmap(nq_client_t cl);
-// set thread id that calls nq_client_poll
+// set thread id that calls nq_client_poll.
+// call this if thread which polls this nq_client_t is different from creator thread.
 extern void nq_client_set_thread(nq_client_t cl);
 
 

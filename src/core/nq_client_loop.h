@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "net/quic/core/quic_server_id.h"
+#include "net/quic/core/quic_version_manager.h"
 
 #include "core/nq_loop.h"
 #include "core/nq_config.h"
@@ -16,9 +17,10 @@ class NqClientLoop : public NqLoop,
   nq::HandlerMap handler_map_;
   NqSessionContainer<NqClient> client_map_;
   NqBoxer::Processor processor_;
+  QuicVersionManager versions_;
   std::thread::id thread_id_;
  public:
-  NqClientLoop() : handler_map_(), client_map_(), processor_() {
+  NqClientLoop() : handler_map_(), client_map_(), processor_(), versions_(net::AllSupportedVersions()) {
     set_main_thread();
   }
   ~NqClientLoop() { Close(); }

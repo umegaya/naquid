@@ -14,7 +14,9 @@ NqServerSession::NqServerSession(QuicConnection *connection,
                                          : NqSession(connection, this, port_config), 
                                          dispatcher_(dispatcher),
                                          port_config_(port_config),
-                                         session_index_(dispatcher->new_session_index()) {}
+                                         session_index_(dispatcher->new_session_index()) {
+  init_crypto_stream();
+}
 
 NqStream *NqServerSession::FindStream(QuicStreamId id) {
   auto it = dynamic_streams().find(id);

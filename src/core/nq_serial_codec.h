@@ -27,7 +27,7 @@ class NqStreamSerialCodec {
   static inline uint64_t ServerEncode(NqSessionIndex session_index, 
                                       QuicConnectionId conn_id, 
                                       QuicStreamId stream_id, int n_worker) {
-    ASSERT(n_worker > 0x0000FFFF);
+    ASSERT(n_worker <= 0x0000FFFF);
     return (((uint64_t)session_index) << 48) | 
             ((conn_id % n_worker) << 32) | (stream_id);
   }
@@ -60,7 +60,7 @@ class NqConnSerialCodec {
  public:
   static inline uint64_t ServerEncode(NqSessionIndex session_index, 
                                       QuicConnectionId conn_id, int n_worker) {
-    ASSERT(n_worker > 0x0000FFFF);
+    ASSERT(n_worker <= 0x0000FFFF);
     return (((uint64_t)session_index) << 16) | ((conn_id % n_worker) << 0);
   }
   static inline NqSessionIndex ServerSessionIndex(uint64_t serial) {

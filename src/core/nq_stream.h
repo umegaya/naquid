@@ -92,6 +92,7 @@ protected:
   bool proto_sent_;
 public:
   NqStreamHandler(NqStream *stream) : stream_(stream), proto_sent_(false) {}
+  virtual ~NqStreamHandler() {}
   
   //interface
   virtual void OnRecv(const void *p, nq_size_t len) = 0;
@@ -165,6 +166,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
       }
       delete alarm_; //it deletes Requet object itself
     }
+    inline void Cancel() { alarm_->Cancel(); }
    private:
     friend class NqSimpleRPCStreamHandler;
     NqSimpleRPCStreamHandler *stream_; 
@@ -184,6 +186,15 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     NqStreamHandler(stream), parse_buffer_(), 
     on_request_(on_request), on_notify_(on_notify), msgid_factory_(), req_map_(),
     loop_(stream->GetLoop()) {};
+
+  ~NqSimpleRPCStreamHandler() {
+    TRACE("NqSimpleRPCStreamHandler dtor\n");
+    for (auto &kv : req_map_) {
+      kv.second->Cancel();
+      delete kv.second;
+    }
+    req_map_.clear();
+  }
 
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;

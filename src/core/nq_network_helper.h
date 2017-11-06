@@ -5,17 +5,19 @@
 #include <string>
 
 #include "net/tools/quic/quic_client_base.h"
-#include "net/tools/quic/quic_packet_reader.h"
+#include "net/tools/quic/quic_process_packet_interface.h"
+//#include "net/tools/quic/quic_packet_reader.h"
 
 #include "basis/io_processor.h"
 #include "core/nq_loop.h"
+#include "core/nq_packet_reader.h"
 
 namespace net {
 // An implementation of the QuicClientBase::NetworkHelper based off
 // the epoll server.
 class NqNetworkHelper : public QuicClientBase::NetworkHelper,
-								            public nq::IoProcessor,
-                            public ProcessPacketInterface {
+                        public nq::IoProcessor,
+                        public NqPacketReader::Delegate {
  public:
   // Create a quic client, which will have events managed by an externally owned
   // EpollServer.
@@ -31,9 +33,7 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
 
   // implements ProcessPacketInterface. 
   // This will be called for each received packet.
-  void ProcessPacket(const QuicSocketAddress& self_address,
-                     const QuicSocketAddress& peer_address,
-                     const QuicReceivedPacket& packet) override;
+  void OnRecv(NqPacketReader::Packet *p) override;
 
   // implements NetworkHelper.
   void RunEventLoop() override;
@@ -75,7 +75,7 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
 
   // Point to a QuicPacketReader object on the heap. The reader allocates more
   // space than allowed on the stack.
-  std::unique_ptr<QuicPacketReader> packet_reader_;
+  std::unique_ptr<NqPacketReader> packet_reader_;
 
   QuicClientBase* client_;
 

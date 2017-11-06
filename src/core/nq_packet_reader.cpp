@@ -171,8 +171,11 @@ bool NqPacketReader::ReadPackets(
       QuicSocketUtils::ReadPacket(fd, buf, kMaxPacketSize, packets_dropped,
                                   &server_ip, &walltimestamp, &client_address);
   if (bytes_read < 0) {
+    TRACE("NqPacketReader::ReadPackets fails %u\n", errno);
     return false;  // ReadPacket failed.
   }
+
+  TRACE("NqPacketReader::ReadPackets %u bytes %d, my ip: %s\n", bytes_read, errno, server_ip.ToString().c_str());
 
   if (!server_ip.IsInitialized()) {
     QUIC_BUG << "Unable to get server address.";

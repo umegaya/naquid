@@ -152,7 +152,7 @@ set(net_src
 	./src/chromium/net/tools/quic/quic_client_base.cc
 	./src/chromium/net/tools/quic/quic_default_packet_writer.cc
 	./src/chromium/net/tools/quic/quic_dispatcher.cc
-	./src/chromium/net/tools/quic/quic_packet_reader.cc
+	#./src/chromium/net/tools/quic/quic_packet_reader.cc
 	./src/chromium/net/tools/quic/quic_per_connection_packet_writer.cc
 	./src/chromium/net/tools/quic/quic_time_wait_list_manager.cc
 	./src/chromium/net/tools/quic/stateless_rejector.cc

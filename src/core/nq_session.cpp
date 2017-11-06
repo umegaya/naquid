@@ -13,8 +13,7 @@ NqSession::NqSession(QuicConnection* connection,
   QuicSession(connection, nullptr, config), delegate_(delegate) {
   //chromium implementation treat initial value (3) as special stream (header stream for QPDY)
   auto id = GetNextOutgoingStreamId();
-  ASSERT(id == kHeadersStreamId);
-  crypto_stream_.reset(delegate_->NewCryptoStream(this));
+  ASSERT(perspective() == Perspective::IS_SERVER || id == kHeadersStreamId);
 }
 QuicCryptoStream* NqSession::GetMutableCryptoStream() {
   return crypto_stream_.get();

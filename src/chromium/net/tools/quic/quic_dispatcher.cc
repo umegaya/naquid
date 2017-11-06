@@ -378,6 +378,7 @@ bool QuicDispatcher::OnUnauthenticatedPublicHeader(
       }
       // Since the version is not supported, send a version negotiation
       // packet and stop processing the current packet.
+      fprintf(stderr, "send version nego\n");
       time_wait_list_manager()->SendVersionNegotiationPacket(
           connection_id, GetSupportedVersions(), current_server_address_,
           current_client_address_);
@@ -385,6 +386,7 @@ bool QuicDispatcher::OnUnauthenticatedPublicHeader(
     }
     version = packet_version;
   }
+  fprintf(stderr, "set_version %d\n", version);
   // Set the framer's version and continue processing.
   framer_.set_version(version);
   return true;
@@ -718,6 +720,7 @@ void QuicDispatcher::ProcessBufferedChlos(size_t max_connections_to_create) {
     if (packets.empty()) {
       return;
     }
+    fprintf(stderr, "ProcessBufferedChlos\n");
     QuicSession* session = CreateQuicSession(
         connection_id, packets.front().client_address, packet_list.alpn);
     QUIC_DLOG(INFO) << "Created new session for " << connection_id;
@@ -775,6 +778,7 @@ void QuicDispatcher::BufferEarlyPacket(QuicConnectionId connection_id) {
 }
 
 void QuicDispatcher::ProcessChlo() {
+  fprintf(stderr, "ProcessChlo\n");
   if (!accept_new_connections_) {
     // Don't any create new connection.
     time_wait_list_manager()->AddConnectionIdToTimeWait(
@@ -785,14 +789,17 @@ void QuicDispatcher::ProcessChlo() {
     time_wait_list_manager()->ProcessPacket(current_server_address(),
                                             current_client_address(),
                                             current_connection_id());
+  fprintf(stderr, "ProcessChlo exit 1\n");
     return;
   }
   if (!buffered_packets_.HasBufferedPackets(current_connection_id_) &&
       !ShouldCreateOrBufferPacketForConnection(current_connection_id_)) {
+  fprintf(stderr, "ProcessChlo exit 2\n");
     return;
   }
   if (FLAGS_quic_allow_chlo_buffering &&
       new_sessions_allowed_per_event_loop_ <= 0) {
+  fprintf(stderr, "ProcessChlo cached\n");
     // Can't create new session any more. Wait till next event loop.
     QUIC_BUG_IF(buffered_packets_.HasChloForConnection(current_connection_id_));
     EnqueuePacketResult rs = buffered_packets_.EnqueuePacket(
@@ -820,6 +827,8 @@ void QuicDispatcher::ProcessChlo() {
   // buffered in the store before flag is turned off.
   DeliverPacketsToSession(packets, session);
   --new_sessions_allowed_per_event_loop_;
+
+  fprintf(stderr, "ProcessChlo exit 3\n");
 }
 
 const QuicSocketAddress QuicDispatcher::GetClientAddress() const {

@@ -8,7 +8,9 @@ class NqClientSession : public NqSession {
   NqClientSession(QuicConnection *connection,
             Delegate* delegate,
           	const QuicConfig& config)
-    : NqSession(connection, delegate, config) {}
+    : NqSession(connection, delegate, config) {
+      init_crypto_stream();
+    }
 
   inline QuicCryptoClientStream *GetClientCryptoStream() {
     ASSERT(delegate()->IsClient());

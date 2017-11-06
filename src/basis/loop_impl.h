@@ -23,6 +23,11 @@ namespace internal {
 	public:
 		constexpr static uint32_t EV_READ = EPOLLIN;
 		constexpr static uint32_t EV_WRITE = EPOLLOUT;
+  #if !defined(LOOP_LEVEL_TRIGGER)
+    constexpr static uint32_t EV_ET = EPOLLET;
+  #else
+    constexpr static uint32_t EV_ET = 0;
+  #endif
 		typedef struct epoll_event Event;
 		typedef int Timeout;
 		
@@ -41,13 +46,13 @@ namespace internal {
 		inline bool EAgain() { return Syscall::EAgain(); }
 		inline int Add(Fd d, uint32_t flag) {
 			Event e;
-			e.events = (flag | EPOLLONESHOT | EPOLLRDHUP);
+			e.events = (flag | EV_ET | EPOLLRDHUP);
 			e.data.fd = d;
 			return ::epoll_ctl(fd_, EPOLL_CTL_ADD, d, &e) != 0 ? NQ_ESYSCALL : NQ_OK;
 		}
 		inline int Mod(Fd d, uint32_t flag) {
 			Event e;
-			e.events = (flag | EPOLLONESHOT | EPOLLRDHUP);
+			e.events = (flag | EV_ET | EPOLLRDHUP);
 			e.data.fd = d;
 			return ::epoll_ctl(fd_, EPOLL_CTL_MOD, d, &e) != 0 ? NQ_ESYSCALL : NQ_OK;
 		}
@@ -86,6 +91,11 @@ namespace internal {
 	public:
 		constexpr static uint32_t EV_READ = 0x01;
 		constexpr static uint32_t EV_WRITE = 0x02;
+  #if !defined(LOOP_LEVEL_TRIGGER)
+    constexpr static uint32_t EV_ET = EV_CLEAR;
+  #else
+    constexpr static uint32_t EV_ET = 0;
+  #endif
 		typedef struct kevent Event;
 		typedef struct timespec Timeout;
 
@@ -105,10 +115,10 @@ namespace internal {
 		inline int Errno() { return Syscall::Errno(); }
 		inline bool EAgain() { return Syscall::EAgain(); }
 		inline int Add(Fd d, uint32_t flag) {
-			return register_from_flag(d, flag, EV_ADD | EV_ONESHOT);
+			return register_from_flag(d, flag, EV_ADD | EV_ET | EV_EOF);
 		}
 		inline int Mod(Fd d, uint32_t flag) {
-			return register_from_flag(d, flag, EV_ADD | EV_ONESHOT);
+			return register_from_flag(d, flag, EV_ADD | EV_ET | EV_EOF);
 		}
 		inline int Del(Fd d) {
 			return register_from_flag(d, EV_READ, EV_DELETE);
