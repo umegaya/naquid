@@ -22,7 +22,6 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config, NqWorker &wor
   server_map_(), thread_id_(worker.thread_id()) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
-  TRACE("dispatcher index %d\n", index_);
 }
 
 //implement QuicDistpacher
@@ -92,6 +91,10 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
     s->Initialize();
     server_map_.Add(s);
     server_map_.Activate(s->session_index()); //make connection valid
+    if (!s->OnOpen(NQ_HS_START)) {
+      auto c = Box(s);
+      Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Disconnect));
+    }
     return s;
 }
 

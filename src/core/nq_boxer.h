@@ -25,6 +25,7 @@ class NqBoxer {
     Call,
     Reply,
     Notify,
+    Finalize,
   };
   enum OpTarget : uint8_t {
     Invalid = 0,
@@ -154,6 +155,9 @@ class NqBoxer {
         break;
       case Reconnect:
         unboxed->Reconnect();
+        break;
+      case Finalize:
+        delete unboxed;
         break;
       default:
         ASSERT(false);

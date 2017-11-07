@@ -94,7 +94,6 @@ void NqNetworkHelper::OnClose(Fd /*fd*/) {}
 int NqNetworkHelper::OnOpen(Fd /*fd*/) {  return NQ_OK; }
 void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
   if (NqLoop::Readable(event)) {
-    TRACE("readable %d\n", fd);
     bool more_to_read = true;
     while (client_->connected() && more_to_read) {
       more_to_read = packet_reader_->Read(
@@ -104,7 +103,6 @@ void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
     }
   }
   if (client_->connected() && NqLoop::Writable(event)) {
-    TRACE("writable %d\n", fd);
     client_->writer()->SetWritable();
     client_->session()->connection()->OnCanWrite();
   }

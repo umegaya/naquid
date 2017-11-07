@@ -18,13 +18,20 @@ class NqBoxer;
 // A QUIC session with a headers stream.
 class NqSession : public QuicSession {
  public:
+  //dummy class to call protected method of QuicConnection...
+  class NqConnection : public QuicConnection {
+   public: 
+    void Cleanup() {
+      CancelAllAlarms();
+    }
+  };
   class Delegate {
    public:
     virtual ~Delegate() {}
     virtual void OnClose(QuicErrorCode error,
                          const std::string& error_details,
                          ConnectionCloseSource close_by_peer_or_self) = 0;
-    virtual bool OnOpen() = 0;
+    virtual bool OnOpen(nq_handshake_event_t hsev) = 0;
 
     virtual void Disconnect() = 0;
     virtual bool Reconnect() = 0; //only supported for client 
@@ -47,9 +54,16 @@ class NqSession : public QuicSession {
   std::unique_ptr<QuicCryptoStream> crypto_stream_;
   Delegate *delegate_;
  public:
+  //NqSession takes ownership of connection
   NqSession(QuicConnection *connection,
             Delegate* delegate,
           	const QuicConfig& config);
+  ~NqSession() override {
+    if (connection() != nullptr) {
+      static_cast<NqConnection*>(connection())->Cleanup();
+      delete connection();
+    }
+  }
 
   inline void RegisterStreamPriority(QuicStreamId id, SpdyPriority priority) {
     write_blocked_streams()->RegisterStream(id, priority);

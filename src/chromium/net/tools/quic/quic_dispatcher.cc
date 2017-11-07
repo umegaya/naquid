@@ -778,7 +778,6 @@ void QuicDispatcher::BufferEarlyPacket(QuicConnectionId connection_id) {
 }
 
 void QuicDispatcher::ProcessChlo() {
-  fprintf(stderr, "ProcessChlo\n");
   if (!accept_new_connections_) {
     // Don't any create new connection.
     time_wait_list_manager()->AddConnectionIdToTimeWait(
@@ -789,17 +788,14 @@ void QuicDispatcher::ProcessChlo() {
     time_wait_list_manager()->ProcessPacket(current_server_address(),
                                             current_client_address(),
                                             current_connection_id());
-  fprintf(stderr, "ProcessChlo exit 1\n");
     return;
   }
   if (!buffered_packets_.HasBufferedPackets(current_connection_id_) &&
       !ShouldCreateOrBufferPacketForConnection(current_connection_id_)) {
-  fprintf(stderr, "ProcessChlo exit 2\n");
     return;
   }
   if (FLAGS_quic_allow_chlo_buffering &&
       new_sessions_allowed_per_event_loop_ <= 0) {
-  fprintf(stderr, "ProcessChlo cached\n");
     // Can't create new session any more. Wait till next event loop.
     QUIC_BUG_IF(buffered_packets_.HasChloForConnection(current_connection_id_));
     EnqueuePacketResult rs = buffered_packets_.EnqueuePacket(
@@ -827,8 +823,6 @@ void QuicDispatcher::ProcessChlo() {
   // buffered in the store before flag is turned off.
   DeliverPacketsToSession(packets, session);
   --new_sessions_allowed_per_event_loop_;
-
-  fprintf(stderr, "ProcessChlo exit 3\n");
 }
 
 const QuicSocketAddress QuicDispatcher::GetClientAddress() const {

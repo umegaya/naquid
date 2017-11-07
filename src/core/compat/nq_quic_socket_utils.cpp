@@ -185,8 +185,6 @@ int QuicSocketUtils::ReadPacket(int fd,
   hdr.msg_control = cmsg;
   hdr.msg_controllen = arraysize(cbuf);
 
-  TRACE("b4 recvmsg %d\n", errno);
-
   int bytes_read = recvmsg(fd, &hdr, 0);
 
   // Return before setting dropped packets: if we get EAGAIN, it will

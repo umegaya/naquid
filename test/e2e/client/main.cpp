@@ -4,10 +4,12 @@
 
 
 /* conn callback */
-bool on_conn_open(void *, nq_conn_t) {
+bool on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void *) {
+  TRACE("on_conn_open event:%d\n", hsev);
   return true;
 }
-nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char*, bool) {
+nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char *detail, bool) {
+  TRACE("on_conn_close: reason:%s\n", detail);
   return nq_time_sec(2);
 }
 

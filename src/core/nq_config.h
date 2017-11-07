@@ -52,7 +52,7 @@ class NqServerConfig : public QuicConfig {
   const nq_svconf_t &server() const { return server_; }
   const QuicCryptoServerConfig *crypto() const { return &crypto_; }
  protected:
-  static bool NoopOnOpen(void *, nq_conn_t) { return false; }
+  static bool NoopOnOpen(void *, nq_conn_t, nq_handshake_event_t, void *) { return false; }
   static nq_time_t NoopOnClose(void *, nq_conn_t, nq_result_t, const char*, bool) { return 0; }
 };
 

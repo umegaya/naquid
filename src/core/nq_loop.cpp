@@ -38,20 +38,21 @@ QuicTime NqLoop::ToQuicTime(uint64_t from_us) {
   return QuicTime::Zero() + QuicTime::Delta::FromMicroseconds(from_us);
 }
 
-
 //implements QuicAlarmFactory
 class NqAlarm : public QuicAlarm {
  public:
   NqAlarm(NqLoop *loop, QuicArenaScopedPtr<Delegate> delegate)
-      : QuicAlarm(std::move(delegate)), loop_(loop), timeout_in_us_(0) {}
-  ~NqAlarm() { TRACE("delete alarm %p\n", this); }
+      : QuicAlarm(std::move(delegate)), loop_(loop), timeout_in_us_(0) {
+        //TRACE("create alarm: %p\n", this);
+      }
+  ~NqAlarm() override { /* TRACE("delete alarm %p\n", this); */ }
 
   inline void OnAlarm() { Fire(); }
  protected:
   void SetImpl() override {
     DCHECK(deadline().IsInitialized());
     timeout_in_us_ = (deadline() - QuicTime::Zero()).ToMicroseconds();
-    TRACE("to in us %llu\n", timeout_in_us_);
+    //TRACE("to in us %llu %p\n", timeout_in_us_, this);
     loop_->AlarmMap().insert(std::make_pair(timeout_in_us_, this));
   }
 
@@ -69,6 +70,7 @@ class NqAlarm : public QuicAlarm {
       }
     }
     if (it != alarm_map.end()) {
+      //TRACE("alarm cancel: %p\n", this);
       loop_->AlarmMap().erase(it);
     }
   }
@@ -103,8 +105,8 @@ void NqLoop::Poll() {
     if (it->first > current) {
       break;
     }
-    TRACE("alarm fired %llu %llu\n", it->first, current);
     NqAlarm* cb = static_cast<NqAlarm*>(it->second);
+    TRACE("alarm fired %llu %llu %p\n", it->first, current, cb);
     cb->OnAlarm();
     auto it_prev = it;
     it++;

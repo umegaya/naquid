@@ -35,11 +35,18 @@ NqClient::NqClient(QuicSocketAddress server_address,
           stream_manager_(), destroyed_(false) {
   set_server_address(server_address);
 }
-NqClient::~NqClient() {}
+NqClient::~NqClient() {
+  ResetSession();
+}
 
 
 std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* connection) {
-  return QuicWrapUnique(new NqClientSession(connection, this, *config()));
+  auto s = new NqClientSession(connection, this, *config());
+  if (!OnOpen(NQ_HS_START)) {
+    auto c = loop_->Box(this);
+    loop_->Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Disconnect));
+  }
+  return QuicWrapUnique(s);
 }
 void NqClient::InitializeSession() {
   QuicClientBase::InitializeSession();
@@ -59,8 +66,8 @@ void NqClient::OnProofVerifyDetailsAvailable(const ProofVerifyDetails& verify_de
 }
 
 //implements NqSession::Delegate
-bool NqClient::OnOpen() { 
-  return nq_closure_call(on_open_, on_conn_open, ToHandle()); 
+bool NqClient::OnOpen(nq_handshake_event_t hsev) { 
+  return nq_closure_call(on_open_, on_conn_open, ToHandle(), hsev, nullptr); 
 }
 void NqClient::OnClose(QuicErrorCode error,
              const std::string& error_details,

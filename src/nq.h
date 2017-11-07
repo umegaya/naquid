@@ -68,6 +68,11 @@ typedef enum {
 	NQ_GOAWAY = -5,
 } nq_error_t;
 
+typedef enum {
+	NQ_HS_START = 0, //client: client send first packet, server: server receive initial packet
+	NQ_HS_DONE = 10,  //client: receive SHLO, server: accept CHLO
+} nq_handshake_event_t;
+
 typedef struct {
 	const char *host, *cert, *key, *ca;
 	int port;
@@ -76,9 +81,13 @@ typedef struct {
 typedef void (*nq_logger_t)(const char *, size_t, bool);
 
 //closure
-typedef bool (*nq_on_conn_open_t)(void *, nq_conn_t);
+//connection opening and opened. receive handshake progress (only start now) and done event.
+//returns false indicates shutdown connection (both server and client)
+//TODO(iyatomi): give more imformation for deciding shutdown connection through 4th paramter
+typedef bool (*nq_on_conn_open_t)(void *, nq_conn_t, nq_handshake_event_t, void *);
 //connection closed. after this called, nq_stream_t created by given nq_conn_t, will be invalid.
-//nq_conn_t itself will be invalid if this callback return 0, retained otherwise. 
+//nq_conn_t itself will be invalid if this callback return 0, 
+//otherwise, behavior will be differnt between client and server.
 typedef nq_time_t (*nq_on_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
 
 typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t);
@@ -138,7 +147,7 @@ typedef struct {
 } nq_clconf_t;
 
 typedef struct {
-	nq_closure_t on_open, on_close;
+	nq_closure_t on_open, on_accept, on_close;
 	const char *quic_secret;
 	int quic_cert_cache_size;
 } nq_svconf_t;

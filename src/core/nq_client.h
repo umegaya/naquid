@@ -115,7 +115,7 @@ class NqClient : public QuicClientBase,
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
-  bool OnOpen() override;
+  bool OnOpen(nq_handshake_event_t hsev) override;
   bool IsClient() const override { return true; }
   void Disconnect() override;
   bool Reconnect() override;

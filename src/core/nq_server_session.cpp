@@ -31,9 +31,13 @@ void NqServerSession::OnClose(QuicErrorCode error,
                   (int)error, 
                   error_details.c_str(), 
                   close_by_peer_or_self == ConnectionCloseSource::FROM_PEER);
+  //TODO(iyatomi): destroy session (seems no one delete it)
+  auto c = dispatcher_->Box(this);
+  //don't use invokeconn because it causes deletion of connection immediately.
+  dispatcher_->Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Finalize, NqBoxer::OpTarget::Conn));
 }
-bool NqServerSession::OnOpen() {
-  return nq_closure_call(port_config_.server().on_open, on_conn_open, ToHandle());
+bool NqServerSession::OnOpen(nq_handshake_event_t hsev) {
+  return nq_closure_call(port_config_.server().on_open, on_conn_open, ToHandle(), hsev, nullptr);
 }
 void NqServerSession::Disconnect() {
   connection()->CloseConnection(QUIC_CONNECTION_CANCELLED, "server side close", 

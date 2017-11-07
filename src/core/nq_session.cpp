@@ -36,7 +36,7 @@ void NqSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   QuicSession::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
     //TODO(iyatomi): if entering shutdown mode, always disconnect no matter what OnOpen returns
-    if (!delegate_->OnOpen()) {
+    if (!delegate_->OnOpen(NQ_HS_DONE)) {
       delegate_->Disconnect();
     }
   }
