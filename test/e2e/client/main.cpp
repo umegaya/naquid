@@ -29,7 +29,7 @@ static int idx = 0;
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
   ASSERT(result >= 0);
   auto sent_ts = nq::Endian::NetbytesToHost64((const char *)data);
-  printf("req %d: latency %lf sec\n", ++idx, ((double)(nq_time_now() - sent_ts) / (1000 * 1000 * 1000)));
+  printf("req %d: sent_ts: %llu, latency %lf sec\n", ++idx, sent_ts, ((double)(nq_time_now() - sent_ts) / (1000 * 1000 * 1000)));
 }
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {
 
@@ -39,7 +39,8 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
 
 /* helper */
 static void send_rpc(nq_rpc_t rpc, nq_closure_t reply_cb) {
-  nq_time_t now = nq_time_now();
+  nq_time_t now = nq::Endian::HostToNet(nq_time_now());
+  TRACE("now = %llx\n", now);
   nq_rpc_call(rpc, 1, (const void *)&now, sizeof(now), reply_cb);
 }
 
@@ -73,12 +74,12 @@ int main(int argc, char *argv[]){
 
   nq_rpc_t rpc = nq_conn_rpc(c, "test");
 
-  nq_time_t end = nq_time_now() + nq_time_sec(300);
+  nq_time_t end = nq_time_now() + nq_time_sec(3);
   nq_closure_t reply_cb;
   nq_closure_init(reply_cb, on_rpc_reply, on_rpc_reply, nullptr);
   while (nq_time_now() < end) {
     send_rpc(rpc, reply_cb);
-    nq_time_pause(nq_time_msec(100));
+    //nq_time_pause(nq_time_msec(100));
     nq_client_poll(cl);
   }
 

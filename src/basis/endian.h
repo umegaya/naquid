@@ -23,10 +23,12 @@ struct Endian {
       return ((const char *)(&checker_))[1] == 1;
   }
 
-  static inline uint16_t NetbytesToHost16(const char *b) {
+  template <typename T>
+  static inline uint16_t NetbytesToHost16(const T *p) {
+    auto b = reinterpret_cast<const uint8_t *>(p);
     if (Endian::isLittleEndian()) {
   		return ((uint16_t)b[0] << 8) |
-  			     ((uint16_t)b[1]);
+  			     ((uint16_t)b[1] << 0);
     } else if (Endian::isBigEndian()) {
   		return *(uint16_t *)b;
     } else {
@@ -34,15 +36,18 @@ struct Endian {
       return *(uint16_t *)b;
     }
   }
-  static inline int16_t NetbytesToHostS16(const char *b) {
+  template <typename T>
+  static inline int16_t NetbytesToHostS16(const T *b) {
     return (int16_t)NetbytesToHost16(b);
   }
-  static inline uint32_t NetbytesToHost32(const char *b) {
+  template <typename T>
+  static inline uint32_t NetbytesToHost32(const T *p) {
+    auto b = reinterpret_cast<const uint8_t *>(p);
     if (Endian::isLittleEndian()) {
       return ((uint32_t)b[0] << 24) |
              ((uint32_t)b[1] << 16) |
              ((uint32_t)b[2] << 8)  |
-             ((uint32_t)b[3]);
+             ((uint32_t)b[3] << 0);
     } else if (Endian::isBigEndian()) {
   		return *(uint32_t *)b;
     } else {
@@ -50,10 +55,13 @@ struct Endian {
       return *(uint32_t *)b;
     }
   }
-  static inline int32_t NetbytesToHostS32(const char *b) {
+  template <typename T>
+  static inline int32_t NetbytesToHostS32(const T *b) {
     return (int32_t)NetbytesToHost32(b);
   }
-  static inline uint64_t NetbytesToHost64(const char *b) {
+  template <typename T>
+  static inline uint64_t NetbytesToHost64(const T *p) {
+    auto b = reinterpret_cast<const uint8_t *>(p);
     if (Endian::isLittleEndian()) {
       return ((uint64_t)b[0] << 56) |
              ((uint64_t)b[1] << 48) |
@@ -62,7 +70,7 @@ struct Endian {
              ((uint64_t)b[4] << 24) |
              ((uint64_t)b[5] << 16) |
              ((uint64_t)b[6] << 8)  |
-             ((uint64_t)b[7]);
+             ((uint64_t)b[7] << 0);
     } else if (Endian::isBigEndian()) {
       return *(uint64_t *)b;
     } else {
@@ -70,13 +78,14 @@ struct Endian {
       return *(uint64_t *)b;
     }
   }
-  static inline int64_t NetbytesToHostS64(const char *b) {
+  template <typename T>
+  static inline int64_t NetbytesToHostS64(const T *b) {
     return (int64_t)NetbytesToHost64(b);
   }
   template <typename T>
   static inline T HostToNet(T value) noexcept {
     if (Endian::isLittleEndian()) {
-  		char* ptr = reinterpret_cast<char*>(&value);
+  		uint8_t* ptr = reinterpret_cast<uint8_t*>(&value);
   	 	  std::reverse (ptr, ptr + sizeof(T));
       return value;
     } else if (Endian::isBigEndian()) {

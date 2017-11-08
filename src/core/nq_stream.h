@@ -188,7 +188,6 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     loop_(stream->GetLoop()) {};
 
   ~NqSimpleRPCStreamHandler() {
-    TRACE("NqSimpleRPCStreamHandler dtor\n");
     for (auto &kv : req_map_) {
       kv.second->Cancel();
       delete kv.second;

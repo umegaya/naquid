@@ -106,7 +106,7 @@ void NqLoop::Poll() {
       break;
     }
     NqAlarm* cb = static_cast<NqAlarm*>(it->second);
-    TRACE("alarm fired %llu %llu %p\n", it->first, current, cb);
+    //TRACE("alarm fired %llu %llu %p\n", it->first, current, cb);
     cb->OnAlarm();
     auto it_prev = it;
     it++;

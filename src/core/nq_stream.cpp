@@ -84,11 +84,14 @@ void NqStream::OnDataAvailable() {
   //greedy read and called back
   struct iovec v[256];
   int n_blocks = sequencer()->GetReadableRegions(v, 256);
+  //TRACE("NqStream OnDataAvailable %u data blocks\n", n_blocks);
   int i = 0;
   if (handler_ == nullptr && !establish_side()) {
     //establishment
-    for (;i < n_blocks; i++) {
+    for (;i < n_blocks;) {
       buffer_.append(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
+      sequencer()->MarkConsumed(v[i].iov_len);
+      i++;
       size_t idx = buffer_.find('\0');
       if (idx == std::string::npos) {
         continue; //not yet established
@@ -109,9 +112,12 @@ void NqStream::OnDataAvailable() {
       break;
     }
   }
+  size_t consumed = 0;
   for (;i < n_blocks; i++) {
     handler_->OnRecv(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
+    consumed += v[i].iov_len;
   }
+  sequencer()->MarkConsumed(consumed);  
 }
 
 
@@ -127,7 +133,9 @@ void NqClientStream::OnClose() {
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
   if (!proto_sent_) { //TODO: use unlikely
     const auto& name = stream_->protocol();
+    char zero_byte = 0;
     stream_->WriteOrBufferData(QuicStringPiece(name.c_str(), name.length()), false, nullptr);
+    stream_->WriteOrBufferData(QuicStringPiece(&zero_byte, 1), false, nullptr);
     OnOpen(); //client stream side OnOpen
     proto_sent_ = true;
   }
@@ -185,18 +193,20 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, u
   req->alarm_ = alarm;
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
+  TRACE("stream handler OnRecv %u bytes\n", len);
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
   const char *pstr = parse_buffer_.c_str();
   size_t plen = parse_buffer_.length();
-  nq_size_t read_ofs, reclen = nq::LengthCodec::Decode(&read_ofs, pstr, plen);
-  if (reclen > 0 && (reclen + read_ofs) <= len) {
+  nq_size_t reclen = 0, read_ofs = nq::LengthCodec::Decode(&reclen, pstr, plen);
+  /* read_ofs => length of encoded length, reclen => actual payload length */
+  if (reclen > 0 && (read_ofs + reclen) <= plen) {
     /*
       type > 0 && msgid != 0 => request
       type <= 0 && msgid != 0 => reply
       type > 0 && msgid == 0 => notify
     */
-    pstr += read_ofs;
+    pstr += read_ofs; //move pointer to top of payload
     int16_t type = nq::Endian::NetbytesToHostS16(pstr);
     nq_msgid_t msgid = nq::Endian::NetbytesToHost16(pstr + 2);
     if (msgid != 0) {
@@ -227,6 +237,8 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   } else if (reclen == 0 && len > len_buff_len) {
     //broken payload. should resolve payload length
     stream_->Disconnect();
+  } else {
+    //TRACE("pb: %zu bytes, recv: %u bytes, reclen: %u bytes\n", plen, len, reclen);
   }
 }
 void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t len) {
