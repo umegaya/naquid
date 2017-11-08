@@ -2,6 +2,7 @@
 #include "basis/endian.h"
 #include <stdio.h>
 
+#define N_CLIENT (16)
 
 /* conn callback */
 bool on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void *) {
@@ -66,20 +67,26 @@ int main(int argc, char *argv[]){
   nq_clconf_t conf;
   nq_closure_init(conf.on_open, on_conn_open, on_conn_open, nullptr);
   nq_closure_init(conf.on_close, on_conn_close, on_conn_close, nullptr);
-  nq_conn_t c = nq_client_connect(cl, &addr, &conf);
-  if (!nq_conn_is_valid(c)) {
-    printf("fail to create connection\n");
-    return -1;
+
+  nq_conn_t cs[N_CLIENT];
+  nq_rpc_t rpcs[N_CLIENT];
+  for (int i = 0; i < N_CLIENT; i++) {
+    cs[i] = nq_client_connect(cl, &addr, &conf);
+    if (!nq_conn_is_valid(cs[i])) {
+      printf("fail to create connection\n");
+      return -1;
+    }
+    rpcs[i] = nq_conn_rpc(cs[i], "test");
   }
 
-  nq_rpc_t rpc = nq_conn_rpc(c, "test");
-
-  nq_time_t end = nq_time_now() + nq_time_sec(3);
+  nq_time_t end = nq_time_now() + nq_time_sec(5);
   nq_closure_t reply_cb;
   nq_closure_init(reply_cb, on_rpc_reply, on_rpc_reply, nullptr);
   while (nq_time_now() < end) {
-    send_rpc(rpc, reply_cb);
-    //nq_time_pause(nq_time_msec(100));
+    for (int i = 0; i < N_CLIENT; i++) {
+      send_rpc(rpcs[i], reply_cb);
+    }
+    nq_time_pause(nq_time_msec(10));
     nq_client_poll(cl);
   }
 

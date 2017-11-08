@@ -83,7 +83,7 @@ namespace nq {
         int old = max_nfd_;
         do {
           max_nfd_ <<= 1;
-        } while (max_nfd_ > (int)fd);
+        } while (max_nfd_ < (int)fd);
         processors_ = (IoProcessor**)std::realloc(processors_, max_nfd_ * sizeof(IoProcessor*));
         memset(processors_ + old, 0, sizeof(IoProcessor*) * (max_nfd_ - old));
       }
