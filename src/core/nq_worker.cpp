@@ -75,7 +75,7 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
       ASSERT(false);
       return false;
     }
-    auto d = new NqDispatcher(kv.first, kv.second, *this);
+    auto d = new NqDispatcher(kv.first, kv.second, kv.second.NewCryptoConfig(&loop_), *this);
     if (loop_.Add(listen_fd, d, NqLoop::EV_READ | NqLoop::EV_WRITE) != NQ_OK) {
       nq::Syscall::Close(listen_fd);
       delete d;

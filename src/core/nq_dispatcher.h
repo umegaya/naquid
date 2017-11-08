@@ -25,6 +25,7 @@ class NqDispatcher : public QuicDispatcher,
   int port_; 
   uint32_t index_, n_worker_;
   const NqServer &server_;
+  std::unique_ptr<QuicCryptoServerConfig> crypto_config_;
   InvokeQueue *invoke_queues_;
   NqServerLoop &loop_;
   NqPacketReader &reader_;
@@ -34,12 +35,15 @@ class NqDispatcher : public QuicDispatcher,
  public:
   //TODO(iyatomi): find proper cache size
   static const int kDefaultCertCacheSize = 16; 
-  NqDispatcher(int port, const NqServerConfig& config, NqWorker &worker);
+  NqDispatcher(int port, const NqServerConfig& config, 
+               std::unique_ptr<QuicCryptoServerConfig> crypto_config, 
+               NqWorker &worker);
   void Process(NqPacket *p) {
     ProcessPacket(p->server_address(), p->client_address(), *p);
     reader_.Pool(const_cast<char *>(p->data()), p);
   }
   inline QuicCompressedCertsCache *cert_cache() { return &cert_cache_; }
+  inline const QuicCryptoServerConfig *crypto_config() const { return crypto_config_.get(); }
   inline NqLoop *loop() { return &loop_; }
   inline InvokeQueue *invoke_queues() { return invoke_queues_; }
   inline NqSessionIndex new_session_index() { return server_map_.NewIndex(); }

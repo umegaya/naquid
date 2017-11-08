@@ -59,8 +59,9 @@ class NqServer {
       ASSERT(false);
       return nullptr;
     }
+    auto &pconf = pc.first->second;
     //first is iterator of map<int, PortConfig>
-    return &(pc.first->second.handler_map_);
+    return &(pconf.handler_map_);
   }
 	int Start(bool block) {
     if (!alive_) { return NQ_OK; }

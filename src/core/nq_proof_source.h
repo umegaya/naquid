@@ -24,15 +24,13 @@ class NqProofSource : public ProofSourceChromium {
         base::FilePath(base::FilePath::StringPieceType(a.cert)), 
         base::FilePath(base::FilePath::StringPieceType(a.key)), 
         base::FilePath());
-
-    } 
+    }
 #if defined(OS_LINUX)
     if (!inited) {
       auto basepath = base::FilePath::StringType("/etc/letsencrypt/live/") + 
                       base::FilePath::StringType(a.host), 
            certfile = base::FilePath::StringType("/fullchain.pem"),
            keyfile = base::FilePath::StringType("/privkey.pem");
-      //TODO(iyatomi): for linux, try to use /etc/letsencrypt/live/${domain_name}/privkey.pem, fullchain.pem
       inited = ProofSourceChromium::Initialize(
         base::FilePath(basepath + certfile), 
         base::FilePath(basepath + keyfile), 
@@ -44,6 +42,11 @@ class NqProofSource : public ProofSourceChromium {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqProofSource);
+
+#if defined(DEBUG)
+  static char s_dummy_cert[];
+  static char s_dummy_key[];
+#endif
 };
 
 }  // namespace net

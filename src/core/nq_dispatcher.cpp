@@ -9,15 +9,18 @@
 #include "core/nq_stub_interface.h"
 
 namespace net {
-NqDispatcher::NqDispatcher(int port, const NqServerConfig& config, NqWorker &worker) : 
+NqDispatcher::NqDispatcher(int port, const NqServerConfig& config, 
+                           std::unique_ptr<QuicCryptoServerConfig> crypto_config, 
+                           NqWorker &worker) : 
 	QuicDispatcher(config,
-                 config.crypto(),
+                 crypto_config.get(),
                  new QuicVersionManager(net::AllSupportedVersions()),
                  std::unique_ptr<QuicConnectionHelperInterface>(new NqStubConnectionHelper(worker.loop())), 
                  std::unique_ptr<QuicCryptoServerStream::Helper>(new NqStubCryptoServerStreamHelper(*this)),
-                 std::unique_ptr<QuicAlarmFactory>(new NqStubAlarmFactory(worker.loop()))), 
+                 std::unique_ptr<QuicAlarmFactory>(new NqStubAlarmFactory(worker.loop()))
+                ), 
 	port_(port), index_(worker.index()), n_worker_(worker.server().n_worker()), 
-  server_(worker.server()), loop_(worker.loop()), reader_(worker.reader()), 
+  server_(worker.server()), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
   server_map_(), thread_id_(worker.thread_id()) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);

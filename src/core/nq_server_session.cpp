@@ -68,7 +68,7 @@ QuicStream *NqServerSession::NewStream(const std::string &name) {
 }
 QuicCryptoStream *NqServerSession::NewCryptoStream(NqSession *session) {
   return new QuicCryptoServerStream(
-    port_config_.crypto(),
+    dispatcher_->crypto_config(),
     dispatcher_->cert_cache(),
     true,
     session,

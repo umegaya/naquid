@@ -46,7 +46,7 @@ int main(int argc, char *argv[]){
 
   nq_hdmap_t hm;
   nq_addr_t addr = {
-    "0.0.0.0", nullptr, nullptr, nullptr,
+    "0.0.0.0", "./test/e2e/server/certs/leaf_cert.pem", "./test/e2e/server/certs/leaf_cert.pkcs8", nullptr,
     8443
   };
   nq_svconf_t conf;

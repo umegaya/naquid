@@ -83,7 +83,7 @@ NqClient *NqClientLoop::Create(const std::string &host,
     supported_versions,
     config,
     this,
-    config.proof_verifier()
+    config.NewProofVerifier()
   );
   if (!c->Initialize()) {
     delete c;
