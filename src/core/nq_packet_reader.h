@@ -44,7 +44,7 @@ class NqPacketReader {
     inline uint64_t ConnectionId() const {
       switch (data()[0] & 0x08) {
         case 0x08:
-          return nq::Endian::NetbytesToHost64(data() + 1);
+          return nq::Endian::NetbytesToHost<uint64_t>(data() + 1);
         default:
           //TODO(iyatomi): can we detect connection_id from packet->client_address()? but chromium server sample itself seems to ignore...
           return 0;

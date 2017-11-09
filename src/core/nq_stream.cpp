@@ -162,10 +162,10 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
   QuicConnection::ScopedPacketBundler bundler(
     nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
-	char len_buff[len_buff_len];
-	auto enc_len = nq::LengthCodec::Encode(len, len_buff, sizeof(len_buff));
-	WriteBytes(len_buff, enc_len);
-	WriteBytes(ToCStr(p), len);
+	char buffer[len_buff_len + len];
+	auto enc_len = nq::LengthCodec::Encode(len, buffer, sizeof(buffer));
+  memcpy(buffer + enc_len, p, len);
+	WriteBytes(buffer, enc_len + len);
 }
 
 
@@ -207,8 +207,8 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
       type > 0 && msgid == 0 => notify
     */
     pstr += read_ofs; //move pointer to top of payload
-    int16_t type = nq::Endian::NetbytesToHostS16(pstr);
-    nq_msgid_t msgid = nq::Endian::NetbytesToHost16(pstr + 2);
+    int16_t type = nq::Endian::NetbytesToHost<int16_t>(pstr);
+    nq_msgid_t msgid = nq::Endian::NetbytesToHost<nq_msgid_t>(pstr + 2);
     if (msgid != 0) {
       if (type <= 0) {
         auto it = req_map_.find(msgid);
@@ -246,13 +246,12 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
     nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   //pack and send buffer
-  char len_buff[len_buff_len];
-  auto enc_len = nq::LengthCodec::Encode(len + 4, len_buff, sizeof(len_buff));
-  WriteBytes(len_buff, enc_len);
-  uint16_t ntype = nq::Endian::HostToNet(type), nmsgid = 0;
-  WriteBytes((char *)&ntype, 2);
-  WriteBytes((char *)&nmsgid, 2);
-  WriteBytes(ToCStr(p), len);  
+  char buffer[len_buff_len + 4 + len];
+  auto enc_len = nq::LengthCodec::Encode(len + 4, buffer, sizeof(buffer));
+  nq::Endian::HostToNetbytes(type, buffer + enc_len);
+  nq::Endian::HostToNetbytes((uint16_t)0, buffer + enc_len + 2);
+  memcpy(buffer + enc_len + 4, p, len);
+  WriteBytes(buffer, enc_len + 4 + len);  
 }
 void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
   QuicConnection::ScopedPacketBundler bundler(
@@ -260,13 +259,12 @@ void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len,
   ASSERT(type > 0);
   nq_msgid_t msgid = msgid_factory_.New();
   //pack and send buffer
-  char len_buff[len_buff_len];
-  auto enc_len = nq::LengthCodec::Encode(len + 4, len_buff, sizeof(len_buff));
-  WriteBytes(len_buff, enc_len);
-  uint16_t ntype = nq::Endian::HostToNet(type), nmsgid = nq::Endian::HostToNet(msgid);
-  WriteBytes((char *)&ntype, 2);
-  WriteBytes((char *)&nmsgid, 2);
-  WriteBytes(ToCStr(p), len);
+  char buffer[len_buff_len + 4 + len];
+  auto enc_len = nq::LengthCodec::Encode(len + 4, buffer, sizeof(buffer));
+  nq::Endian::HostToNetbytes(type, buffer + enc_len);
+  nq::Endian::HostToNetbytes(msgid, buffer + enc_len + 2);
+  memcpy(buffer + enc_len + 4, p, len);
+  WriteBytes(buffer, enc_len + 4 + len);  
 
   EntryRequest(msgid, cb);
 }
@@ -275,13 +273,12 @@ void NqSimpleRPCStreamHandler::Reply(nq_result_t result, nq_msgid_t msgid, const
     nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);
   //pack and send buffer
-  char len_buff[len_buff_len];
-  auto enc_len = nq::LengthCodec::Encode(len + 4, len_buff, sizeof(len_buff));
-  WriteBytes(len_buff, enc_len);
-  uint16_t nresult = nq::Endian::HostToNet(result), nmsgid = nq::Endian::HostToNet(msgid);
-  WriteBytes((char *)&nresult, 2);
-  WriteBytes((char *)&nmsgid, 2);
-  WriteBytes(ToCStr(p), len);
+  char buffer[len_buff_len + 4 + len];
+  auto enc_len = nq::LengthCodec::Encode(len + 4, buffer, sizeof(buffer));
+  nq::Endian::HostToNetbytes(result, buffer + enc_len);
+  nq::Endian::HostToNetbytes(msgid, buffer + enc_len + 2);
+  memcpy(buffer + enc_len + 4, p, len);
+  WriteBytes(buffer, enc_len + 4 + len);  
 }
 
 

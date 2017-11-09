@@ -28,7 +28,7 @@ void on_stream_close(void *p, nq_stream_t s) {
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
   ASSERT(type == kRpcPing);
   ASSERT(len == sizeof(nq_time_t));
-  auto peer_ts = nq::Endian::NetbytesToHost64((const char *)data);
+  auto peer_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
   TRACE("peer_ts => %llu\n", peer_ts);
   nq_rpc_reply(rpc, kRpcOk, msgid, data, len);
 }

@@ -162,6 +162,8 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     void OnAlarm() override { 
       auto it = stream_->req_map_.find(msgid_);
       if (it != stream_->req_map_.end()) {
+        //TODO(iyatomi): raise timeout error
+        nq_closure_call(on_data_, on_rpc_reply, stream_->ToHandle<nq_rpc_t>(), type, "", 0);
         stream_->req_map_.erase(it);
       }
       delete alarm_; //it deletes Requet object itself
