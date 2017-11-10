@@ -44,6 +44,7 @@ class NqSession : public QuicSession {
     virtual NqLoop *GetLoop() = 0;
     virtual NqBoxer *GetBoxer() = 0;
     virtual NqSessionIndex SessionIndex() const = 0;
+    virtual QuicConnection *Connection() = 0;
 
     template <class S> S *NewStreamCast(const std::string &name) {
       return static_cast<S *>(NewStream(name));

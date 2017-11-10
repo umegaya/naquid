@@ -127,6 +127,8 @@ class NqClient : public QuicClientBase,
   NqLoop *GetLoop() override { return loop_; }
   NqBoxer *GetBoxer() override { return static_cast<NqBoxer *>(loop_); }
   NqSessionIndex SessionIndex() const override { return session_index_; }
+  QuicConnection *Connection() override { return session()->connection(); }
+
 
  private:
   NqClientLoop* loop_;

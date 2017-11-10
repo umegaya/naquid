@@ -86,6 +86,9 @@ int main(int argc, char *argv[]){
   while (nq_time_now() < end) {
     for (int i = 0; i < N_CLIENT; i++) {
       send_rpc(rpcs[i], reply_cb);
+      if (i == 0) {
+        nq_conn_flush(cs[i]);
+      }
     }
     //nq_time_pause(nq_time_msec(10));
     nq_client_poll(cl);

@@ -230,6 +230,8 @@ extern nq_hdmap_t nq_conn_hdmap(nq_conn_t conn);
 extern NQ_THREADSAFE void nq_conn_close(nq_conn_t conn); 
 //this just restart connection, never destroy. but associated stream/rpc all destroyed. (client only)
 extern NQ_THREADSAFE void nq_conn_reset(nq_conn_t conn); 
+//flush buffered packets
+extern NQ_THREADSAFE void nq_conn_flush(nq_conn_t conn);
 //check connection is client mode or not.
 extern NQ_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
 //check conn is valid. invalid means fail to create or closed, or temporary disconnected (will reconnect soon).

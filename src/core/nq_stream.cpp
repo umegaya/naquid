@@ -259,8 +259,8 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
   WriteBytes(buffer, ofs + len);  
 }
 void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
-  QuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  //QuicConnection::ScopedPacketBundler bundler(
+    //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   nq_msgid_t msgid = msgid_factory_.New();
   //pack and send buffer
@@ -274,8 +274,8 @@ void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len,
   EntryRequest(msgid, cb);
 }
 void NqSimpleRPCStreamHandler::Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len) {
-  QuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  //QuicConnection::ScopedPacketBundler bundler(
+    //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];

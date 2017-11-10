@@ -120,6 +120,9 @@ void nq_conn_close(nq_conn_t conn) {
 void nq_conn_reset(nq_conn_t conn) {
   NqBoxer::From(conn)->InvokeConn(conn.s,NqBoxer::OpCode::Reconnect);
 } 
+void nq_conn_flush(nq_conn_t conn) {
+  NqBoxer::From(conn)->InvokeConn(conn.s,NqBoxer::OpCode::Flush);
+} 
 bool nq_conn_is_client(nq_conn_t conn) {
 	return NqBoxer::From(conn)->IsClient();
 }
@@ -127,10 +130,12 @@ bool nq_conn_is_valid(nq_conn_t conn) {
   return NqBoxer::From(conn)->Valid(conn);
 }
 nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
-	return NqBoxer::Unbox(conn)->ResetHandlerMap()->ToHandle();
+  auto c = NqBoxer::Unbox(conn);
+	return c != nullptr ? c->ResetHandlerMap()->ToHandle() : nullptr;
 }
 uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
-  return NqBoxer::Unbox(conn)->ReconnectDurationUS();
+  auto c = NqBoxer::Unbox(conn);
+  return c != nullptr ? c->ReconnectDurationUS() : 0;
 }
 
 
