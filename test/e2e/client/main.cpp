@@ -58,6 +58,7 @@ int main(int argc, char *argv[]){
   nq_closure_init(handler.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
   nq_closure_init(handler.on_stream_open, on_stream_open, on_stream_open, nullptr);
   nq_closure_init(handler.on_stream_close, on_stream_close, on_stream_close, nullptr);
+  handler.use_large_msgid = false;
   nq_hdmap_rpc_handler(hm, "test", handler);
 
   nq_addr_t addr = {

@@ -34,7 +34,7 @@ typedef uint64_t nq_time_t;	//nano seconds timestamp
 
 typedef time_t nq_unix_time_t; //place holder for unix timestamp
 
-typedef uint16_t nq_msgid_t;
+typedef uint32_t nq_msgid_t;
 
 typedef uint32_t nq_stream_id_t;
 
@@ -162,6 +162,7 @@ typedef struct {
 
 typedef struct {
 	nq_closure_t on_rpc_request, on_rpc_notify, on_stream_open, on_stream_close;
+	bool use_large_msgid;
 } nq_rpc_handler_t;
 
 

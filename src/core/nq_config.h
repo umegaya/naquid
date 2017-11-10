@@ -46,7 +46,7 @@ class NqServerConfig : public QuicConfig {
   const nq_svconf_t &server() const { return server_; }
   std::unique_ptr<QuicCryptoServerConfig> NewCryptoConfig(QuicClock *clock) const {
 #if !defined(DEBUG)
-    if (conf.quic_secret == nullptr) {
+    if (server_.quic_secret == nullptr) {
       return nullptr; //should use original secret
     }
 #endif

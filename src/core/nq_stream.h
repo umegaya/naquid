@@ -108,6 +108,7 @@ public:
   }
   inline void Disconnect() { stream_->Disconnect(); }
   inline void ProtoSent() { proto_sent_ = true; }
+  inline NqStream *stream() { return stream_; }
   void WriteBytes(const char *p, nq_size_t len);
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
@@ -154,24 +155,24 @@ class NqRawStreamHandler : public NqStreamHandler {
 class NqSimpleRPCStreamHandler : public NqStreamHandler {
   class Request : public QuicAlarm::Delegate {
    public:
-    Request(NqSimpleRPCStreamHandler *stream, 
+    Request(NqSimpleRPCStreamHandler *stream_handler, 
             nq_msgid_t msgid,
             nq_closure_t on_data) : 
-            stream_(stream), alarm_(nullptr), on_data_(on_data), msgid_(msgid) {}
+            stream_handler_(stream_handler), alarm_(nullptr), on_data_(on_data), msgid_(msgid) {}
     ~Request() {}
     void OnAlarm() override { 
-      auto it = stream_->req_map_.find(msgid_);
-      if (it != stream_->req_map_.end()) {
+      auto it = stream_handler_->req_map_.find(msgid_);
+      if (it != stream_handler_->req_map_.end()) {
         //TODO(iyatomi): raise timeout error
-        nq_closure_call(on_data_, on_rpc_reply, stream_->ToHandle<nq_rpc_t>(), type, "", 0);
-        stream_->req_map_.erase(it);
+        nq_closure_call(on_data_, on_rpc_reply, stream_handler_->stream()->ToHandle<nq_rpc_t>(), NQ_ETIMEOUT, "", 0);
+        stream_handler_->req_map_.erase(it);
       }
       delete alarm_; //it deletes Requet object itself
     }
     inline void Cancel() { alarm_->Cancel(); }
    private:
     friend class NqSimpleRPCStreamHandler;
-    NqSimpleRPCStreamHandler *stream_; 
+    NqSimpleRPCStreamHandler *stream_handler_; 
     QuicAlarm *alarm_;
     nq_closure_t on_data_;
     nq_msgid_t msgid_/*, padd_[3]*/;
@@ -184,10 +185,12 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   std::map<uint32_t, Request*> req_map_;
   NqLoop *loop_;
  public:
-  NqSimpleRPCStreamHandler(NqStream *stream, nq_closure_t on_request, nq_closure_t on_notify) : 
+  NqSimpleRPCStreamHandler(NqStream *stream, nq_closure_t on_request, nq_closure_t on_notify, bool use_large_msgid) : 
     NqStreamHandler(stream), parse_buffer_(), 
     on_request_(on_request), on_notify_(on_notify), msgid_factory_(), req_map_(),
-    loop_(stream->GetLoop()) {};
+    loop_(stream->GetLoop()) {
+      if (!use_large_msgid) { msgid_factory_.set_limit(0xFFFF); }
+    };
 
   ~NqSimpleRPCStreamHandler() {
     for (auto &kv : req_map_) {

@@ -1,6 +1,6 @@
 #include "core/nq_stream.h"
 
-#include "basis/length_codec.h"
+#include "basis/header_codec.h"
 #include "basis/endian.h"
 #include "core/nq_loop.h"
 #include "core/nq_session.h"
@@ -59,13 +59,15 @@ NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
       s = new NqSimpleStreamHandler(this, he->stream.on_stream_record);
     } else {
       s = new NqRawStreamHandler(this, he->stream.on_stream_record, 
-                                          he->stream.stream_reader, 
-                                          he->stream.stream_writer); 
+                                 he->stream.stream_reader, 
+                                 he->stream.stream_writer); 
     }
     s->SetLifeCycleCallback(he->stream.on_stream_open, he->stream.on_stream_close);
   } break;
   case nq::HandlerMap::RPC: {
-    s = new NqSimpleRPCStreamHandler(this, he->rpc.on_rpc_request, he->rpc.on_rpc_notify);
+    s = new NqSimpleRPCStreamHandler(this, he->rpc.on_rpc_request, 
+                                     he->rpc.on_rpc_notify, 
+                                    he->rpc.use_large_msgid);
     s->SetLifeCycleCallback(he->rpc.on_stream_open, he->rpc.on_stream_close);
   } break;
   default:
@@ -145,6 +147,7 @@ void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
 
 
 constexpr size_t len_buff_len = nq::LengthCodec::EncodeLength(sizeof(nq_size_t));
+constexpr size_t header_buff_len = 8;
 void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
   //greedy read and called back
 	parse_buffer_.append(ToCStr(p), len);
@@ -196,10 +199,14 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   TRACE("stream handler OnRecv %u bytes\n", len);
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
+  //prepare tmp variables
   const char *pstr = parse_buffer_.c_str();
-  size_t plen = parse_buffer_.length();
-  nq_size_t reclen = 0, read_ofs = nq::LengthCodec::Decode(&reclen, pstr, plen);
-  /* read_ofs => length of encoded length, reclen => actual payload length */
+  size_t plen = parse_buffer_.length(), read_ofs = 0;
+  int16_t type; nq_msgid_t msgid; nq_size_t reclen = 0;
+  //decode header
+  read_ofs = nq::HeaderCodec::Decode(&type, &msgid, pstr, plen);
+  read_ofs += nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
+  /* read_ofs => length of encoded header, reclen => actual payload length */
   if (reclen > 0 && (read_ofs + reclen) <= plen) {
     /*
       type > 0 && msgid != 0 => request
@@ -207,8 +214,6 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
       type > 0 && msgid == 0 => notify
     */
     pstr += read_ofs; //move pointer to top of payload
-    int16_t type = nq::Endian::NetbytesToHost<int16_t>(pstr);
-    nq_msgid_t msgid = nq::Endian::NetbytesToHost<nq_msgid_t>(pstr + 2);
     if (msgid != 0) {
       if (type <= 0) {
         auto it = req_map_.find(msgid);
@@ -216,7 +221,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
           auto req = it->second;
           req_map_.erase(it);
           //reply from serve side
-          nq_closure_call(req->on_data_, on_rpc_reply, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr + 4), reclen - 4);
+          nq_closure_call(req->on_data_, on_rpc_reply, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
           req->alarm_->Cancel(); //cancel firing alarm
           delete req->alarm_; //it deletes req itself
         } else {
@@ -225,11 +230,11 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
         }
       } else {
         //request
-        nq_closure_call(on_request_, on_rpc_request, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr + 4), reclen - 4);
+        nq_closure_call(on_request_, on_rpc_request, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr), reclen);
       }
     } else if (type > 0) {
       //notify
-      nq_closure_call(on_notify_, on_rpc_notify, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr + 4), reclen - 4);
+      nq_closure_call(on_notify_, on_rpc_notify, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
     } else {
       ASSERT(false);
     }
@@ -246,12 +251,12 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
     nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   //pack and send buffer
-  char buffer[len_buff_len + 4 + len];
-  auto enc_len = nq::LengthCodec::Encode(len + 4, buffer, sizeof(buffer));
-  nq::Endian::HostToNetbytes(type, buffer + enc_len);
-  nq::Endian::HostToNetbytes((uint16_t)0, buffer + enc_len + 2);
-  memcpy(buffer + enc_len + 4, p, len);
-  WriteBytes(buffer, enc_len + 4 + len);  
+  char buffer[header_buff_len + len_buff_len + len];
+  size_t ofs = 0;
+  ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), 0, buffer, sizeof(buffer));
+  ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
+  memcpy(buffer + ofs, p, len);
+  WriteBytes(buffer, ofs + len);  
 }
 void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
   QuicConnection::ScopedPacketBundler bundler(
@@ -259,12 +264,12 @@ void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len,
   ASSERT(type > 0);
   nq_msgid_t msgid = msgid_factory_.New();
   //pack and send buffer
-  char buffer[len_buff_len + 4 + len];
-  auto enc_len = nq::LengthCodec::Encode(len + 4, buffer, sizeof(buffer));
-  nq::Endian::HostToNetbytes(type, buffer + enc_len);
-  nq::Endian::HostToNetbytes(msgid, buffer + enc_len + 2);
-  memcpy(buffer + enc_len + 4, p, len);
-  WriteBytes(buffer, enc_len + 4 + len);  
+  char buffer[header_buff_len + len_buff_len + len];
+  size_t ofs = 0;
+  ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), msgid, buffer, sizeof(buffer));
+  ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
+  memcpy(buffer + ofs, p, len);
+  WriteBytes(buffer, ofs + len);  
 
   EntryRequest(msgid, cb);
 }
@@ -273,12 +278,12 @@ void NqSimpleRPCStreamHandler::Reply(nq_result_t result, nq_msgid_t msgid, const
     nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);
   //pack and send buffer
-  char buffer[len_buff_len + 4 + len];
-  auto enc_len = nq::LengthCodec::Encode(len + 4, buffer, sizeof(buffer));
-  nq::Endian::HostToNetbytes(result, buffer + enc_len);
-  nq::Endian::HostToNetbytes(msgid, buffer + enc_len + 2);
-  memcpy(buffer + enc_len + 4, p, len);
-  WriteBytes(buffer, enc_len + 4 + len);  
+  char buffer[header_buff_len + len_buff_len + len];
+  size_t ofs = 0;
+  ofs = nq::HeaderCodec::Encode(result, msgid, buffer, sizeof(buffer));
+  ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
+  memcpy(buffer + ofs, p, len);
+  WriteBytes(buffer, ofs + len);  
 }
 
 
