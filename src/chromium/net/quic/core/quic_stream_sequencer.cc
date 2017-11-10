@@ -37,7 +37,6 @@ QuicStreamSequencer::QuicStreamSequencer(QuicStream* quic_stream,
 QuicStreamSequencer::~QuicStreamSequencer() {}
 
 void QuicStreamSequencer::OnStreamFrame(const QuicStreamFrame& frame) {
-  fprintf(stderr, "OnStreamFrame\n");
   ++num_frames_received_;
   const QuicStreamOffset byte_offset = frame.offset;
   const size_t data_len = frame.data_length;

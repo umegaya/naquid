@@ -6,8 +6,8 @@
 - [x] rpc: add header byte to indicate msgid/type size
 - [ ] conn: client side proof verification (import ProofVerifierChromium)
 - [ ] conn: study is there a way to send stream name without sending over stream (cmsghdr can do this somehow?)
-- [ ] conn: changing to batch send by default, with preparing new API to flush batch buffer
-- [ ] conn: make user able to read property of NqSession::Delegate via nq_conn_t
+- [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
+- [ ] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
 - [ ] test: high freqent reconnection test
 - [ ] test: higher concurrency test (around 10k client connection)
 - [ ] test: server side stream initiation
@@ -16,6 +16,7 @@
 - [ ] test: stream handle send/recv test
 - [ ] bench: ensure scalability with number of thread
 - [ ] bench: latency, throughput, compare with mrs, which is gaming specific udp network library
+- [ ] bench: fix problem that performance significantly decreased when binary does not run with lldb
 
 #### remain tasks for future
 - [ ] stream/rpc: unreliable packet sending

@@ -172,6 +172,7 @@ bool NqPacketReader::ReadPackets(
                                   &server_ip, &walltimestamp, &client_address);
   if (bytes_read < 0) {
     TRACE("NqPacketReader::ReadPackets fails %u\n", errno);
+    buffer_pool_.push(buf);
     return false;  // ReadPacket failed.
   }
 
@@ -179,6 +180,7 @@ bool NqPacketReader::ReadPackets(
 
   if (!server_ip.IsInitialized()) {
     QUIC_BUG << "Unable to get server address.";
+    buffer_pool_.push(buf);
     return false;
   }
   // This isn't particularly desirable, but not all platforms support socket

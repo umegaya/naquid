@@ -43,4 +43,36 @@ class NqProofVerifier : public ProofVerifier {
     return QUIC_SUCCESS;
   }
 };
+class NqNoopProofVerifier : public ProofVerifier {
+ public:
+  NqNoopProofVerifier() {}
+  ~NqNoopProofVerifier() override {}
+
+  // ProofVerifier override.
+  QuicAsyncStatus VerifyProof(
+      const std::string& hostname,
+      const uint16_t port,
+      const std::string& server_config,
+      QuicVersion quic_version,
+      QuicStringPiece chlo_hash,
+      const std::vector<std::string>& certs,
+      const std::string& cert_sct,
+      const std::string& signature,
+      const ProofVerifyContext* context,
+      std::string* error_details,
+      std::unique_ptr<ProofVerifyDetails>* verify_details,
+      std::unique_ptr<ProofVerifierCallback> callback) override {
+    return QUIC_SUCCESS;
+  }
+
+  QuicAsyncStatus VerifyCertChain(
+      const std::string& hostname,
+      const std::vector<std::string>& certs,
+      const ProofVerifyContext* context,
+      std::string* error_details,
+      std::unique_ptr<ProofVerifyDetails>* details,
+      std::unique_ptr<ProofVerifierCallback> callback) override {
+    return QUIC_SUCCESS;
+  }
+};
 } //net

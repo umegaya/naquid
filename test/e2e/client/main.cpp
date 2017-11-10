@@ -2,7 +2,7 @@
 #include "basis/endian.h"
 #include <stdio.h>
 
-#define N_CLIENT (16)
+#define N_CLIENT (64)
 
 /* conn callback */
 bool on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void *) {
@@ -26,11 +26,14 @@ void on_stream_close(void *p, nq_stream_t s) {
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
 
 }
-static int idx = 0;
+static uint64_t idx = 0;
+static uint64_t latency_sum = 0;
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
   ASSERT(result >= 0);
   auto sent_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-  printf("req %d: sent_ts: %llu, latency %lf sec\n", ++idx, sent_ts, ((double)(nq_time_now() - sent_ts) / (1000 * 1000 * 1000)));
+  latency_sum += (nq_time_now() - sent_ts);
+  idx++;
+  //printf("req %d: sent_ts: %llu, latency %lf sec\n", ++idx, sent_ts, ((double)(nq_time_now() - sent_ts) / (1000 * 1000 * 1000)));
 }
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {
 
@@ -62,7 +65,7 @@ int main(int argc, char *argv[]){
   nq_hdmap_rpc_handler(hm, "test", handler);
 
   nq_addr_t addr = {
-    "localhost", nullptr, nullptr, nullptr,
+    "dev", nullptr, nullptr, nullptr,
     8443
   };
   nq_clconf_t conf;
@@ -93,6 +96,8 @@ int main(int argc, char *argv[]){
     //nq_time_pause(nq_time_msec(10));
     nq_client_poll(cl);
   }
+
+  printf("process %llu requests average %lf sec\n", idx, ((double)latency_sum) / idx / (1000 * 1000 * 1000));
 
   nq_client_destroy(cl);
 
