@@ -52,14 +52,14 @@ android:
 	mv build/android.64/lib$(LIB).so build/android/lib$(LIB)-arm64.so
 
 inject:
-	python tools/deps/tools/sync.py --dir ./src --dir $(CHROMIUM_ROOT) \
+	python tools/deps/tools/sync.py --debug --dir ./src --dir $(CHROMIUM_ROOT) \
 		--sync_dir=$(CHROMIUM_ROOT)/third_party/protobuf/src/google \
 		--sync_dir=$(CHROMIUM_ROOT)/third_party/boringssl/src/crypto \
 		--sync_dir=$(CHROMIUM_ROOT)/third_party/boringssl/src/include \
 		--sync_dir=$(CHROMIUM_ROOT)/third_party/zlib \
 		--sync_dir=$(CHROMIUM_ROOT)/url \
 		--altroot_file=./tools/deps/tools/altroots.list \
-		--outdir=./src/chromium ./src/naquid.cpp 
+		--outdir=./src/chromium ./src/nq.cpp 
 
 patch:
 	cd ./src/chromium && patch -p1 < ../../tools/patch/current.patch

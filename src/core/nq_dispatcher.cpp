@@ -28,13 +28,16 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
 }
 
 //implement QuicDistpacher
-void NqDispatcher::CleanUpSession(SessionMap::iterator it,
-                                  QuicConnection* connection,
-                                  bool should_close_statelessly) {
-  auto idx = static_cast<NqServerSession *>(it->second.get())->session_index();
-  server_map_.Remove(idx);
-  server_map_.Deactivate(idx); //make connection invalid 
-  QuicDispatcher::CleanUpSession(it, connection, should_close_statelessly);
+void NqDispatcher::OnConnectionClosed(QuicConnectionId connection_id,
+                        QuicErrorCode error,
+                        const std::string& error_details) {
+  auto it = session_map().find(connection_id);
+  if (it != session_map().end()) {
+    auto idx = static_cast<NqServerSession *>(it->second.get())->session_index();
+    server_map_.Remove(idx);
+    server_map_.Deactivate(idx); //make connection invalid 
+  }
+  QuicDispatcher::OnConnectionClosed(connection_id, error, error_details);  
 }
 
 //implements nq::IoProcessor

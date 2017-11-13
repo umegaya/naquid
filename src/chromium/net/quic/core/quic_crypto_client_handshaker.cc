@@ -215,7 +215,6 @@ void QuicCryptoClientHandshaker::DoHandshakeLoop(
 
   QuicAsyncStatus rv = QUIC_SUCCESS;
   do {
-    fprintf(stderr, "next state %u\n", next_state_);
     CHECK_NE(STATE_NONE, next_state_);
     const State state = next_state_;
     next_state_ = STATE_IDLE;
@@ -370,7 +369,6 @@ void QuicCryptoClientHandshaker::DoSendCHLO(
     // chance to send us another in the future.
     cached->InvalidateServerConfig();
     stream_->CloseConnectionWithDetails(error, error_details);
-    fprintf(stderr, "CHLO6");
     return;
   }
   CryptoUtils::HashHandshakeMessage(out, &chlo_hash_, Perspective::IS_CLIENT);

@@ -38,6 +38,7 @@ set(common_src
 	./src/chromium/crypto/openssl_util.cc
 	./src/chromium/crypto/random.cc
 	./src/chromium/crypto/secure_util.cc
+	./src/chromium/crypto/signature_verifier.cc
 	./src/chromium/crypto/symmetric_key.cc
 	./src/chromium/crypto/rsa_private_key.cc
 

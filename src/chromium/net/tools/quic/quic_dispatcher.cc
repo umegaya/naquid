@@ -378,7 +378,6 @@ bool QuicDispatcher::OnUnauthenticatedPublicHeader(
       }
       // Since the version is not supported, send a version negotiation
       // packet and stop processing the current packet.
-      fprintf(stderr, "send version nego\n");
       time_wait_list_manager()->SendVersionNegotiationPacket(
           connection_id, GetSupportedVersions(), current_server_address_,
           current_client_address_);
@@ -386,7 +385,6 @@ bool QuicDispatcher::OnUnauthenticatedPublicHeader(
     }
     version = packet_version;
   }
-  fprintf(stderr, "set_version %d\n", version);
   // Set the framer's version and continue processing.
   framer_.set_version(version);
   return true;
@@ -508,6 +506,7 @@ void QuicDispatcher::CleanUpSession(SessionMap::iterator it,
       it->first, connection->version(), should_close_statelessly,
       connection->termination_packets());
   session_map_.erase(it);
+  fprintf(stderr, "CleanUpSession %llu\n", connection->connection_id());
 }
 
 void QuicDispatcher::StopAcceptingNewConnections() {
@@ -720,7 +719,6 @@ void QuicDispatcher::ProcessBufferedChlos(size_t max_connections_to_create) {
     if (packets.empty()) {
       return;
     }
-    fprintf(stderr, "ProcessBufferedChlos\n");
     QuicSession* session = CreateQuicSession(
         connection_id, packets.front().client_address, packet_list.alpn);
     QUIC_DLOG(INFO) << "Created new session for " << connection_id;

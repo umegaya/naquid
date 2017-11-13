@@ -8,9 +8,10 @@
 namespace net {
 
 NqSession::NqSession(QuicConnection* connection,
+                     Visitor* owner,
                      Delegate* delegate,
                      const QuicConfig& config) : 
-  QuicSession(connection, nullptr, config), delegate_(delegate) {
+  QuicSession(connection, owner, config), delegate_(delegate) {
   //chromium implementation treat initial value (3) as special stream (header stream for QPDY)
   auto id = GetNextOutgoingStreamId();
   ASSERT(perspective() == Perspective::IS_SERVER || id == kHeadersStreamId);

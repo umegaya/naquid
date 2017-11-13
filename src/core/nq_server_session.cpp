@@ -9,12 +9,12 @@
 
 namespace net {
 NqServerSession::NqServerSession(QuicConnection *connection,
-                                         NqDispatcher *dispatcher,
-                                         const NqServer::PortConfig &port_config)
-                                         : NqSession(connection, this, port_config), 
-                                         dispatcher_(dispatcher),
-                                         port_config_(port_config),
-                                         session_index_(dispatcher->new_session_index()) {
+                                 NqDispatcher *dispatcher,
+                                 const NqServer::PortConfig &port_config)
+  : NqSession(connection, dispatcher, this, port_config), //dispatcher implements QuicSession::Visitor interface
+  dispatcher_(dispatcher),
+  port_config_(port_config),
+  session_index_(dispatcher->new_session_index()) {
   init_crypto_stream();
 }
 

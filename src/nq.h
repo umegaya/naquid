@@ -144,6 +144,7 @@ extern nq_closure_t nq_closure_empty();
 //config
 typedef struct {
 	nq_closure_t on_open, on_close;
+	bool insecure; //set true to ignore proof verification
 } nq_clconf_t;
 
 typedef struct {

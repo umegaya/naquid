@@ -96,8 +96,8 @@ class NqDispatcher : public QuicDispatcher,
     QuicConnectionId connection_id,
     const QuicSocketAddress& client_address,
     QuicStringPiece alpn) override;
-  void CleanUpSession(SessionMap::iterator it,
-                      QuicConnection* connection,
-                      bool should_close_statelessly) override;
+  void OnConnectionClosed(QuicConnectionId connection_id,
+                          QuicErrorCode error,
+                          const std::string& error_details) override;
 };
 }

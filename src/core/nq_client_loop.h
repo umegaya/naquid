@@ -13,7 +13,8 @@
 namespace net {
 class NqClient;
 class NqClientLoop : public NqLoop,
-                     public NqBoxer {
+                     public NqBoxer,
+                     public QuicSession::Visitor {
   nq::HandlerMap handler_map_;
   NqSessionContainer<NqClient> client_map_;
   NqBoxer::Processor processor_;
@@ -67,5 +68,15 @@ class NqClientLoop : public NqLoop,
       return false;
     }
   }
+
+  //implement QuicSession::Visitor
+  void OnConnectionClosed(QuicConnectionId connection_id,
+                          QuicErrorCode error,
+                          const std::string& error_details) override {}
+  // Called when the session has become write blocked.
+  void OnWriteBlocked(QuicBlockedWriterInterface* blocked_writer) override {}
+  // Called when the session receives reset on a stream from the peer.
+  void OnRstStreamReceived(const QuicRstStreamFrame& frame) override {}
+
 };
 }

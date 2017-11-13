@@ -41,7 +41,7 @@ NqClient::~NqClient() {
 
 
 std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* connection) {
-  auto s = new NqClientSession(connection, this, *config());
+  auto s = new NqClientSession(connection, loop_, this, *config());
   if (!OnOpen(NQ_HS_START)) {
     auto c = loop_->Box(this);
     loop_->Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Disconnect));

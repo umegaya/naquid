@@ -19,9 +19,7 @@ class NqClientConfig : public QuicConfig {
   }
   void Setup(); //init other variables from client_
   const nq_clconf_t &client() const { return client_; }
-  std::unique_ptr<ProofVerifier> NewProofVerifier() const { 
-    return std::unique_ptr<ProofVerifier>(new NqProofVerifier); 
-  }
+  std::unique_ptr<ProofVerifier> NewProofVerifier() const;
 };
 
 class NqServerConfig : public QuicConfig {

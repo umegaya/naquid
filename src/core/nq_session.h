@@ -57,6 +57,7 @@ class NqSession : public QuicSession {
  public:
   //NqSession takes ownership of connection
   NqSession(QuicConnection *connection,
+            Visitor* owner,
             Delegate* delegate,
           	const QuicConfig& config);
   ~NqSession() override {

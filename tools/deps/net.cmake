@@ -1,3 +1,20 @@
+set(net_verify_src
+	./src/chromium/net/base/hash_value.cc
+	./src/chromium/net/cert/caching_cert_verifier.cc
+	./src/chromium/net/cert/cert_status_flags.cc
+	./src/chromium/net/cert/cert_verifier.cc
+	./src/chromium/net/cert/cert_verify_proc.cc
+	./src/chromium/net/cert/cert_verify_result.cc
+	./src/chromium/net/cert/ct_known_logs.cc
+	./src/chromium/net/cert/ct_log_verifier.cc
+	./src/chromium/net/cert/ct_policy_enforcer.cc
+	./src/chromium/net/cert/ct_verify_result.cc
+	./src/chromium/net/cert/symantec_certs.cc
+	./src/chromium/net/cert/multi_log_ct_verifier.cc
+	./src/chromium/net/cert/ocsp_verify_result.cc
+	./src/chromium/net/ssl/ssl_config_service.cc
+)
+
 set(net_src
 	./src/chromium/net/base/address_family.cc
 	./src/chromium/net/base/escape.cc
@@ -14,6 +31,7 @@ set(net_src
 	./src/chromium/net/base/registry_controlled_domains/registry_controlled_domain.cc
 	./src/chromium/net/base/sockaddr_storage.cc
 	./src/chromium/net/base/url_util.cc
+	./src/chromium/net/cert/asn1_util.cc
 	./src/chromium/net/cert/internal/cert_errors.cc
 	./src/chromium/net/cert/internal/cert_error_id.cc
 	./src/chromium/net/cert/internal/cert_error_params.cc
@@ -27,7 +45,6 @@ set(net_src
 	./src/chromium/net/cert/internal/signature_algorithm.cc
 	./src/chromium/net/cert/internal/verify_name_match.cc
 	./src/chromium/net/cert/internal/verify_signed_data.cc
-	./src/chromium/net/cert/asn1_util.cc
 	./src/chromium/net/cert/pem_tokenizer.cc
 	./src/chromium/net/cert/x509_cert_types.cc
 	./src/chromium/net/cert/x509_certificate.cc
@@ -38,6 +55,10 @@ set(net_src
 	./src/chromium/net/der/parser.cc
 	./src/chromium/net/der/parse_values.cc
 	./src/chromium/net/der/tag.cc
+	./src/chromium/net/dns/dns_util.cc
+	./src/chromium/net/http/http_security_headers.cc
+	./src/chromium/net/http/transport_security_state.cc
+	./src/chromium/net/http/transport_security_state_source.cc
 	./src/chromium/net/quic/core/congestion_control/bandwidth_sampler.cc
 	./src/chromium/net/quic/core/congestion_control/bbr_sender.cc
 	./src/chromium/net/quic/core/congestion_control/cubic.cc
@@ -90,6 +111,7 @@ set(net_src
 	./src/chromium/net/quic/core/frames/quic_stream_frame.cc
 	./src/chromium/net/quic/core/frames/quic_window_update_frame.cc
 	./src/chromium/net/quic/chromium/crypto/proof_source_chromium.cc
+	./src/chromium/net/quic/chromium/crypto/proof_verifier_chromium.cc
 	./src/chromium/net/quic/core/proto/cached_network_parameters.pb.cc
 	./src/chromium/net/quic/core/proto/source_address_token.pb.cc
 	./src/chromium/net/quic/core/quic_ack_listener_interface.cc
@@ -152,7 +174,6 @@ set(net_src
 	./src/chromium/net/tools/quic/quic_client_base.cc
 	./src/chromium/net/tools/quic/quic_default_packet_writer.cc
 	./src/chromium/net/tools/quic/quic_dispatcher.cc
-	#./src/chromium/net/tools/quic/quic_packet_reader.cc
 	./src/chromium/net/tools/quic/quic_per_connection_packet_writer.cc
 	./src/chromium/net/tools/quic/quic_time_wait_list_manager.cc
 	./src/chromium/net/tools/quic/stateless_rejector.cc
