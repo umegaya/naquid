@@ -83,6 +83,8 @@ void NqStream::OnClose() {
   handler_->OnClose();
 }
 void NqStream::OnDataAvailable() {
+  QuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   //greedy read and called back
   struct iovec v[256];
   int n_blocks = sequencer()->GetReadableRegions(v, 256);
