@@ -21,6 +21,7 @@ void NqWorker::Run(PacketQueue &pq) {
   InvokeQueue *iq[n_dispatcher];
   NqDispatcher *ds[n_dispatcher];
   if (!Listen(iq, ds)) {
+    exit(1);
     return;
   }
   NqPacket *p;
@@ -29,7 +30,7 @@ void NqWorker::Run(PacketQueue &pq) {
     //TODO(iyatomi): better way to handle this (eg. with timer system)
     nq_time_t now = nq_time_now();
     bool consume_buffered_chlo = false;
-    if ((next_consume_buffered_chlo + nq_time_msec(50)) < now) {
+    if ((next_consume_buffered_chlo + nq_time_msec(10)) < now) {
       consume_buffered_chlo = true;
       next_consume_buffered_chlo = now;
     }
@@ -43,7 +44,7 @@ void NqWorker::Run(PacketQueue &pq) {
     for (int i = 0; i < n_dispatcher; i++) {
       iq[i]->Poll(ds[i]);
       if (consume_buffered_chlo) {
-        const size_t kNumSessionsToCreatePerSocketEvent = 16;
+        const size_t kNumSessionsToCreatePerSocketEvent = 1024;
         ds[i]->ProcessBufferedChlos(kNumSessionsToCreatePerSocketEvent);
       }
     }
@@ -75,8 +76,13 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
       ASSERT(false);
       return false;
     }
+    auto cc = kv.second.NewCryptoConfig(&loop_);
+    if (cc == nullptr) {
+      ASSERT(false);
+      return false;      
+    }
     TRACE("thread %d, fd %d\n", index_, listen_fd);
-    auto d = new NqDispatcher(kv.first, kv.second, kv.second.NewCryptoConfig(&loop_), *this);
+    auto d = new NqDispatcher(kv.first, kv.second, std::move(cc), *this);
     if (loop_.Add(listen_fd, d, NqLoop::EV_READ | NqLoop::EV_WRITE) != NQ_OK) {
       nq::Syscall::Close(listen_fd);
       delete d;

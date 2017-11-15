@@ -4,11 +4,11 @@
 #### remain tasks for 0.1.0
 - [x] rpc: reduce frame number (unify length header/msgid/type to one frame)
 - [x] rpc: add header byte to indicate msgid/type size
-- [ ] conn: client side proof verification (import ProofVerifierChromium)
+- [x] conn: client side proof verification (import ProofVerifierChromium)
 - [ ] conn: study is there a way to send stream name without sending it over stream (cmsghdr can do this somehow?)
 - [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
 - [ ] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
-- [ ] test: high freqent reconnection test
+- [ ] test: high frequent reconnection test
 - [ ] test: higher concurrency test (around 10k client connection)
 - [ ] test: server side stream initiation
 - [ ] test: stream disconnection using on open callback 

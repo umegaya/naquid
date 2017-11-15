@@ -6,7 +6,7 @@
 	#if defined(DEBUG)
 		#define TRACE(...) fprintf(stderr, __VA_ARGS__)
 	#else
-		#define TRACE(...)
+		#define TRACE(...) //fprintf(stderr, __VA_ARGS__)
 	#endif
 #endif
 

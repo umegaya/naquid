@@ -42,11 +42,6 @@ class NqProofSource : public ProofSourceChromium {
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqProofSource);
-
-#if defined(DEBUG)
-  static char s_dummy_cert[];
-  static char s_dummy_key[];
-#endif
 };
 
 }  // namespace net

@@ -1,7 +1,10 @@
 #include <nq.h>
 #include "basis/endian.h"
 
-static const int kThreads = 4;  //4 thread server
+#include <map>
+#include <thread>
+
+static const int kThreads = 1;  //4 thread server
 static const int kRpcOk = 0;
 static const int kRpcPing = 1;
 
@@ -25,11 +28,13 @@ bool on_stream_open(void *p, nq_stream_t s) {
 }
 void on_stream_close(void *p, nq_stream_t s) {
 }
+static std::map<uint64_t, uint64_t> recv_progress;
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
   ASSERT(type == kRpcPing);
   ASSERT(len == sizeof(nq_time_t));
   auto peer_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-  TRACE("peer_ts => %llu\n", peer_ts);
+  recv_progress[rpc.s] = peer_ts;
+  //fprintf(stderr, "peer_ts => %llu\n", peer_ts);
   nq_rpc_reply(rpc, kRpcOk, msgid, data, len);
 }
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
@@ -51,8 +56,10 @@ int main(int argc, char *argv[]){
     8443
   };
   nq_svconf_t conf;
-  conf.quic_secret = nullptr;
+  conf.quic_secret = "e336e27898ff1e17ac79e82fa0084999";
   conf.quic_cert_cache_size = 0;
+  conf.handshake_idle_timeout = nq_time_sec(60);
+  conf.handshake_timeout = nq_time_sec(120);
   nq_closure_init(conf.on_open, on_conn_open, on_conn_open, nullptr);
   nq_closure_init(conf.on_close, on_conn_close, on_conn_close, nullptr);
   hm = nq_server_listen(sv, &addr, &conf);
@@ -65,6 +72,16 @@ int main(int argc, char *argv[]){
   nq_hdmap_rpc_handler(hm, "test", handler);
 
   nq_server_start(sv, false);
+
+  /*auto dump_thread = std::thread([]() {
+    while (true) {
+      nq_time_sleep(nq_time_msec(500));
+      fprintf(stderr, "------------------ start seq dump ----------------------\n");
+      for (auto &kv : recv_progress) {
+        fprintf(stderr, "rpc %llx, seq %llu\n", kv.first, kv.second);
+      }
+    }
+  });*/
 
   nq_time_sleep(nq_time_sec(5));
   nq_server_join(sv);

@@ -506,7 +506,6 @@ void QuicDispatcher::CleanUpSession(SessionMap::iterator it,
       it->first, connection->version(), should_close_statelessly,
       connection->termination_packets());
   session_map_.erase(it);
-  fprintf(stderr, "CleanUpSession %llu\n", connection->connection_id());
 }
 
 void QuicDispatcher::StopAcceptingNewConnections() {

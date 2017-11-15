@@ -27,7 +27,7 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
   ASSERT(invoke_queues_ != nullptr);
 }
 
-//implement QuicDistpacher
+//implement QuicDispatcher
 void NqDispatcher::OnConnectionClosed(QuicConnectionId connection_id,
                         QuicErrorCode error,
                         const std::string& error_details) {

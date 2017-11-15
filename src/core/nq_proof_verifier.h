@@ -2,9 +2,6 @@
 
 #include <string>
 
-#include "net/cert/multi_log_ct_verifier.h"
-#include "net/cert/cert_verifier.h"
-#include "net/http/transport_security_state.h"
 #include "net/quic/core/crypto/proof_verifier.h"
 #include "net/quic/chromium/crypto/proof_verifier_chromium.h"
 

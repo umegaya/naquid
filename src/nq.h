@@ -143,14 +143,26 @@ extern nq_closure_t nq_closure_empty();
 
 //config
 typedef struct {
+	//connection open/close watcher
 	nq_closure_t on_open, on_close;
-	bool insecure; //set true to ignore proof verification
+
+	//set true to ignore proof verification
+	bool insecure; 
+	
+	//total handshake time limit / handshake no input limit in milli seconds
+	nq_time_t handshake_timeout, handshake_idle_timeout; 
 } nq_clconf_t;
 
 typedef struct {
+	//connection open/close watcher
 	nq_closure_t on_open, on_accept, on_close;
+
 	const char *quic_secret;
+
 	int quic_cert_cache_size;
+
+	//total handshake time limit / handshake no input limit in milli seconds
+	nq_time_t handshake_timeout, handshake_idle_timeout; 
 } nq_svconf_t;
 
 //handlers

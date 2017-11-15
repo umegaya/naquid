@@ -201,13 +201,17 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   parse_buffer_.append(ToCStr(p), len);
   //prepare tmp variables
   const char *pstr = parse_buffer_.c_str();
-  size_t plen = parse_buffer_.length(), read_ofs = 0;
-  int16_t type; nq_msgid_t msgid; nq_size_t reclen = 0;
-  //decode header
-  read_ofs = nq::HeaderCodec::Decode(&type, &msgid, pstr, plen);
-  read_ofs += nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
-  /* read_ofs => length of encoded header, reclen => actual payload length */
-  if (reclen > 0 && (read_ofs + reclen) <= plen) {
+  size_t plen = parse_buffer_.length(), read_ofs;
+  int16_t type; nq_msgid_t msgid; nq_size_t reclen;
+  do {
+    //decode header
+    read_ofs = nq::HeaderCodec::Decode(&type, &msgid, pstr, plen);
+    reclen = 0;
+    read_ofs += nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
+    /* read_ofs => length of encoded header, reclen => actual payload length */
+    if (reclen == 0 || (read_ofs + reclen) > plen) {
+      break;
+    }
     /*
       type > 0 && msgid != 0 => request
       type <= 0 && msgid != 0 => reply
@@ -239,12 +243,15 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
       ASSERT(false);
     }
     parse_buffer_.erase(0, reclen + read_ofs);
-  } else if (reclen == 0 && len > len_buff_len) {
-    //broken payload. should resolve payload length
-    stream_->Disconnect();
-  } else {
-    //TRACE("pb: %zu bytes, recv: %u bytes, reclen: %u bytes\n", plen, len, reclen);
-  }
+    pstr = parse_buffer_.c_str();
+    plen = parse_buffer_.length();
+    /*} else if (reclen == 0 && len > len_buff_len) {
+      //broken payload. should resolve payload length
+      stream_->Disconnect();
+    } else {
+      //TRACE("pb: %zu bytes, recv: %u bytes, reclen: %u bytes\n", plen, len, reclen);
+    } */
+  } while (parse_buffer_.length() > 0);
 }
 void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t len) {
   QuicConnection::ScopedPacketBundler bundler(
