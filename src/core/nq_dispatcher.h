@@ -32,6 +32,7 @@ class NqDispatcher : public QuicDispatcher,
   QuicCompressedCertsCache cert_cache_;
   NqSessionContainer<NqServerSession> server_map_;
   std::thread::id thread_id_;
+  uint64_t n_recv_;
  public:
   //TODO(iyatomi): find proper cache size
   static const int kDefaultCertCacheSize = 16; 
@@ -49,6 +50,7 @@ class NqDispatcher : public QuicDispatcher,
   inline NqSessionIndex new_session_index() { return server_map_.NewIndex(); }
   inline const NqSessionContainer<NqServerSession> &server_map() const { return server_map_; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
+  inline uint64_t n_recv() const { return n_recv_; }
 
 
   //implements nq::IoProcessor
@@ -78,17 +80,8 @@ class NqDispatcher : public QuicDispatcher,
   NqBoxer::UnboxResult Unbox(uint64_t serial, NqSession::Delegate **unboxed) override;
   NqBoxer::UnboxResult Unbox(uint64_t serial, NqStream **unboxed) override;
   bool IsClient() const override { return false; }
-  bool Valid(uint64_t serial, OpTarget target) const override {
-    switch (target) {
-    case Conn:
-      return server_map().Active(NqConnSerialCodec::ServerSessionIndex(serial));
-    case Stream:
-      return server_map().Active(NqStreamSerialCodec::ServerSessionIndex(serial));
-    default:
-      ASSERT(false);
-      return false;
-    }
-  }
+  const NqSession::Delegate *FindConn(uint64_t serial, OpTarget target) const override;
+  const NqStream *FindStream(uint64_t serial) const override;
 
  protected:
   //implements QuicDispatcher

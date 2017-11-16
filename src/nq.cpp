@@ -114,28 +114,32 @@ bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t
 // conn API
 //
 // --------------------------
-void nq_conn_close(nq_conn_t conn) {
+NQ_THREADSAFE void nq_conn_close(nq_conn_t conn) {
   NqBoxer::From(conn)->InvokeConn(conn.s,NqBoxer::OpCode::Disconnect);
 }
-void nq_conn_reset(nq_conn_t conn) {
+NQ_THREADSAFE void nq_conn_reset(nq_conn_t conn) {
   NqBoxer::From(conn)->InvokeConn(conn.s,NqBoxer::OpCode::Reconnect);
 } 
-void nq_conn_flush(nq_conn_t conn) {
+NQ_THREADSAFE void nq_conn_flush(nq_conn_t conn) {
   NqBoxer::From(conn)->InvokeConn(conn.s,NqBoxer::OpCode::Flush);
 } 
-bool nq_conn_is_client(nq_conn_t conn) {
+NQ_THREADSAFE bool nq_conn_is_client(nq_conn_t conn) {
 	return NqBoxer::From(conn)->IsClient();
 }
-bool nq_conn_is_valid(nq_conn_t conn) {
-  return NqBoxer::From(conn)->Valid(conn);
+NQ_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn) {
+  return NqBoxer::From(conn)->Find(conn) != nullptr;
 }
-nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
+NQ_OWNERTHREAD nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
   auto c = NqBoxer::Unbox(conn);
 	return c != nullptr ? c->ResetHandlerMap()->ToHandle() : nullptr;
 }
-uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
-  auto c = NqBoxer::Unbox(conn);
+NQ_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
+  auto c = NqBoxer::From(conn)->Find(conn);
   return c != nullptr ? c->ReconnectDurationUS() : 0;
+}
+NQ_THREADSAFE nq_cid_t nq_conn_id(nq_conn_t conn) {
+  auto c = NqBoxer::From(conn)->Find(conn);
+  return c != nullptr ? c->Id() : 0;
 }
 
 
@@ -144,13 +148,13 @@ uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
 // stream API
 //
 // --------------------------
-nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
+NQ_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
   NqSession::Delegate *d;
   return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
     d->NewStreamCast<NqStream>(name)->ToHandle<nq_stream_t>() : 
     INVALID_HANDLE<nq_stream_t>("fail to unbox");
 }
-nq_conn_t nq_stream_conn(nq_stream_t s) {
+NQ_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
   auto b = NqBoxer::From(s);
   nq_conn_t c = {
     .p = s.p, 
@@ -160,13 +164,13 @@ nq_conn_t nq_stream_conn(nq_stream_t s) {
   };
   return c;
 }
-bool nq_stream_is_valid(nq_stream_t s) {
-  return NqBoxer::From(s)->Valid(s);
+NQ_THREADSAFE bool nq_stream_is_valid(nq_stream_t s) {
+  return NqBoxer::From(s)->Find(s) != nullptr;
 }
-void nq_stream_close(nq_stream_t s) {
+NQ_THREADSAFE void nq_stream_close(nq_stream_t s) {
 	NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Disconnect);
 }
-void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
+NQ_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
   NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Send, data, datalen);
 }
 
@@ -178,13 +182,13 @@ void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
 // rpc API
 //
 // --------------------------
-nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {
+NQ_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {
   NqSession::Delegate *d;
   return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
     d->NewStreamCast<NqStream>(name)->ToHandle<nq_rpc_t>() : 
     INVALID_HANDLE<nq_rpc_t>("fail to unbox");
 }
-nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
+NQ_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   auto b = NqBoxer::From(rpc);
   nq_conn_t c = {
     .p = rpc.p, 
@@ -194,19 +198,19 @@ nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   };
   return c;
 }
-bool nq_rpc_is_valid(nq_rpc_t rpc) {
-  return NqBoxer::From(rpc)->Valid(rpc);
+NQ_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc) {
+  return NqBoxer::From(rpc)->Find(rpc) != nullptr;
 }
-void nq_rpc_close(nq_rpc_t rpc) {
+NQ_THREADSAFE void nq_rpc_close(nq_rpc_t rpc) {
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Disconnect);
 }
-void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
+NQ_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Call, type, data, datalen, on_reply);
 }
-void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen) {
+NQ_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen) {
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Notify, type, data, datalen);
 }
-void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
+NQ_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen);
 }
 
@@ -217,17 +221,17 @@ void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void
 // time API
 //
 // --------------------------
-nq_time_t nq_time_now() {
+NQ_THREADSAFE nq_time_t nq_time_now() {
 	return nq::clock::now();
 }
-nq_unix_time_t nq_time_unix() {
+NQ_THREADSAFE nq_unix_time_t nq_time_unix() {
 	long s, us;
 	nq::clock::now(s, us);
 	return s;
 }
-nq_time_t nq_time_sleep(nq_time_t d) {
+NQ_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d) {
 	return nq::clock::sleep(d);
 }
-nq_time_t nq_time_pause(nq_time_t d) {
+NQ_THREADSAFE nq_time_t nq_time_pause(nq_time_t d) {
 	return nq::clock::pause(d);
 }

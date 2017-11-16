@@ -57,17 +57,8 @@ class NqClientLoop : public NqLoop,
   NqBoxer::UnboxResult Unbox(uint64_t serial, NqSession::Delegate **unboxed) override;
   NqBoxer::UnboxResult Unbox(uint64_t serial, NqStream **unboxed) override;
   bool IsClient() const override { return true; }
-  bool Valid(uint64_t serial, OpTarget target) const override {
-    switch (target) {
-    case Conn:
-      return client_map().Active(NqConnSerialCodec::ClientSessionIndex(serial));
-    case Stream:
-      return client_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
-    default:
-      ASSERT(false);
-      return false;
-    }
-  }
+  const NqSession::Delegate *FindConn(uint64_t serial, NqBoxer::OpTarget target) const override;
+  const NqStream *FindStream(uint64_t serial) const override;
 
   //implement QuicSession::Visitor
   void OnConnectionClosed(QuicConnectionId connection_id,

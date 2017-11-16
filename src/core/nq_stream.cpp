@@ -5,6 +5,7 @@
 #include "core/nq_loop.h"
 #include "core/nq_session.h"
 #include "core/nq_client.h"
+#include "core/nq_server_session.h"
 
 namespace net {
 
@@ -106,7 +107,7 @@ void NqStream::OnDataAvailable() {
       handler_->ProtoSent();
       if (handler_ == nullptr || !handler_->OnOpen()) { //server side OnOpen
         Disconnect();
-        return; //broken payload. stream handler does not exists
+        return; //broken payload. stream handler does not exists / stream handler reject to processs
       }
       if (buffer_.length() > (idx + 1)) {
         //parse_buffer may contains over-received payload
@@ -127,8 +128,19 @@ void NqStream::OnDataAvailable() {
 
 
 void NqClientStream::OnClose() {
+  //it's generally unsafe. delegate is not assured to be NqClient*
+  ASSERT(nq_session()->delegate()->IsClient());
   auto c = static_cast<NqClient *>(nq_session()->delegate());
   c->stream_manager().OnClose(this);
+  NqStream::OnClose();
+}
+
+
+
+void NqServerStream::OnClose() {
+  ASSERT(!nq_session()->delegate()->IsClient());
+  auto c = static_cast<NqServerSession *>(nq_session());
+  c->RemoveStreamForRead(id());
   NqStream::OnClose();
 }
 

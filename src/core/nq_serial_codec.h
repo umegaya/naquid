@@ -1,7 +1,6 @@
 #pragma once
 
 #include <map>
-#include <set>
 #include <mutex>
 #include <algorithm>
 
@@ -11,6 +10,7 @@ namespace net {
 typedef uint16_t NqSessionIndex;
 typedef uint16_t NqStreamNameId;
 typedef uint16_t NqStreamIndexPerNameId;
+static const NqStreamNameId CLIENT_INCOMING_STREAM_NAME_ID = static_cast<NqStreamNameId>(0);
 class NqSessionIndexFactory {
  public:
   static constexpr NqSessionIndex kLimit = 65535;
@@ -89,11 +89,11 @@ class NqConnSerialCodec {
 template <class S>
 class NqSessionContainer : public std::map<NqSessionIndex, S*> {
   typedef std::map<NqSessionIndex, S*>  super;
-  std::set<NqSessionIndex> alive_indexes_;
-  std::mutex alive_mutex_;
+  super read_map_;
+  std::mutex read_map_mutex_;
   NqSessionIndex session_index_seed_;
  public:
-  NqSessionContainer() : super(), alive_indexes_(), alive_mutex_(), session_index_seed_(0) {}
+  NqSessionContainer() : super(), read_map_(), read_map_mutex_(), session_index_seed_(0) {}
   inline NqSessionIndex NewIndex() { 
     return NqSessionIndexFactory::Create(session_index_seed_); 
   }
@@ -103,8 +103,8 @@ class NqSessionContainer : public std::map<NqSessionIndex, S*> {
     }
     super::clear();    
     {
-        std::mutex alive_mutex_;
-        alive_indexes_.clear();
+        std::mutex read_map_mutex_;
+        read_map_.clear();
     }
   }
   inline void Add(S *s) { (*this)[s->session_index()] = s; }
@@ -114,17 +114,18 @@ class NqSessionContainer : public std::map<NqSessionIndex, S*> {
       super::erase(it);
     }
   }
-  inline void Activate(NqSessionIndex idx) {
-    std::unique_lock<std::mutex> lock(alive_mutex_);
-    alive_indexes_.insert(idx);
+  inline void Activate(S *s) {
+    std::unique_lock<std::mutex> lock(read_map_mutex_);
+    read_map_[s->session_index()] = s;
   }
   inline void Deactivate(NqSessionIndex idx) {
-    std::unique_lock<std::mutex> lock(alive_mutex_);
-    alive_indexes_.erase(idx);
+    std::unique_lock<std::mutex> lock(read_map_mutex_);
+    read_map_.erase(idx);
   }
-  inline bool Active(NqSessionIndex idx) const {
-      std::unique_lock<std::mutex> lock(const_cast<NqSessionContainer<S>*>(this)->alive_mutex_);
-      return alive_indexes_.find(idx) != alive_indexes_.end();
+  inline const S *Active(NqSessionIndex idx) const {
+      std::unique_lock<std::mutex> lock(const_cast<NqSessionContainer<S>*>(this)->read_map_mutex_);
+      auto it = read_map_.find(idx);
+      return it != read_map_.end() ? it->second : nullptr;
   }
 };
 }

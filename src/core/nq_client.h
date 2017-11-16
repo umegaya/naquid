@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <mutex>
+#include <stack>
 #include <functional>
 
 #include <arpa/inet.h>
@@ -24,6 +26,11 @@ class NqClient : public QuicClientBase,
                  public QuicCryptoClientStream::ProofHandler, 
                  public NqSession::Delegate {
  public:
+  enum ConnectState : uint8_t {
+    DISCONNECT,
+    CONNECT,
+    FINALIZED,
+  };
   class ReconnectAlarm : public QuicAlarm::Delegate {
    public:
     ReconnectAlarm(NqClient *client) : client_(client) {}
@@ -36,37 +43,41 @@ class NqClient : public QuicClientBase,
       std::vector<NqClientStream*> streams_;
       std::string name_;
     };
-    std::map<NqStreamNameId, Entry> map_;
-    NqStreamNameId seed_;
+    std::vector<Entry> out_entries_;
+    std::vector<NqClientStream*> in_entries_;
+    std::stack<NqStreamIndexPerNameId> in_empty_indexes_;
+    std::mutex entries_mutex_;
    public:
-    StreamManager() : map_(), seed_(0) {}
+    StreamManager() : out_entries_(), in_entries_(), in_empty_indexes_(), entries_mutex_() {}
     
-    void OnClose(NqClientStream *s);
-    bool OnOpen(const std::string &name, NqClientStream *s);
+    inline bool OnOpen(const std::string &name, NqClientStream *s) {
+      return ((s->id() % 2) == 0) ? OnIncomingOpen(s) : OnOutgoingOpen(name, s);
+    }
+    inline void OnClose(NqClientStream *s) {
+      if ((s->id() % 2) == 0) {
+        OnIncomingClose(s);
+      } else {
+        OnOutgoingClose(s);
+      }
+    }
     NqClientStream *FindOrCreateStream(
       NqClientSession *session, 
       NqStreamNameId name_id, 
       NqStreamIndexPerNameId index_per_name_id, 
       bool connected);
     
+    //it should be used by non-owner thread of this client. 
+    const NqClientStream *Find(NqStreamNameId id, NqStreamIndexPerNameId index) const;
     inline const std::string &Find(NqStreamNameId id) const {
       static std::string empty_;
-      auto it = map_.find(id);
-      return it != map_.end() ? it->second.name_ : empty_;
+      return id <= out_entries_.size() ? out_entries_[id - 1].name_ : empty_;
     }
-    inline NqStreamNameId Add(const std::string &name) {
-      //add entry to name <=> conversion map
-      for (auto &kv : map_) {
-        if (kv.second.name_ == name) {
-          return kv.first;
-        }
-      }
-      auto id = ++seed_;
-      Entry e;
-      e.name_ = name;
-      map_[id] = e;
-      return id;
-    }
+   protected:
+    NqStreamNameId Add(const std::string &name);
+    bool OnOutgoingOpen(const std::string &name, NqClientStream *s);
+    void OnOutgoingClose(NqClientStream *s);
+    bool OnIncomingOpen(NqClientStream *s);
+    void OnIncomingClose(NqClientStream *s);    
   };
  public:
   // This will create its own QuicClientEpollNetworkHelper.
@@ -80,9 +91,10 @@ class NqClient : public QuicClientBase,
 
   // operation
   NqClientSession *nq_session() { return static_cast<NqClientSession *>(session()); }
-  inline void set_destroyed() { destroyed_ = true; }
+  inline bool destroyed() const { return connect_state_ == FINALIZED; }
   inline NqSessionIndex session_index() const { return session_index_; }
   inline StreamManager &stream_manager() { return stream_manager_; }
+  inline const StreamManager &stream_manager() const { return stream_manager_; }
   inline nq_conn_t ToHandle() { return loop_->Box(this); }
   NqClientStream *FindOrCreateStream(NqStreamNameId name_id, NqStreamIndexPerNameId index_per_name_id);
 
@@ -112,6 +124,7 @@ class NqClient : public QuicClientBase,
 
 
   // implements NqSession::Delegate
+  uint64_t Id() const override { return session_index_; }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
@@ -138,7 +151,7 @@ class NqClient : public QuicClientBase,
   NqSessionIndex session_index_;
   StreamManager stream_manager_;
   uint64_t next_reconnect_us_ts_;
-  bool destroyed_;
+  ConnectState connect_state_;
 
   DISALLOW_COPY_AND_ASSIGN(NqClient);
 };

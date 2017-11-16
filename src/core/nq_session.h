@@ -28,6 +28,7 @@ class NqSession : public QuicSession {
   class Delegate {
    public:
     virtual ~Delegate() {}
+    virtual uint64_t Id() const = 0;
     virtual void OnClose(QuicErrorCode error,
                          const std::string& error_details,
                          ConnectionCloseSource close_by_peer_or_self) = 0;

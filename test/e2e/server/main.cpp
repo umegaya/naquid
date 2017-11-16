@@ -12,11 +12,11 @@ static const int kRpcPing = 1;
 
 /* conn callback */
 bool on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void *) {
-  TRACE("on_conn_open event:%d\n", hsev);
+  fprintf(stderr, "on_conn_open event:%d\n", hsev);
   return true;
 }
 nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char *detail, bool) {
-  TRACE("on_conn_close reason:%s\n", detail);
+  fprintf(stderr, "on_conn_close reason:%s\n", detail);
   return 0;
 }
 
@@ -72,16 +72,6 @@ int main(int argc, char *argv[]){
   nq_hdmap_rpc_handler(hm, "test", handler);
 
   nq_server_start(sv, false);
-
-  /*auto dump_thread = std::thread([]() {
-    while (true) {
-      nq_time_sleep(nq_time_msec(500));
-      fprintf(stderr, "------------------ start seq dump ----------------------\n");
-      for (auto &kv : recv_progress) {
-        fprintf(stderr, "rpc %llx, seq %llu\n", kv.first, kv.second);
-      }
-    }
-  });*/
 
   nq_time_sleep(nq_time_sec(5));
   nq_server_join(sv);

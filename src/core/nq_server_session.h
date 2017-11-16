@@ -1,5 +1,8 @@
 #pragma once
 
+#include <map>
+#include <mutex>
+
 #include "core/nq_session.h"
 #include "core/nq_server.h"
 #include "core/nq_config.h"
@@ -17,12 +20,15 @@ class NqServerSession : public NqSession,
   inline nq_conn_t ToHandle() { return GetBoxer()->Box(this); }
   inline NqSessionIndex session_index() const { return session_index_; }
   NqStream *FindStream(QuicStreamId id);
+  const NqStream *FindStreamForRead(QuicStreamId id) const;
+  void RemoveStreamForRead(QuicStreamId id);
 
   //implements QuicSession
   QuicStream* CreateIncomingDynamicStream(QuicStreamId id) override;
   QuicStream* CreateOutgoingDynamicStream() override;
 
   //implements NqSession::Delegate
+  uint64_t Id() const override { return connection_id(); }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
@@ -46,6 +52,8 @@ class NqServerSession : public NqSession,
   const NqServer::PortConfig &port_config_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
   NqSessionIndex session_index_;
+  std::map<QuicStreamId, NqServerStream*> read_map_;
+  std::mutex read_map_mutex_;
 };
 
 }

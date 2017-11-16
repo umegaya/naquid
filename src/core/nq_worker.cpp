@@ -44,6 +44,7 @@ void NqWorker::Run(PacketQueue &pq) {
     for (int i = 0; i < n_dispatcher; i++) {
       iq[i]->Poll(ds[i]);
       if (consume_buffered_chlo) {
+        //fprintf(stderr, "%d n_recv=%llu\n", index_, ds[i]->n_recv());
         const size_t kNumSessionsToCreatePerSocketEvent = 1024;
         ds[i]->ProcessBufferedChlos(kNumSessionsToCreatePerSocketEvent);
       }

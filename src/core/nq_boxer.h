@@ -143,7 +143,8 @@ class NqBoxer {
   virtual nq_stream_t Box(NqStream *s) = 0;
   virtual UnboxResult Unbox(uint64_t serial, NqSession::Delegate **unboxed) = 0;
   virtual UnboxResult Unbox(uint64_t serial, NqStream **unboxed) = 0;
-  virtual bool Valid(uint64_t serial, OpTarget target) const = 0;
+  virtual const NqSession::Delegate *FindConn(uint64_t serial, OpTarget target) const = 0;
+  virtual const NqStream *FindStream(uint64_t serial) const = 0;
   virtual bool IsClient() const = 0;
 
   //invoker
@@ -245,9 +246,9 @@ class NqBoxer {
   static inline NqBoxer *From(nq_stream_t s) { return (NqBoxer *)s.p; }
   static inline NqBoxer *From(nq_rpc_t rpc) { return (NqBoxer *)rpc.p; }
 
-  inline bool Valid(nq_conn_t c) const { return c.s != 0 && Valid(c.s, Conn); }
-  inline bool Valid(nq_stream_t s) const { return s.s != 0 && Valid(s.s, Stream); }
-  inline bool Valid(nq_rpc_t rpc) const { return rpc.s != 0 && Valid(rpc.s, Stream); }
+  inline const NqSession::Delegate *Find(nq_conn_t c) const { return c.s != 0 ? FindConn(c.s, Conn) : nullptr; }
+  inline const NqStream *Find(nq_stream_t s) const { return s.s != 0 ? FindStream(s.s) : nullptr; }
+  inline const NqStream *Find(nq_rpc_t rpc) const { return rpc.s != 0 ? FindStream(rpc.s) : nullptr; }
 
   template <class H>
   struct unbox_result_trait {

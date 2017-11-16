@@ -81,6 +81,7 @@ class NqServerStream : public NqStream {
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority) : 
     NqStream(id, nq_session, establish_side, priority) {}
+  void OnClose() override;
 };
 
 

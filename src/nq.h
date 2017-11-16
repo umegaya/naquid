@@ -15,7 +15,12 @@ extern "C" {
 // Annotation
 //
 // --------------------------
+//indicate this call only safe before main loop starts, which means call of nq_server_start or nq_client_poll.
+#define NQ_BOOTSTRAP
+//indicate this call thread safe, and works correctly
 #define NQ_THREADSAFE
+//indicate this call thread safe, but only on owner thread works correctly
+#define NQ_OWNERTHREAD
 
 
 
@@ -149,7 +154,7 @@ typedef struct {
 	//set true to ignore proof verification
 	bool insecure; 
 	
-	//total handshake time limit / handshake no input limit in milli seconds
+	//total handshake time limit / handshake no input limit in milli seconds. default 1000/500
 	nq_time_t handshake_timeout, handshake_idle_timeout; 
 } nq_clconf_t;
 
@@ -157,11 +162,13 @@ typedef struct {
 	//connection open/close watcher
 	nq_closure_t on_open, on_accept, on_close;
 
+	//quic secret. need to specify arbiter (hopefully unique) string
 	const char *quic_secret;
 
+	//cert cache size. default 16
 	int quic_cert_cache_size;
 
-	//total handshake time limit / handshake no input limit in milli seconds
+	//total handshake time limit / handshake no input limit in milli seconds. default 1000/500
 	nq_time_t handshake_timeout, handshake_idle_timeout; 
 } nq_svconf_t;
 
@@ -186,19 +193,19 @@ typedef struct {
 //
 // --------------------------
 // create client object which have max_nfd of connection. 
-extern nq_client_t nq_client_create(int max_nfd);
+NQ_THREADSAFE extern nq_client_t nq_client_create(int max_nfd);
 // do actual network IO. need to call periodically
-extern void nq_client_poll(nq_client_t cl);
+NQ_BOOTSTRAP extern void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.
-extern void nq_client_destroy(nq_client_t cl);
+NQ_BOOTSTRAP extern void nq_client_destroy(nq_client_t cl);
 // create conn from client. server side can get from argument of on_accept handler
 // return invalid conn on error, can check with nq_conn_is_valid. 
-extern nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
+NQ_BOOTSTRAP extern nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
 // get handler map of the client. 
-extern nq_hdmap_t nq_client_hdmap(nq_client_t cl);
+NQ_BOOTSTRAP extern nq_hdmap_t nq_client_hdmap(nq_client_t cl);
 // set thread id that calls nq_client_poll.
 // call this if thread which polls this nq_client_t is different from creator thread.
-extern void nq_client_set_thread(nq_client_t cl);
+NQ_BOOTSTRAP extern void nq_client_set_thread(nq_client_t cl);
 
 
 
@@ -208,13 +215,13 @@ extern void nq_client_set_thread(nq_client_t cl);
 //
 // --------------------------
 //create server which has n_worker of workers
-extern nq_server_t nq_server_create(int n_worker);
+NQ_THREADSAFE extern nq_server_t nq_server_create(int n_worker);
 //listen and returns handler map associated with it. 
-extern nq_hdmap_t nq_server_listen(nq_server_t sv, const nq_addr_t *addr, const nq_svconf_t *config);
+NQ_BOOTSTRAP extern nq_hdmap_t nq_server_listen(nq_server_t sv, const nq_addr_t *addr, const nq_svconf_t *config);
 //if block is true, nq_server_start blocks until some other thread calls nq_server_join. 
-extern void nq_server_start(nq_server_t sv, bool block);
+NQ_BOOTSTRAP extern void nq_server_start(nq_server_t sv, bool block);
 //request shutdown and wait for server to stop. after calling this API, do not call nq_server_* API
-extern void nq_server_join(nq_server_t sv);
+NQ_BOOTSTRAP extern void nq_server_join(nq_server_t sv);
 
 
 
@@ -224,11 +231,11 @@ extern void nq_server_join(nq_server_t sv);
 //
 // --------------------------
 //setup original stream protocol (client), with 3 pattern
-extern bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler);
+NQ_BOOTSTRAP extern bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler);
 
-extern bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc_handler_t handler);
+NQ_BOOTSTRAP extern bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc_handler_t handler);
 
-extern bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t factory);
+NQ_BOOTSTRAP extern bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t factory);
 
 
 
@@ -238,7 +245,7 @@ extern bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_fa
 //
 // --------------------------
 //can change handler map of connection, which is usually inherit from nq_client_t or nq_server_t
-extern nq_hdmap_t nq_conn_hdmap(nq_conn_t conn);
+extern NQ_OWNERTHREAD nq_hdmap_t nq_conn_hdmap(nq_conn_t conn);
 //close and destroy conn/associated stream eventually, so never touch conn/stream/rpc after calling this API.
 extern NQ_THREADSAFE void nq_conn_close(nq_conn_t conn); 
 //this just restart connection, never destroy. but associated stream/rpc all destroyed. (client only)
@@ -251,6 +258,8 @@ extern NQ_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
 extern NQ_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn);
 //get reconnect wait duration in us. 0 means does not wait reconnection
 extern NQ_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn);
+//get unique connection id of nq_conn_t. CAUTION: for client side, that is not same as QUIC's connection id. 
+extern NQ_THREADSAFE nq_cid_t nq_conn_id(nq_conn_t conn);
 
 
 
@@ -259,7 +268,7 @@ extern NQ_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn);
 // stream API 
 //
 // --------------------------
-//create single stream from conn, which has type specified by "name". need to use valid conn and call from owner thread of it
+//create single stream from conn, which has type specified by "name". need to use valid conn && call from owner thread of it
 //return invalid stream on error
 extern NQ_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name);
 //get parent conn from rpc
@@ -278,7 +287,7 @@ extern NQ_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_siz
 // rpc API
 //
 // --------------------------
-//create single rpc stream from conn, which has type specified by "name". need to use valid conn and call from owner thread of it
+//create single rpc stream from conn, which has type specified by "name". need to use valid conn && call from owner thread of it
 //return invalid stream on error
 extern NQ_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name);
 //get parent conn from rpc

@@ -22,7 +22,7 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
 	port_(port), index_(worker.index()), n_worker_(worker.server().n_worker()), 
   server_(worker.server()), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
-  server_map_(), thread_id_(worker.thread_id()) {
+  server_map_(), thread_id_(worker.thread_id()), n_recv_(0) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
 }
@@ -58,7 +58,8 @@ void NqDispatcher::OnRecv(NqPacket *packet) {
   if (conn_id == 0) { 
     return; 
   }
-  TRACE("conn_id = %llu @ %d\n", conn_id, index_);
+  //fprintf(stderr, "conn_id = %llu @ %d\n", conn_id, index_);
+  n_recv_++;
   auto idx = conn_id % n_worker_;
   if (index_ == idx) {
     //TODO(iyatomi): if idx is same as current index, directly process packet here
@@ -96,7 +97,7 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
     auto s = new NqServerSession(connection, this, it->second);
     s->Initialize();
     server_map_.Add(s);
-    server_map_.Activate(s->session_index()); //make connection valid
+    server_map_.Activate(s); //make connection valid
     if (!s->OnOpen(NQ_HS_START)) {
       auto c = Box(s);
       Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Disconnect));
@@ -171,6 +172,22 @@ NqDispatcher::Unbox(uint64_t serial, NqStream **unboxed) {
     }
   }
   return NqBoxer::UnboxResult::SerialExpire;
+}
+const NqSession::Delegate *NqDispatcher::FindConn(uint64_t serial, OpTarget target) const {
+  switch (target) {
+  case Conn:
+    return server_map().Active(NqConnSerialCodec::ServerSessionIndex(serial));
+  case Stream:
+    return server_map().Active(NqStreamSerialCodec::ServerSessionIndex(serial));
+  default:
+    ASSERT(false);
+    return nullptr;
+  }
+}
+const NqStream *NqDispatcher::FindStream(uint64_t serial) const {
+  auto c = server_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
+  if (c == nullptr) { return nullptr; }
+  return c->FindStreamForRead(NqStreamSerialCodec::ServerStreamId(serial));
 }
 }
 

@@ -63,6 +63,24 @@ NqClientLoop::Unbox(uint64_t serial, NqStream **unboxed) {
   }
   return NqBoxer::UnboxResult::SerialExpire;
 }
+const NqSession::Delegate *NqClientLoop::FindConn(uint64_t serial, NqBoxer::OpTarget target) const {
+  switch (target) {
+  case Conn:
+    return client_map().Active(NqConnSerialCodec::ClientSessionIndex(serial));
+  case Stream:
+    return client_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
+  default:
+    ASSERT(false);
+    return nullptr;
+  }
+}
+const NqStream *NqClientLoop::FindStream(uint64_t serial) const {
+  auto c = client_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
+  if (c == nullptr) { return nullptr; }
+  return c->stream_manager().Find(NqStreamSerialCodec::ClientStreamNameId(serial), 
+                                  NqStreamSerialCodec::ClientStreamIndexPerName(serial));
+}
+
 
 //called from diseonnecting alarm
 void NqClientLoop::RemoveClient(NqClient *cl) {

@@ -5,7 +5,7 @@
 - [x] rpc: reduce frame number (unify length header/msgid/type to one frame)
 - [x] rpc: add header byte to indicate msgid/type size
 - [x] conn: client side proof verification (import ProofVerifierChromium)
-- [ ] conn: study is there a way to send stream name without sending it over stream (cmsghdr can do this somehow?)
+- [ ] conn: study is there a way to send stream name without sending it over wire (cmsghdr can do this somehow?)
 - [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
 - [ ] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
 - [ ] test: high frequent reconnection test
