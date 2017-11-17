@@ -7,7 +7,7 @@
 - [x] conn: client side proof verification (import ProofVerifierChromium)
 - [ ] conn: study is there a way to send stream name without sending it over wire (cmsghdr can do this somehow?)
 - [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
-- [ ] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
+- [x] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
 - [ ] test: high frequent reconnection test
 - [ ] test: higher concurrency test (around 10k client connection)
 - [ ] test: server side stream initiation
@@ -18,7 +18,7 @@
 - [ ] bench: latency, throughput, compare with mrs, which is gaming specific udp network library
 - [ ] bench: fix problem that performance significantly decreased when binary does not run with lldb
 
-#### remain tasks for future
+#### remain tasks for 1.0.0
 - [ ] stream/rpc: unreliable packet sending
 - [ ] stream/rpc: unencrypted packet sending 
 - [ ] conn: optional faster network stack by by-passing kernel (like dpdk)
