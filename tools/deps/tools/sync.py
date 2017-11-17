@@ -186,22 +186,6 @@ class DependencyTree(object):
     def make_pp_symbol(self, now):
         return "_".join(os.path.dirname(now).split(os.sep)).upper() + "_COMPILE_FLAGS"
 
-compiled_action("generate_transport_security_state") {
-  tool = "//net/tools/transport_security_state_generator"
-
-  # Inputs in order expected by the command line of the tool.
-  inputs = [
-    "transport_security_state_static.json",
-    "transport_security_state_static.pins",
-    "transport_security_state_static.template",
-  ]
-  outputs = [
-    "$target_gen_dir/transport_security_state_static.h",
-  ]
-  args =
-      rebase_path(inputs, root_build_dir) + rebase_path(outputs, root_build_dir)
-}
-
     def rescue_file_missing(self, non_real_path, imported_from_rpath):
         if not os.path.dirname(non_real_path):
             rescue_path = os.path.dirname(imported_from_rpath) + "/" + non_real_path
@@ -210,9 +194,9 @@ compiled_action("generate_transport_security_state") {
         if non_real_path.endswith("features.h"):
             root = self.find_chromium_root()
             return self.write_feature_header(os.path.join(root, non_real_path), self.make_pp_symbol(non_real_path))
-        elif "transport_security_state_static.h" in non_real_path:
-            root = self.find_chromium_root()
-            return self.write_ts_state_static()os.path.join(root, non_real_path)
+        #elif "transport_security_state_static.h" in non_real_path:
+        #    root = self.find_chromium_root()
+        #    return self.write_ts_state_static()os.path.join(root, non_real_path)
         elif "debugging_flags.h" in non_real_path:
             root = self.find_chromium_root()
             return self.write_feature_header(os.path.join(root, non_real_path), "BASE_DEBUG")

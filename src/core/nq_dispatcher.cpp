@@ -19,13 +19,24 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
                  std::unique_ptr<QuicCryptoServerStream::Helper>(new NqStubCryptoServerStreamHelper(*this)),
                  std::unique_ptr<QuicAlarmFactory>(new NqStubAlarmFactory(worker.loop()))
                 ), 
-	port_(port), index_(worker.index()), n_worker_(worker.server().n_worker()), 
+	port_(port), 
+  accept_per_loop_(config.server().accept_per_loop <= 0 ? kNumSessionsToCreatePerSocketEvent : config.server().accept_per_loop),
+  index_(worker.index()), n_worker_(worker.server().n_worker()), 
   server_(worker.server()), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
-  server_map_(), thread_id_(worker.thread_id()), n_recv_(0) {
+  server_map_(), thread_id_(worker.thread_id()) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
+  SetFromConfig(config);
 }
+void NqDispatcher::SetFromConfig(const NqServerConfig &config) {
+  if (config.server().idle_timeout > 0) {
+    buffered_packets().SetConnectionLifeSpan(QuicTime::Delta::FromMicroseconds(nq::clock::to_us(config.server().idle_timeout)));
+  }
+}
+  
+
+
 
 //implement QuicDispatcher
 void NqDispatcher::OnConnectionClosed(QuicConnectionId connection_id,
@@ -59,7 +70,6 @@ void NqDispatcher::OnRecv(NqPacket *packet) {
     return; 
   }
   //fprintf(stderr, "conn_id = %llu @ %d\n", conn_id, index_);
-  n_recv_++;
   auto idx = conn_id % n_worker_;
   if (index_ == idx) {
     //TODO(iyatomi): if idx is same as current index, directly process packet here

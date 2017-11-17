@@ -108,7 +108,7 @@ int main(int argc, char *argv[]){
   };
   nq_clconf_t conf;
   conf.insecure = false;
-  conf.handshake_idle_timeout = nq_time_sec(60);
+  conf.idle_timeout = nq_time_sec(60);
   conf.handshake_timeout = nq_time_sec(120);
 
   for (int i = 0; i < N_CLIENT; i++) {

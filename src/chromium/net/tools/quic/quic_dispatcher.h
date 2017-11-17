@@ -244,6 +244,8 @@ class QuicDispatcher : public QuicTimeWaitListManager::Visitor,
 
   QuicPacketWriter* writer() { return writer_.get(); }
 
+  QuicBufferedPacketStore &buffered_packets() { return buffered_packets_; }
+
   // Creates per-connection packet writers out of the QuicDispatcher's shared
   // QuicPacketWriter. The per-connection writers' IsWriteBlocked() state must
   // always be the same as the shared writer's IsWriteBlocked(), or else the

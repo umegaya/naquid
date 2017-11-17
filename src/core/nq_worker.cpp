@@ -25,14 +25,14 @@ void NqWorker::Run(PacketQueue &pq) {
     return;
   }
   NqPacket *p;
-  nq_time_t next_consume_buffered_chlo = 0;
+  nq_time_t next_try_accept = 0;
   while (server_.alive()) {
     //TODO(iyatomi): better way to handle this (eg. with timer system)
     nq_time_t now = nq_time_now();
-    bool consume_buffered_chlo = false;
-    if ((next_consume_buffered_chlo + nq_time_msec(10)) < now) {
-      consume_buffered_chlo = true;
-      next_consume_buffered_chlo = now;
+    bool try_accept = false;
+    if ((next_try_accept + nq_time_msec(10)) < now) {
+      try_accept = true;
+      next_try_accept = now;
     }
     //consume queue
     while (pq.try_dequeue(p)) {
@@ -43,10 +43,9 @@ void NqWorker::Run(PacketQueue &pq) {
     //wait and process incoming event
     for (int i = 0; i < n_dispatcher; i++) {
       iq[i]->Poll(ds[i]);
-      if (consume_buffered_chlo) {
+      if (try_accept) {
         //fprintf(stderr, "%d n_recv=%llu\n", index_, ds[i]->n_recv());
-        const size_t kNumSessionsToCreatePerSocketEvent = 1024;
-        ds[i]->ProcessBufferedChlos(kNumSessionsToCreatePerSocketEvent);
+        ds[i]->Accept();
       }
     }
     loop_.Poll();

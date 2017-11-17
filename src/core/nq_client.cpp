@@ -209,7 +209,7 @@ void NqClient::StreamManager::OnOutgoingClose(NqClientStream *s) {
   e.streams_[s->index_per_name_id()] = nullptr;
 }
 bool NqClient::StreamManager::OnOutgoingOpen(const std::string &name, NqClientStream *s) {
-  ASSERT((s->id() % 2) == 0); //must be incoming stream from server (server outgoing stream)
+  ASSERT((s->id() % 2) != 0); //must be incoming stream from server (server outgoing stream)
   s->set_protocol(name);
   auto name_id = Add(name);
   s->set_name_id(name_id);

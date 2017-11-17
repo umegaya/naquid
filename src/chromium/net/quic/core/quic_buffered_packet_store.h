@@ -132,6 +132,9 @@ class QUIC_EXPORT_PRIVATE QuicBufferedPacketStore {
   // Is there any CHLO buffered in the store?
   bool HasChlosBuffered() const;
 
+  // set connection life span
+  inline void SetConnectionLifeSpan(const QuicTime::Delta &span) { connection_life_span_ = span; }
+
  private:
   friend class test::QuicBufferedPacketStorePeer;
 
@@ -146,7 +149,7 @@ class QUIC_EXPORT_PRIVATE QuicBufferedPacketStore {
   BufferedPacketMap undecryptable_packets_;
 
   // The max time the packets of a connection can be buffer in the store.
-  const QuicTime::Delta connection_life_span_;
+  QuicTime::Delta connection_life_span_;
 
   VisitorInterface* visitor_;  // Unowned.
 

@@ -58,8 +58,9 @@ int main(int argc, char *argv[]){
   nq_svconf_t conf;
   conf.quic_secret = "e336e27898ff1e17ac79e82fa0084999";
   conf.quic_cert_cache_size = 0;
-  conf.handshake_idle_timeout = nq_time_sec(60);
+  conf.accept_per_loop = 1;
   conf.handshake_timeout = nq_time_sec(120);
+  conf.idle_timeout = nq_time_sec(60);
   nq_closure_init(conf.on_open, on_conn_open, on_conn_open, nullptr);
   nq_closure_init(conf.on_close, on_conn_close, on_conn_close, nullptr);
   hm = nq_server_listen(sv, &addr, &conf);

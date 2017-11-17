@@ -171,3 +171,39 @@ index 14aaa5b4461f..4709bf4b4443 100644
    if (der_certs.empty())
      return NULL;
  
+diff --git a/net/quic/core/quic_buffered_packet_store.h b/net/quic/core/quic_buffered_packet_store.h
+index f8254f73bd29..2e1f00280b70 100644
+--- a/net/quic/core/quic_buffered_packet_store.h
++++ b/net/quic/core/quic_buffered_packet_store.h
+@@ -132,6 +132,9 @@ class QUIC_EXPORT_PRIVATE QuicBufferedPacketStore {
+   // Is there any CHLO buffered in the store?
+   bool HasChlosBuffered() const;
+ 
++  // set connection life span
++  inline void SetConnectionLifeSpan(const QuicTime::Delta &span) { connection_life_span_ = span; }
++
+  private:
+   friend class test::QuicBufferedPacketStorePeer;
+ 
+@@ -146,7 +149,7 @@ class QUIC_EXPORT_PRIVATE QuicBufferedPacketStore {
+   BufferedPacketMap undecryptable_packets_;
+ 
+   // The max time the packets of a connection can be buffer in the store.
+-  const QuicTime::Delta connection_life_span_;
++  QuicTime::Delta connection_life_span_;
+ 
+   VisitorInterface* visitor_;  // Unowned.
+ 
+diff --git a/net/tools/quic/quic_dispatcher.h b/net/tools/quic/quic_dispatcher.h
+index 52905bc0e2fa..295674f17291 100644
+--- a/net/tools/quic/quic_dispatcher.h
++++ b/net/tools/quic/quic_dispatcher.h
+@@ -244,6 +244,8 @@ class QuicDispatcher : public QuicTimeWaitListManager::Visitor,
+ 
+   QuicPacketWriter* writer() { return writer_.get(); }
+ 
++  QuicBufferedPacketStore &buffered_packets() { return buffered_packets_; }
++
+   // Creates per-connection packet writers out of the QuicDispatcher's shared
+   // QuicPacketWriter. The per-connection writers' IsWriteBlocked() state must
+   // always be the same as the shared writer's IsWriteBlocked(), or else the

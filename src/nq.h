@@ -154,8 +154,8 @@ typedef struct {
 	//set true to ignore proof verification
 	bool insecure; 
 	
-	//total handshake time limit / handshake no input limit in milli seconds. default 1000/500
-	nq_time_t handshake_timeout, handshake_idle_timeout; 
+	//total handshake time limit / no input limit. default 1000ms/500ms
+	nq_time_t handshake_timeout, idle_timeout; 
 } nq_clconf_t;
 
 typedef struct {
@@ -165,11 +165,11 @@ typedef struct {
 	//quic secret. need to specify arbiter (hopefully unique) string
 	const char *quic_secret;
 
-	//cert cache size. default 16
-	int quic_cert_cache_size;
+	//cert cache size. default 16, how meny sessions accepted per loop. default 1024
+	int quic_cert_cache_size, accept_per_loop;
 
-	//total handshake time limit / handshake no input limit in milli seconds. default 1000/500
-	nq_time_t handshake_timeout, handshake_idle_timeout; 
+	//total handshake time limit / no input limit. default 1000ms/500ms
+	nq_time_t handshake_timeout, idle_timeout; 
 } nq_svconf_t;
 
 //handlers

@@ -3,23 +3,9 @@
 #include "net/cert/ct_known_logs.h"
 #include "net/cert/ct_log_verifier.h"
 
-#include "basis/timespec.h"
-
 namespace net {
 void NqClientConfig::Setup() { //init other variables from client_
-  if (client_.handshake_idle_timeout > 0) {
-    set_max_idle_time_before_crypto_handshake(
-      QuicTime::Delta::FromMicroseconds(nq::clock::to_us(client_.handshake_idle_timeout)));
-    if (max_idle_time_before_crypto_handshake() > 
-        max_time_before_crypto_handshake()) {
-      set_max_time_before_crypto_handshake(
-        max_idle_time_before_crypto_handshake());
-    }
-  }
-  if (client_.handshake_timeout > 0) {
-    set_max_time_before_crypto_handshake(
-      QuicTime::Delta::FromMicroseconds(nq::clock::to_us(client_.handshake_timeout)));
-  }
+  ConfigureSelf(client_);
 }
 std::unique_ptr<ProofVerifier> NqClientConfig::NewProofVerifier() const { 
   if (client_.insecure) {
@@ -28,20 +14,32 @@ std::unique_ptr<ProofVerifier> NqClientConfig::NewProofVerifier() const {
     return std::unique_ptr<ProofVerifier>(new NqProofVerifier);
   }
 }
+
+
+
 const char NqServerConfig::kDefaultQuicSecret[] = "e3f0f228cd0517a1a303ca983184f5ef";
 void NqServerConfig::Setup() { //init other variables from client_
-  if (server_.handshake_idle_timeout > 0) {
-    set_max_idle_time_before_crypto_handshake(
-      QuicTime::Delta::FromMicroseconds(nq::clock::to_us(server_.handshake_idle_timeout)));
-    if (max_idle_time_before_crypto_handshake() > 
-        max_time_before_crypto_handshake()) {
-      set_max_time_before_crypto_handshake(
-        max_idle_time_before_crypto_handshake());
-    }
+  ConfigureSelf(server_);
+}
+std::unique_ptr<QuicCryptoServerConfig> 
+NqServerConfig::NewCryptoConfig(QuicClock *clock) const {
+#if !defined(DEBUG)
+  if (server_.quic_secret == nullptr) {
+    return nullptr; //should use original secret
   }
-  if (server_.handshake_timeout > 0) {
-    set_max_time_before_crypto_handshake(
-      QuicTime::Delta::FromMicroseconds(nq::clock::to_us(server_.handshake_timeout)));
-  }
+#endif
+  auto c = std::unique_ptr<QuicCryptoServerConfig>(new QuicCryptoServerConfig(
+    server_.quic_secret == nullptr ? kDefaultQuicSecret : server_.quic_secret, 
+    QuicRandom::GetInstance(),
+    std::unique_ptr<ProofSource>(new NqProofSource(addr_))
+  ));
+  std::unique_ptr<CryptoHandshakeMessage> scfg(
+    c->AddDefaultConfig(
+      QuicRandom::GetInstance(), 
+      clock, 
+      crypto_options_
+    )
+  );
+  return c;
 }
 } //net

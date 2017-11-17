@@ -20,9 +20,11 @@ class NqDispatcher : public QuicDispatcher,
                      public QuicCryptoServerStream::Helper,
                      public NqPacketReader::Delegate,
                      public NqBoxer {
+  static const int kNumSessionsToCreatePerSocketEvent = 1024;
+  static const int kDefaultCertCacheSize = 16; 
   typedef NqWorker::InvokeQueue InvokeQueue;
   
-  int port_; 
+  int port_, accept_per_loop_; 
   uint32_t index_, n_worker_;
   const NqServer &server_;
   std::unique_ptr<QuicCryptoServerConfig> crypto_config_;
@@ -32,16 +34,16 @@ class NqDispatcher : public QuicDispatcher,
   QuicCompressedCertsCache cert_cache_;
   NqSessionContainer<NqServerSession> server_map_;
   std::thread::id thread_id_;
-  uint64_t n_recv_;
  public:
-  //TODO(iyatomi): find proper cache size
-  static const int kDefaultCertCacheSize = 16; 
   NqDispatcher(int port, const NqServerConfig& config, 
                std::unique_ptr<QuicCryptoServerConfig> crypto_config, 
                NqWorker &worker);
-  void Process(NqPacket *p) {
+  inline void Process(NqPacket *p) {
     ProcessPacket(p->server_address(), p->client_address(), *p);
     reader_.Pool(const_cast<char *>(p->data()), p);
+  }
+  inline void Accept() {
+    ProcessBufferedChlos(accept_per_loop_);
   }
   inline QuicCompressedCertsCache *cert_cache() { return &cert_cache_; }
   inline const QuicCryptoServerConfig *crypto_config() const { return crypto_config_.get(); }
@@ -50,7 +52,6 @@ class NqDispatcher : public QuicDispatcher,
   inline NqSessionIndex new_session_index() { return server_map_.NewIndex(); }
   inline const NqSessionContainer<NqServerSession> &server_map() const { return server_map_; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
-  inline uint64_t n_recv() const { return n_recv_; }
 
 
   //implements nq::IoProcessor
@@ -84,6 +85,8 @@ class NqDispatcher : public QuicDispatcher,
   const NqStream *FindStream(uint64_t serial) const override;
 
  protected:
+  void SetFromConfig(const NqServerConfig &conf);
+  
   //implements QuicDispatcher
   QuicSession* CreateQuicSession(
     QuicConnectionId connection_id,
