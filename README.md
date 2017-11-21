@@ -10,8 +10,11 @@
   - seems cannot, we stick to send stream kind over stream for a while.
 - [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
 - [x] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
+- [ ] conn: more cert check
+- [ ] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
 - [ ] API: reduce error code (can use app-defined error code almost anywhere)
 - [ ] API: more API to thread safe 
+- [ ] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
 - [ ] test: high frequent reconnection test
 - [ ] test: server side stream initiation
 - [ ] test: stream disconnection using on open callback 
@@ -21,7 +24,7 @@
 - [ ] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread
 - [x] bench: latency, throughput, compare with mrs, which is gaming specific udp network library
-  - 20~30% slower than mrs
+  - 20~30% slower than mrs, but it may not big difference for naquid main use case (send/recv small packet very frequently)
 
 
 #### remain tasks for 1.0.0

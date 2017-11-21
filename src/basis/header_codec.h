@@ -78,6 +78,7 @@ namespace nq {
         ofs += 1;
       } else {
         *type = Endian::NetbytesToHost<int16_t>(buf + 1);
+        ofs += 2;
       }
       if (f & MSGID_4BYTE) {
         *msgid = Endian::NetbytesToHost<uint32_t>(buf + ofs);
@@ -85,6 +86,8 @@ namespace nq {
       } else if (f & MSGID_2BYTE) {
         *msgid = Endian::NetbytesToHost<uint16_t>(buf + ofs);
         ofs += 2;
+      } else {
+        *msgid = 0;
       }
       return ofs;      
     }

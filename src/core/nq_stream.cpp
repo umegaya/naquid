@@ -103,10 +103,14 @@ void NqStream::OnDataAvailable() {
       //create handler by initial establish string
       auto name = buffer_.substr(0, idx);
       handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name));
-      handler_->ProtoSent();
-      if (handler_ == nullptr || !handler_->OnOpen()) { //server side OnOpen
+      if (handler_ == nullptr) { //server side OnOpen
         Disconnect();
         return; //broken payload. stream handler does not exists / stream handler reject to processs
+      }
+      handler_->ProtoSent();
+      if (!handler_->OnOpen()) {
+        Disconnect();
+        return; //broken payload. stream handler does not exists / stream handler reject to processs        
       }
       if (buffer_.length() > (idx + 1)) {
         //parse_buffer may contains over-received payload
@@ -129,24 +133,24 @@ void NqStream::OnDataAvailable() {
 void NqClientStream::OnClose() {
   //it's generally unsafe. delegate is not assured to be NqClient*
   ASSERT(nq_session()->delegate()->IsClient());
+  NqStream::OnClose();
   auto c = static_cast<NqClient *>(nq_session()->delegate());
   c->stream_manager().OnClose(this);
-  NqStream::OnClose();
 }
 
 
 
 void NqServerStream::OnClose() {
   ASSERT(!nq_session()->delegate()->IsClient());
+  NqStream::OnClose();
   auto c = static_cast<NqServerSession *>(nq_session());
   c->RemoveStreamForRead(id());
-  NqStream::OnClose();
 }
 
 
 
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
-  if (!proto_sent_) { //TODO: use unlikely
+  if (!proto_sent_) { //TODO(iyatomi): use unlikely
     const auto& name = stream_->protocol();
     char zero_byte = 0;
     stream_->WriteOrBufferData(QuicStringPiece(name.c_str(), name.length()), false, nullptr);
@@ -170,7 +174,7 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	if (reclen > 0 && (reclen + read_ofs) <= plen) {
 	  nq_closure_call(on_recv_, on_stream_record, stream_->ToHandle<nq_stream_t>(), pstr + read_ofs, reclen);
 	  parse_buffer_.erase(0, reclen + read_ofs);
-	} else if (reclen == 0 && plen > len_buff_len) {
+	} else if (reclen == 0 && plen > len_buff_len) { //TODO(iyatomi): use unlikely
 		//broken payload. should resolve payload length
 		stream_->Disconnect();
 	}
@@ -225,6 +229,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
     if (reclen == 0 || (read_ofs + reclen) > plen) {
       break;
     }
+    //TRACE("msgid, type = %u %d", msgid, type);
     /*
       type > 0 && msgid != 0 => request
       type <= 0 && msgid != 0 => reply
@@ -244,13 +249,16 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
         } else {
           //probably timedout. caller should already be received timeout error
           //req object deleted in OnAlarm
+          //TRACE("stream handler reply: msgid not found %u", msgid);
         }
       } else {
         //request
+        //TRACE("stream handler request: msgid %u", msgid);
         nq_closure_call(on_request_, on_rpc_request, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr), reclen);
       }
     } else if (type > 0) {
       //notify
+      //TRACE("stream handler notify: type %u", type);
       nq_closure_call(on_notify_, on_rpc_notify, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
     } else {
       ASSERT(false);

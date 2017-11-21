@@ -195,7 +195,7 @@ const NqSession::Delegate *NqDispatcher::FindConn(uint64_t serial, OpTarget targ
   }
 }
 const NqStream *NqDispatcher::FindStream(uint64_t serial) const {
-  auto c = server_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
+  auto c = server_map().Active(NqStreamSerialCodec::ServerSessionIndex(serial));
   if (c == nullptr) { return nullptr; }
   return c->FindStreamForRead(NqStreamSerialCodec::ServerStreamId(serial));
 }

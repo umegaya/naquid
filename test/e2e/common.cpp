@@ -3,7 +3,14 @@
 #include <cstdlib>
 
 namespace nqtest {
+nq_stream_t Test::Conn::invalid_stream = { const_cast<char *>("invalid"), 0 };
+nq_rpc_t Test::Conn::invalid_rpc { const_cast<char *>("invalid"), 0 };
+
+
 bool Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void *now_always_null) {
+  if (hsev != NQ_HS_DONE) {
+    return true;
+  }
   auto tc = (Conn *)arg;
   if (tc->th.joinable()) {
     tc->should_signal = true;
@@ -38,27 +45,43 @@ void Test::OnConnFinalize(void *arg, nq_conn_t c) {
 
 
 
-bool Test::OnStreamOpen(void *arg, nq_stream_t s, void **pctx) {
+bool Test::OnStreamOpen(void *arg, nq_stream_t s, void **ppctx) {
   auto c = (Conn *)arg;
-  c->streams.push_back(nq_stream_sid(s));
+  c->AddStream(s);
   c->should_signal = true;
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {
+    nq_closure_call(clsr, on_stream_open, s, ppctx);    
+  }
   return true;
 }
 void Test::OnStreamClose(void *arg, nq_stream_t s) {
   auto c = (Conn *)arg;
-  auto it = std::find(c->streams.begin(), c->streams.end(), nq_stream_sid(s));
-  if (it != c->streams.end()) {
-    c->streams.erase(it);
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::ConnCloseStream, clsr)) {
+    nq_closure_call(clsr, on_stream_close, s);    
+  }
+  if (c->RemoveStream(s)) {
     c->should_signal = true;
   }
 }
 void Test::OnStreamRecord(void *arg, nq_stream_t s, const void *data, nq_size_t len) {
   auto c = (Conn *)arg;
-  c->records.push_back(MakeString(data, len));
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::StreamRecord, s, clsr)) {
+    nq_closure_call(clsr, on_stream_record, s, data, len);    
+  } else {
+    c->records.push_back(MakeString(data, len));
+  }
 }
 void Test::OnStreamRecordSimple(void *arg, nq_stream_t s, const void *data, nq_size_t len) {
   auto c = (Conn *)arg;
-  c->records.push_back(MakeString(data, len));
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::StreamRecord, s, clsr)) {
+    nq_closure_call(clsr, on_stream_record, s, data, len);    
+  } else {
+   c->records.push_back(MakeString(data, len));
+  }
 }
 nq_size_t Test::StreamWriter(void *arg, nq_stream_t s, const void *data, nq_size_t len, void **pbuf) {
   auto c = (Conn *)arg;
@@ -89,71 +112,83 @@ void *Test::StreamReader(void *arg, const char *data, nq_size_t dlen, int *p_rec
 
 
 
-bool Test::OnRpcOpen(void *arg, nq_rpc_t rpc, void **) {
+bool Test::OnRpcOpen(void *arg, nq_rpc_t rpc, void **ppctx) {
   auto c = (Conn *)arg;
-  c->streams.push_back(nq_rpc_sid(rpc));
+  c->AddStream(rpc);
   c->should_signal = true;
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {
+    nq_closure_call(clsr, on_rpc_open, rpc, ppctx);    
+  }
   return true;
 }
 void Test::OnRpcClose(void *arg, nq_rpc_t rpc) {
   auto c = (Conn *)arg;
-  auto it = std::find(c->streams.begin(), c->streams.end(), nq_rpc_sid(rpc));
-  if (it != c->streams.end()) {
-    c->streams.erase(it);
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::ConnCloseStream, clsr)) {
+    nq_closure_call(clsr, on_rpc_close, rpc);    
+  }
+  if (c->RemoveStream(rpc)) {
     c->should_signal = true;
   }
 }
 void Test::OnRpcRequest(void *arg, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t dlen) {
   auto c = (Conn *)arg;
-  RequestData r = {
-    .type = type,
-    .msgid = msgid,
-    .payload = MakeString(data, dlen),
-  };
-  c->requests.push_back(r);
-  auto it = c->notifiers.find(CallbackType::Request);
-  if (it != c->notifiers.end()) {
-    nq_closure_call(it->second, on_rpc_request, rpc, type, msgid, data, dlen);
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::RpcRequest, rpc, clsr)) {
+    nq_closure_call(clsr, on_rpc_request, rpc, type, msgid, data, dlen);    
+  } else {
+    RequestData r = {
+      .type = type,
+      .msgid = msgid,
+      .payload = MakeString(data, dlen),
+    };
+    c->requests.push_back(r);    
   }
 }
 void Test::OnRpcNotify(void *arg, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t dlen) {
   auto c = (Conn *)arg;
-  NotifyData r = {
-    .type = type,
-    .payload = MakeString(data, dlen),
-  };
-  c->notifies.push_back(r);
-  auto it = c->notifiers.find(CallbackType::Notify);
-  if (it != c->notifiers.end()) {
-    nq_closure_call(it->second, on_rpc_notify, rpc, type, data, dlen);
+  nq_closure_t clsr;
+  if (c->FindClosure(CallbackType::RpcNotify, rpc, clsr)) {
+    nq_closure_call(clsr, on_rpc_notify, rpc, type, data, dlen);    
+  } else {
+    NotifyData r = {
+      .type = type,
+      .payload = MakeString(data, dlen),
+    };
+    c->notifies.push_back(r);
   }
 }
 
 
-void Test::RegisterCallback(Conn *tc) {
-  auto hm = nq_conn_hdmap(tc->c);
+void Test::RegisterCallback(Conn &tc) {
+  auto hm = nq_conn_hdmap(tc.c);
+  auto ptc = &tc;
 
   nq_rpc_handler_t rh;
-  nq_closure_init(rh.on_rpc_open, on_rpc_open, &Test::OnRpcOpen, tc);
-  nq_closure_init(rh.on_rpc_close, on_rpc_close, &Test::OnRpcClose, tc);
-  nq_closure_init(rh.on_rpc_request, on_rpc_request, &Test::OnRpcRequest, tc);
-  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, &Test::OnRpcNotify, tc);
+  nq_closure_init(rh.on_rpc_open, on_rpc_open, &Test::OnRpcOpen, ptc);
+  nq_closure_init(rh.on_rpc_close, on_rpc_close, &Test::OnRpcClose, ptc);
+  nq_closure_init(rh.on_rpc_request, on_rpc_request, &Test::OnRpcRequest, ptc);
+  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, &Test::OnRpcNotify, ptc);
   rh.use_large_msgid = false;
   nq_hdmap_rpc_handler(hm, "rpc", rh);
+  tc.AddStream(nq_conn_rpc(tc.c, "rpc"));
 
   nq_stream_handler_t rsh;
-  nq_closure_init(rsh.on_stream_open, on_stream_open, &Test::OnStreamOpen, tc);
-  nq_closure_init(rsh.on_stream_close, on_stream_close, &Test::OnStreamClose, tc);
-  nq_closure_init(rsh.on_stream_record, on_stream_record, &Test::OnStreamRecord, tc);
-  nq_closure_init(rsh.stream_reader, stream_reader, &Test::StreamReader, tc);
-  nq_closure_init(rsh.stream_writer, stream_writer, &Test::StreamWriter, tc);
+  nq_closure_init(rsh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
+  nq_closure_init(rsh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
+  nq_closure_init(rsh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
+  nq_closure_init(rsh.stream_reader, stream_reader, &Test::StreamReader, ptc);
+  nq_closure_init(rsh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
   nq_hdmap_stream_handler(hm, "rst", rsh);
+  tc.AddStream(nq_conn_stream(tc.c, "rst"));
 
   nq_stream_handler_t ssh;
-  nq_closure_init(ssh.on_stream_open, on_stream_open, &Test::OnStreamOpen, tc);
-  nq_closure_init(ssh.on_stream_close, on_stream_close, &Test::OnStreamClose, tc);
-  nq_closure_init(ssh.on_stream_record, on_stream_record, &Test::OnStreamRecordSimple, tc);
+  nq_closure_init(ssh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
+  nq_closure_init(ssh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
+  nq_closure_init(ssh.on_stream_record, on_stream_record, &Test::OnStreamRecordSimple, ptc);
   nq_hdmap_stream_handler(hm, "sst", ssh);
+  tc.AddStream(nq_conn_stream(tc.c, "sst"));
 }
 
 
@@ -169,12 +204,8 @@ bool Test::Run(nq_time_t idle_timeout, nq_time_t timeout) {
     nq_closure_init(conf.on_open, on_conn_open, &Test::OnConnOpen, conns + i);
     nq_closure_init(conf.on_close, on_conn_close, &Test::OnConnClose, conns + i);
     nq_closure_init(conf.on_finalize, on_conn_finalize, &Test::OnConnFinalize, this);
-    conns[i].Init();
-    conns[i].index = i;
-    conns[i].t = this;
-    conns[i].c = nq_client_connect(cl, &addr_, &conf);
-    conns[i].should_signal = false;
-    RegisterCallback(conns + i);
+    auto c = nq_client_connect(cl, &addr_, &conf);
+    conns[i].Init(this, c, i);
   }
   nq_time_t end = nq_time_now() + timeout;
   while (!Finished() && (timeout == 0 || nq_time_now() < end)) {
@@ -197,9 +228,10 @@ bool Test::Run(nq_time_t idle_timeout, nq_time_t timeout) {
   }
   //wait all actual conn close
   while (concurrency_ > closed_conn_) {
-    if (timeout == 0 || nq_time_now() < end) {
+    if (timeout != 0 && nq_time_now() >= end) {
       //should be closed within timedout
       delete []conns;
+      ASSERT(false);
       return false;
     }
     nq_client_poll(cl);

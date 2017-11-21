@@ -300,6 +300,8 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
 //get context, which is set at on_stream_open
 NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s);
+//get stream name
+NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
 
 
 // --------------------------
@@ -316,16 +318,18 @@ NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc);
 NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
 NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc);
-//send arbiter byte array or object to stream peer. 
-NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply);
-//send arbiter byte array or object to stream peer, without receving reply
-NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen);
+//send arbiter byte array or object to stream peer. type should be positive
+NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply);
+//send arbiter byte array or object to stream peer, without receving reply. type should be positive
+NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen);
 //send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
 //get QUIC stream id, CAUTION: this is not unique among all rpc created. if you need global uniqueness, please use 16 byte value of nq_rpc_t
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t s);
 //get context, which is set at on_stream_open
 NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t s);
+//get rpc name
+NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t s);
 
 
 // --------------------------

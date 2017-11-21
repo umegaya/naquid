@@ -1,14 +1,9 @@
-#include <nq.h>
-#include "basis/endian.h"
-
-#include <map>
-#include <thread>
+#include "common.h"
 
 static const int kThreads = 1;  //4 thread server
-static const int kRpcOk = 0;
-static const int kRpcPing = 1;
+static const char NotifySuccess[] = "notify success";
 
-
+using namespace nqtest;
 
 /* conn callback */
 bool on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void *) {
@@ -28,14 +23,48 @@ bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
 }
 void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
-static std::map<uint64_t, uint64_t> recv_progress;
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
-  ASSERT(type == kRpcPing);
-  ASSERT(len == sizeof(nq_time_t));
-  auto peer_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-  recv_progress[rpc.s] = peer_ts;
-  //fprintf(stderr, "peer_ts => %llu\n", peer_ts);
-  nq_rpc_reply(rpc, kRpcOk, msgid, data, len);
+  TRACE("rpc req: %u", type);
+  switch (type) {
+    case RpcType::Ping:
+      ASSERT(len == sizeof(nq_time_t));
+      //auto peer_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
+      //fprintf(stderr, "peer_ts => %llu\n", peer_ts);
+      nq_rpc_reply(rpc, RpcError::None, msgid, data, len);
+      break;
+    case RpcType::Raise:
+      nq_rpc_reply(rpc, nq::Endian::NetbytesToHost<int32_t>(data), msgid, 
+        static_cast<const char *>(data) + sizeof(int32_t), len - sizeof(int32_t));
+      break;
+    case RpcType::NotifyText:
+      nq_rpc_notify(rpc, RpcType::TextNotification, data, len);
+      nq_rpc_reply(rpc, RpcError::None, msgid, NotifySuccess, sizeof(NotifySuccess) - 1);
+      break;
+    case RpcType::ServerStream:
+      {
+        auto s = MakeString(data, len);
+        auto idx = s.find('|');
+        if (idx == std::string::npos) {
+          s = std::string("parse fails:") + s;
+          nq_rpc_reply(rpc, RpcError::Parse, msgid, s.c_str(), s.length());
+          return;
+        }
+        auto name = s.substr(0, idx);
+        auto msg = "from server:" + s.substr(idx + 1);
+        auto c = nq_rpc_conn(rpc);
+        auto rpc2 = nq_conn_rpc(c, name.c_str());
+        if (!nq_rpc_is_valid(rpc2)) {
+          nq_rpc_reply(rpc, RpcError::NoSuchStream, msgid, s.c_str(), s.length());
+          return;          
+        }
+        RPC(rpc2, RpcType::ServerRequest, msg.c_str(), msg.length(), ([rpc2, msg](
+          nq_rpc_t rpc3, nq_result_t r, const void *data, nq_size_t dlen) {
+          ASSERT(r >= 0 && nq_rpc_sid(rpc2) == nq_rpc_sid(rpc3) && MakeString(data, dlen) == ("from client:" + msg));
+        }));
+        nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
+      }
+      break;
+  }
 }
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
 
@@ -70,7 +99,7 @@ int main(int argc, char *argv[]){
   nq_closure_init(handler.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
   nq_closure_init(handler.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
   nq_closure_init(handler.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
-  nq_hdmap_rpc_handler(hm, "test", handler);
+  nq_hdmap_rpc_handler(hm, "rpc", handler);
 
   nq_server_start(sv, false);
 

@@ -140,6 +140,7 @@ NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn) {
 	return NqBoxer::From(conn)->IsClient();
 }
 NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn) {
+  if (conn.s == 0) { TRACE("invalid handle: %s", conn.p); return false; }
   return NqBoxer::From(conn)->Find(conn) != nullptr;
 }
 NQAPI_THREADSAFE nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
@@ -168,6 +169,7 @@ NQAPI_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
     INVALID_HANDLE<nq_stream_t>("fail to unbox");
 }
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
+  ASSERT(nq_stream_is_valid(s));
   auto b = NqBoxer::From(s);
   nq_conn_t c = {
     .p = s.p, 
@@ -178,21 +180,31 @@ NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
   return c;
 }
 NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s) {
+  if (s.s == 0) { TRACE("invalid handle: %s", s.p); return false; }
   return NqBoxer::From(s)->Find(s) != nullptr;
 }
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s) {
+  ASSERT(nq_stream_is_valid(s));
 	NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Disconnect);
 }
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
+  ASSERT(nq_stream_is_valid(s));
   NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Send, data, datalen);
 }
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s) {
+  ASSERT(nq_stream_is_valid(s));
   auto st = NqBoxer::From(s)->Find(s);
   return st != nullptr ? st->id() : 0;
 }
 NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s) {
+  ASSERT(nq_stream_is_valid(s));
   auto st = NqBoxer::From(s)->Find(s);
   return st != nullptr ? st->Handler<NqStreamHandler>()->context() : 0;
+}
+NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s) {
+  ASSERT(nq_stream_is_valid(s));
+  auto st = NqBoxer::From(s)->Find(s);
+  return st != nullptr ? st->protocol().c_str() : "";
 }
 
 
@@ -209,6 +221,7 @@ NQAPI_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {
     INVALID_HANDLE<nq_rpc_t>("fail to unbox");
 }
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
+  ASSERT(nq_rpc_is_valid(rpc));
   auto b = NqBoxer::From(rpc);
   nq_conn_t c = {
     .p = rpc.p, 
@@ -219,27 +232,42 @@ NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   return c;
 }
 NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc) {
+  if (rpc.s == 0) { TRACE("invalid handle: %s", rpc.p); return false; }
   return NqBoxer::From(rpc)->Find(rpc) != nullptr;
 }
 NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc) {
+  ASSERT(nq_rpc_is_valid(rpc));
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Disconnect);
 }
-NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
+NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
+  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(type > 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Call, type, data, datalen, on_reply);
 }
-NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen) {
+NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen) {
+  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(type > 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Notify, type, data, datalen);
 }
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
+  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(result <= 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen);
 }
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc) {
+  ASSERT(nq_rpc_is_valid(rpc));
   auto st = NqBoxer::From(rpc)->Find(rpc);
   return st != nullptr ? st->id() : 0;
 }
 NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t rpc) {
+  ASSERT(nq_rpc_is_valid(rpc));
   auto st = NqBoxer::From(rpc)->Find(rpc);
   return st != nullptr ? st->Handler<NqStreamHandler>()->context() : 0;
+}
+NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t rpc) {
+  ASSERT(nq_rpc_is_valid(rpc));
+  auto st = NqBoxer::From(rpc)->Find(rpc);
+  return st != nullptr ? st->protocol().c_str() : "";
 }
 
 

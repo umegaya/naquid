@@ -36,5 +36,8 @@ public:
     memcpy(r, p, sz);
     return r;
   }
+  static void MemFree(void *p) {
+    free(p);
+  }
 };
 }

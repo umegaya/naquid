@@ -44,11 +44,13 @@ class NqBoxer {
       Data() {}
       Data(const void *p, nq_size_t len) {
         if (len <= 0) {
-          p_ = p; len_ = len; //assume memory of p managed by caller
+          p_ = p; len_ = len; //if p is not byte array, assume memory is managed by caller
         } else {
+          //TODO(iyatomi): allocation from some pool
           p_ = nq::Syscall::Memdup(p, len); len_ = len;
         }
       }
+      ~Data() { if (len_ > 0) { nq::Syscall::MemFree(const_cast<void *>(p_)); } }
       inline const void *ptr() const { return p_; }
       inline nq_size_t length() const { return len_; } 
     } data_;
@@ -66,7 +68,7 @@ class NqBoxer {
       } reply_;
     };
     Op(uint64_t serial, OpCode code, OpTarget target = OpTarget::Stream) : 
-      serial_(serial), code_(code), target_(target) {}
+      serial_(serial), code_(code), target_(target) { data_.len_ = 0; }
     Op(uint64_t serial, OpCode code, const void *data, nq_size_t datalen, 
        OpTarget target = OpTarget::Stream) : 
       serial_(serial), code_(code), target_(target), data_(data, datalen) {}
@@ -89,6 +91,7 @@ class NqBoxer {
       reply_.result_ = result;
       reply_.msgid_ = msgid;
     }
+    ~Op() {}
   };
   class Processor : public moodycamel::ConcurrentQueue<Op*> {
   public:
@@ -173,11 +176,11 @@ class NqBoxer {
     }
   }
   //TODO(iyatomi): use direct pointer of NqStream to achieve faster operation
-  //1. allocate NqStream by the way that reserved to pool on destroy. 
-  //2. then heap for NqStream never reused by other objects, boxer remain same (and we can see always invalid value for serial)
-  //3. nq_stream/rpc_t has NqStream pointer as value of member p. this value also passed to InvokeStream stored into Op if necessary
-  //4. so we can check validity of NqStream just compare given serial value from nq_stream/rpc_t with stored one sinstead of double hash table lookup in Unbox
-  //current blocker of this fix is: NqStream will wrapped unique_ptr<T>, so impossible to reserve it to pool.
+  //1. allocate NqStream by the way that reserved it to pool on destroy. 
+  //2. then heap for NqStream never reused by other objects, boxer remain same (and we can set invalid value for serial)
+  //3. nq_stream/rpc_t has NqStream pointer as value of member p. this value also passed to InvokeStream by storing it into Op
+  //4. so we can check validity of NqStream just compare given serial value from nq_stream/rpc_t with stored one, instead of double hash table lookup in Unbox
+  //current blocker of this fix is: NqStream wrapped unique_ptr<T> inside of QuicSession, so impossible to reserve it to pool.
   inline void InvokeStream(uint64_t serial, OpCode code, NqStream *unboxed = nullptr) {
     UnboxResult r = UnboxResult::Ok;
     if (unboxed != nullptr || (r = Unbox(serial, &unboxed)) == UnboxResult::Ok) {

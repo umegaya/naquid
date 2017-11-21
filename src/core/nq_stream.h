@@ -178,7 +178,6 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     void OnAlarm() override { 
       auto it = stream_handler_->req_map_.find(msgid_);
       if (it != stream_handler_->req_map_.end()) {
-        //TODO(iyatomi): raise timeout error
         nq_closure_call(on_data_, on_rpc_reply, stream_handler_->stream()->ToHandle<nq_rpc_t>(), NQ_ETIMEOUT, "", 0);
         stream_handler_->req_map_.erase(it);
       }
