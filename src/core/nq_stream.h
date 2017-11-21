@@ -72,7 +72,6 @@ class NqClientStream : public NqStream {
   inline NqStreamIndexPerNameId index_per_name_id() const { return index_per_name_id_; }
   inline void set_name_id(NqStreamNameId id) { name_id_ = id; }
   inline void set_index_per_name_id(NqStreamIndexPerNameId idx) { index_per_name_id_ = idx; }
-
 };
 class NqServerStream : public NqStream {
  public:
@@ -90,9 +89,10 @@ class NqStreamHandler {
 protected:
   NqStream *stream_;
   nq_closure_t on_open_, on_close_;
+  void *context_;
   bool proto_sent_;
 public:
-  NqStreamHandler(NqStream *stream) : stream_(stream), proto_sent_(false) {}
+  NqStreamHandler(NqStream *stream) : stream_(stream), context_(nullptr), proto_sent_(false) {}
   virtual ~NqStreamHandler() {}
   
   //interface
@@ -101,7 +101,14 @@ public:
   virtual void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) = 0;
 
   //operation
-  inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>()); }
+  //following code assumes nq_stream_t and nq_rpc_t just has same way to create, 
+  //which can be partially checked this static assertion.
+  //if so, it passes nq_stream_t but it can be treated as nq_rpc_t for that kind of stream, too. 
+  STATIC_ASSERT(sizeof(nq_stream_t) == sizeof(nq_rpc_t) && sizeof(nq_stream_t) == 16, "size difer");
+  STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 0, "offset of p differ");
+  STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 8, "offset of s differ");
+  //TODO(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
+  inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), &context_); }
   inline void OnClose() { nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); }
   inline void SetLifeCycleCallback(nq_closure_t on_open, nq_closure_t on_close) {
     on_open_ = on_open;
@@ -110,6 +117,7 @@ public:
   inline void Disconnect() { stream_->Disconnect(); }
   inline void ProtoSent() { proto_sent_ = true; }
   inline NqStream *stream() { return stream_; }
+  inline void *context() const { return context_; }
   void WriteBytes(const char *p, nq_size_t len);
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
@@ -144,7 +152,13 @@ class NqRawStreamHandler : public NqStreamHandler {
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override {
-    nq_closure_call(writer_, stream_writer, p, len, stream_->ToHandle<nq_stream_t>());
+    void *buf;
+    auto size = nq_closure_call(writer_, stream_writer, stream_->ToHandle<nq_stream_t>(), p, len, &buf);
+    if (size <= 0) {
+      stream_->Disconnect();
+    } else {
+      WriteBytes(static_cast<char *>(buf), size);
+    }
   }
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
 

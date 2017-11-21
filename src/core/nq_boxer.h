@@ -162,7 +162,6 @@ class NqBoxer {
         delete unboxed;
         break;
       case Flush: {
-        //TRACE("flush %p\n", unboxed->Connection());
         QuicConnection::ScopedPacketBundler bundler(unboxed->Connection(), QuicConnection::SEND_ACK_IF_QUEUED);
       } break;
       default:

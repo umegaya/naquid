@@ -107,7 +107,7 @@ void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
     client_->session()->connection()->OnCanWrite();
   }
   if (NqLoop::Closed(event)) {
-    TRACE("closed %d\n", fd);
+    TRACE("closed %d", fd);
     QUIC_DLOG(INFO) << "looperr";
   }
 }

@@ -1,9 +1,43 @@
 #include <nq.h>
-#include "basis/endian.h"
-#include <stdio.h>
+#include "rpc.h"
 
-#include <map>
+using namespace nqtest;
 
+void test_suites(const nq_addr_t &addr, bool skip = true) {
+  {
+    Test t(addr, test_rpc);
+    if (!t.Run()) { ALERT_AND_EXIT("test_rpc fails"); }
+  }//*/
+  /*{
+    Test t(addr, test_reconnect, 32);
+    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect fails"); }
+  }//*/
+  /*{
+    Test t(addr, test_reconnect, 4);
+    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect pending fails"); }
+  }//*/
+  /*{
+    Test t(addr, test_reconnect, 1);
+    if (!t.Run(mtk_time_sec(0), mtk_time_sec(7))) { ALERT_AND_EXIT("test_reconnect failure fails"); }
+  }//*/
+  /*if (skip) {
+    Test t(addr, test_bench, 256);
+    if (!t.Run()) { ALERT_AND_EXIT("test_bench fails"); }
+  }//*/
+}
+
+int main(int argc, char *argv[]){
+  nq_addr_t a1 = {
+    .host = "127.0.0.1",
+    .port = 8443,
+  };
+  test_suites(a1);
+
+  return 0;
+}
+
+
+#if 0
 #define N_CLIENT (100)
 #define N_SEND (1500)
 
@@ -55,10 +89,10 @@ nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_result_t, const char *detail,
 
 
 /* rpc stream callback */
-bool on_stream_open(void *p, nq_stream_t s) {
+bool on_rpc_open(void *p, nq_rpc_t s, void **) {
   return true;
 }
-void on_stream_close(void *p, nq_stream_t s) {
+void on_rpc_close(void *p, nq_rpc_t s) {
   return;
 }
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
@@ -97,8 +131,8 @@ int main(int argc, char *argv[]){
   nq_rpc_handler_t handler;
   nq_closure_init(handler.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
   nq_closure_init(handler.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
-  nq_closure_init(handler.on_stream_open, on_stream_open, on_stream_open, nullptr);
-  nq_closure_init(handler.on_stream_close, on_stream_close, on_stream_close, nullptr);
+  nq_closure_init(handler.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
+  nq_closure_init(handler.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
   handler.use_large_msgid = false;
   nq_hdmap_rpc_handler(hm, "test", handler);
 
@@ -139,3 +173,4 @@ int main(int argc, char *argv[]){
 
   return 0;
 }
+#endif

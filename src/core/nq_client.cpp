@@ -31,6 +31,7 @@ NqClient::NqClient(QuicSocketAddress server_address,
           std::move(proof_verifier)), loop_(loop), 
           on_close_(config.client().on_close), 
           on_open_(config.client().on_open), 
+          on_finalize_(config.client().on_finalize),
           session_index_(loop->new_session_index()), 
           stream_manager_(), connect_state_(DISCONNECT) {
   set_server_address(server_address);
@@ -56,6 +57,12 @@ void NqClient::InitializeSession() {
   connect_state_ = CONNECT;
 }
 
+
+// implements QuicAlarm::Delegate
+void NqClient::OnAlarm() { 
+  nq_closure_call(on_finalize_, on_conn_finalize, ToHandle());
+  loop_->RemoveClient(this); 
+}
 
 //implements QuicCryptoClientStream::ProofHandler
 void NqClient::OnProofValid(const QuicCryptoClientConfig::CachedState& cached) {

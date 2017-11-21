@@ -24,8 +24,9 @@ endif()
 set(lib_src
 	./src/nq.cpp
 
-	./src/basis/timespec.cpp
+	./src/basis/defs.cpp
 	./src/basis/endian.cpp
+	./src/basis/timespec.cpp
 
 	./src/core/nq_at_exit.cpp
 	./src/core/nq_client.cpp

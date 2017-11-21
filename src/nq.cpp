@@ -150,7 +150,7 @@ NQAPI_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
   auto c = NqBoxer::From(conn)->Find(conn);
   return c != nullptr ? c->ReconnectDurationUS() : 0;
 }
-NQAPI_THREADSAFE nq_cid_t nq_conn_id(nq_conn_t conn) {
+NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
   auto c = NqBoxer::From(conn)->Find(conn);
   return c != nullptr ? c->Id() : 0;
 }
@@ -186,7 +186,14 @@ NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s) {
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
   NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Send, data, datalen);
 }
-
+NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s) {
+  auto st = NqBoxer::From(s)->Find(s);
+  return st != nullptr ? st->id() : 0;
+}
+NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s) {
+  auto st = NqBoxer::From(s)->Find(s);
+  return st != nullptr ? st->Handler<NqStreamHandler>()->context() : 0;
+}
 
 
 
@@ -225,6 +232,14 @@ NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *dat
 }
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen);
+}
+NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc) {
+  auto st = NqBoxer::From(rpc)->Find(rpc);
+  return st != nullptr ? st->id() : 0;
+}
+NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t rpc) {
+  auto st = NqBoxer::From(rpc)->Find(rpc);
+  return st != nullptr ? st->Handler<NqStreamHandler>()->context() : 0;
 }
 
 

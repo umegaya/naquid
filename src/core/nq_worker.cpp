@@ -37,14 +37,13 @@ void NqWorker::Run(PacketQueue &pq) {
     //consume queue
     while (pq.try_dequeue(p)) {
       //pass packet to corresponding session
-      TRACE("process packet at %d\n", index_);
+      TRACE("process packet at %d", index_);
       Process(p);
     }
     //wait and process incoming event
     for (int i = 0; i < n_dispatcher; i++) {
       iq[i]->Poll(ds[i]);
       if (try_accept) {
-        //fprintf(stderr, "%d n_recv=%llu\n", index_, ds[i]->n_recv());
         ds[i]->Accept();
       }
     }
@@ -81,7 +80,7 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
       ASSERT(false);
       return false;      
     }
-    TRACE("thread %d, fd %d\n", index_, listen_fd);
+    TRACE("thread %d, fd %d", index_, listen_fd);
     auto d = new NqDispatcher(kv.first, kv.second, std::move(cc), *this);
     if (loop_.Add(listen_fd, d, NqLoop::EV_READ | NqLoop::EV_WRITE) != NQ_OK) {
       nq::Syscall::Close(listen_fd);

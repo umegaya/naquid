@@ -261,7 +261,7 @@ WriteResult QuicSocketUtils::WritePacket(
     size_t buf_len,
     const QuicIpAddress& self_address,
     const QuicSocketAddress& peer_address) {
-  TRACE("QuicSocketUtils::WritePacket %d %zu bytes\n", fd, buf_len);
+  TRACE("QuicSocketUtils::WritePacket %d %zu bytes", fd, buf_len);
   sockaddr_storage raw_address = peer_address.generic_address();
   iovec iov = {const_cast<char*>(buffer), buf_len};
 

@@ -69,7 +69,7 @@ NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
     s = new NqSimpleRPCStreamHandler(this, he->rpc.on_rpc_request, 
                                      he->rpc.on_rpc_notify, 
                                     he->rpc.use_large_msgid);
-    s->SetLifeCycleCallback(he->rpc.on_stream_open, he->rpc.on_stream_close);
+    s->SetLifeCycleCallback(he->rpc.on_rpc_open, he->rpc.on_rpc_close);
   } break;
   default:
     ASSERT(false);
@@ -89,7 +89,6 @@ void NqStream::OnDataAvailable() {
   //greedy read and called back
   struct iovec v[256];
   int n_blocks = sequencer()->GetReadableRegions(v, 256);
-  //TRACE("NqStream OnDataAvailable %u data blocks\n", n_blocks);
   int i = 0;
   if (handler_ == nullptr && !establish_side()) {
     //establishment
@@ -206,11 +205,11 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, u
   auto now = loop_->NowInUsec();
   alarm->Set(NqLoop::ToQuicTime(now + timeout_duration_us));
   //auto end = (alarm->deadline() - QuicTime::Zero()).ToMicroseconds();
-  //TRACE("entry req: start %llu end %llu\n", now, end);
+  //TRACE("entry req: start %llu end %llu", now, end);
   req->alarm_ = alarm;
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
-  TRACE("stream handler OnRecv %u bytes\n", len);
+  TRACE("stream handler OnRecv %u bytes", len);
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
   //prepare tmp variables
@@ -259,12 +258,6 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
     parse_buffer_.erase(0, reclen + read_ofs);
     pstr = parse_buffer_.c_str();
     plen = parse_buffer_.length();
-    /*} else if (reclen == 0 && len > len_buff_len) {
-      //broken payload. should resolve payload length
-      stream_->Disconnect();
-    } else {
-      //TRACE("pb: %zu bytes, recv: %u bytes, reclen: %u bytes\n", plen, len, reclen);
-    } */
   } while (parse_buffer_.length() > 0);
 }
 void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t len) {

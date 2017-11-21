@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 set(DEBUG true CACHE BOOL "do debug build")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c14")
-include_directories(. ..)
+include_directories(. .. ./specs)
 include_directories(SYSTEM ../../../src)
 if (DEBUG)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -DDEBUG")
@@ -12,6 +12,8 @@ endif()
 
 file(GLOB_RECURSE src [
 	"./main.cpp" 
+	"./specs/*.cpp"
+	"../common.cpp"
 ])
 
 find_library(core_foundation CoreFoundation)

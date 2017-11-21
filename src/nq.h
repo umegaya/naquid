@@ -35,6 +35,8 @@ typedef uint32_t nq_size_t;
 
 typedef uint64_t nq_cid_t;
 
+typedef uint64_t nq_sid_t;
+
 typedef uint64_t nq_time_t;	//nano seconds timestamp
 
 typedef time_t nq_unix_time_t; //place holder for unix timestamp
@@ -64,6 +66,7 @@ typedef struct nq_rpc_tag { //this is essentially same as nq_stream, but would h
     uint64_t s; 
 } nq_rpc_t; 
 
+//TODO(iyatomi): reduce error code
 typedef enum {
 	NQ_OK = 0,
 	NQ_ESYSCALL = -1,
@@ -94,16 +97,24 @@ typedef bool (*nq_on_conn_open_t)(void *, nq_conn_t, nq_handshake_event_t, void 
 //nq_conn_t itself will be invalid if this callback return 0, 
 //otherwise, behavior will be differnt between client and server.
 typedef nq_time_t (*nq_on_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
+//connection finalized, by calling nq_conn_close. just after this callback is done, 
+//memory corresponding to the nq_conn_t, will freed. 
+typedef void (*nq_on_conn_finalize_t)(void *, nq_conn_t);
 
-typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t);
+typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void **);
 //stream closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_stream_close_t)(void *, nq_stream_t);
 
 typedef void *(*nq_stream_reader_t)(void *, const char *, nq_size_t, int *);
-
-typedef nq_size_t (*nq_stream_writer_t)(void *, const void *, nq_size_t, nq_stream_t);
+//stores pointer to serialized byte array last argument. memory for byte array owned by callee and 
+//should be available for next call of this callback.
+typedef nq_size_t (*nq_stream_writer_t)(void *, nq_stream_t, const void *, nq_size_t, void **);
 
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
+
+typedef bool (*nq_on_rpc_open_t)(void *, nq_rpc_t, void **);
+
+typedef void (*nq_on_rpc_close_t)(void *, nq_rpc_t);
 
 typedef void (*nq_on_rpc_request_t)(void *, nq_rpc_t, uint16_t, nq_msgid_t, const void *, nq_size_t);
 
@@ -119,15 +130,17 @@ typedef struct {
 		void *ptr;
 		nq_on_conn_open_t on_conn_open;
 		nq_on_conn_close_t on_conn_close;
+		nq_on_conn_finalize_t on_conn_finalize;
 
 		nq_on_stream_open_t on_stream_open;
 		nq_on_stream_close_t on_stream_close;
 		nq_stream_reader_t stream_reader;
 		nq_stream_writer_t stream_writer;
-
 		nq_on_stream_record_t on_stream_record;
-		nq_on_rpc_request_t on_rpc_request;
 
+		nq_on_rpc_open_t on_rpc_open;
+		nq_on_rpc_close_t on_rpc_close;
+		nq_on_rpc_request_t on_rpc_request;
 		nq_on_rpc_reply_t on_rpc_reply;
 		nq_on_rpc_notify_t on_rpc_notify;
 
@@ -149,7 +162,7 @@ nq_closure_t nq_closure_empty();
 //config
 typedef struct {
 	//connection open/close watcher
-	nq_closure_t on_open, on_close;
+	nq_closure_t on_open, on_close, on_finalize;
 
 	//set true to ignore proof verification
 	bool insecure; 
@@ -160,7 +173,7 @@ typedef struct {
 
 typedef struct {
 	//connection open/close watcher
-	nq_closure_t on_open, on_accept, on_close;
+	nq_closure_t on_open, on_close;
 
 	//quic secret. need to specify arbiter (hopefully unique) string
 	const char *quic_secret;
@@ -181,8 +194,8 @@ typedef struct {
 } nq_stream_handler_t;
 
 typedef struct {
-	nq_closure_t on_rpc_request, on_rpc_notify, on_stream_open, on_stream_close;
-	bool use_large_msgid;
+	nq_closure_t on_rpc_request, on_rpc_notify, on_rpc_open, on_rpc_close;
+	bool use_large_msgid; //use 4byte for msgid
 } nq_rpc_handler_t;
 
 
@@ -262,8 +275,8 @@ NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
 NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn);
 //get reconnect wait duration in us. 0 means does not wait reconnection
 NQAPI_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn);
-//get unique connection id of nq_conn_t. CAUTION: for client side, that is not same as QUIC's connection id. 
-NQAPI_THREADSAFE nq_cid_t nq_conn_id(nq_conn_t conn);
+//get QUIC connection id. CAUTION: for client side, only after on_open and before on_close callback called, it returns valid value.
+NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn);
 
 
 
@@ -283,7 +296,10 @@ NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s);
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s);
 //send arbiter byte array/arbiter object to stream peer. 
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
-
+//get QUIC stream id, CAUTION: this is not unique among all stream created. if you need global uniqueness, please use 16 byte value of nq_stream_t
+NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
+//get context, which is set at on_stream_open
+NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s);
 
 
 // --------------------------
@@ -306,7 +322,10 @@ NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, uint16_t type, const void *data,
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t datalen);
 //send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
-
+//get QUIC stream id, CAUTION: this is not unique among all rpc created. if you need global uniqueness, please use 16 byte value of nq_rpc_t
+NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t s);
+//get context, which is set at on_stream_open
+NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t s);
 
 
 // --------------------------

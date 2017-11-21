@@ -91,6 +91,9 @@ class NqClient : public QuicClientBase,
 
   // operation
   NqClientSession *nq_session() { return static_cast<NqClientSession *>(session()); }
+  const NqClientSession *nq_session() const { 
+    return static_cast<const NqClientSession *>(const_cast<NqClient *>(this)->session()); 
+  }
   inline bool destroyed() const { return connect_state_ == FINALIZED; }
   inline NqSessionIndex session_index() const { return session_index_; }
   inline StreamManager &stream_manager() { return stream_manager_; }
@@ -109,7 +112,7 @@ class NqClient : public QuicClientBase,
 
 
   // implements QuicAlarm::Delegate
-  void OnAlarm() override { loop_->RemoveClient(this); }
+  void OnAlarm() override;
 
   // implements QuicCryptoClientStream::ProofHandler
   // Called when the proof in |cached| is marked valid.  If this is a secure
@@ -124,7 +127,7 @@ class NqClient : public QuicClientBase,
 
 
   // implements NqSession::Delegate
-  uint64_t Id() const override { return session_index_; }
+  uint64_t Id() const override { return connect_state_ == CONNECT ? nq_session()->connection_id() : 0; }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
@@ -147,7 +150,7 @@ class NqClient : public QuicClientBase,
   NqClientLoop* loop_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
   std::unique_ptr<QuicAlarm> alarm_;
-  nq_closure_t on_close_, on_open_;
+  nq_closure_t on_close_, on_open_, on_finalize_;
   NqSessionIndex session_index_;
   StreamManager stream_manager_;
   uint64_t next_reconnect_us_ts_;

@@ -23,10 +23,10 @@ nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char *detail, bool
 
 
 /* rpc stream callback */
-bool on_stream_open(void *p, nq_stream_t s) {
+bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
   return true;
 }
-void on_stream_close(void *p, nq_stream_t s) {
+void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
 static std::map<uint64_t, uint64_t> recv_progress;
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
@@ -68,8 +68,8 @@ int main(int argc, char *argv[]){
   nq_rpc_handler_t handler;
   nq_closure_init(handler.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
   nq_closure_init(handler.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
-  nq_closure_init(handler.on_stream_open, on_stream_open, on_stream_open, nullptr);
-  nq_closure_init(handler.on_stream_close, on_stream_close, on_stream_close, nullptr);
+  nq_closure_init(handler.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
+  nq_closure_init(handler.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
   nq_hdmap_rpc_handler(hm, "test", handler);
 
   nq_server_start(sv, false);
