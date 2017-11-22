@@ -16,7 +16,7 @@
 - [ ] API: more API to thread safe 
 - [ ] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
 - [ ] test: high frequent reconnection test
-- [ ] test: server side stream initiation
+- [x] test: server side stream initiation
 - [ ] test: stream disconnection using on open callback 
 - [ ] test: client conn reconnection or finalization using on open callback
 - [ ] test: stream handle send/recv test

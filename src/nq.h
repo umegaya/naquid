@@ -148,9 +148,9 @@ typedef struct {
 	};
 } nq_closure_t;
 
-#define nq_closure_is_empty(__pclsr) ((__pclsr).ptr == NULL)
+NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr);
 
-nq_closure_t nq_closure_empty();
+NQAPI_THREADSAFE nq_closure_t nq_closure_empty();
 
 #define nq_closure_init(__pclsr, __type, __cb, __arg) { \
 	(__pclsr).arg = (void *)(__arg); \

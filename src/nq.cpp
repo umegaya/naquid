@@ -39,6 +39,17 @@ H INVALID_HANDLE(const char *msg) {
   return h;
 }
 
+static void noop_callback(...) {}
+static nq_closure_t g_empty_closure {
+  .arg = nullptr,
+  .ptr = reinterpret_cast<void *>(noop_callback),
+};
+NQAPI_THREADSAFE nq_closure_t nq_closure_empty() {
+  return g_empty_closure;
+}
+NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr) {
+  return clsr.ptr == g_empty_closure.ptr;
+}
 
 
 // --------------------------

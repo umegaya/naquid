@@ -70,6 +70,22 @@ class RpcNotifyClosureCaller : public ClosureCallerBase {
     pcc->cb_(rpc, type, p, l);
   }
 };
+class StreamRecordClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (nq_stream_t, const void *, nq_size_t)> cb_;
+ public:
+  StreamRecordClosureCaller() : cb_() {}
+  ~StreamRecordClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_stream_record, &StreamRecordClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_stream_t s, const void * p, nq_size_t l) { 
+    auto pcc = (StreamRecordClosureCaller *)arg;
+    pcc->cb_(s, p, l);
+  }  
+};
 class ConnOpenStreamClosureCaller : public ClosureCallerBase {
  public:
   std::function<bool (nq_rpc_t, void **)> cb_;
@@ -160,6 +176,7 @@ class Test {
       cond.notify_one();
     }
     nq_stream_t NewStream(const std::string &name) {
+      TRACE("NewStream %p: streams %lu", this, streams.size());
       for (auto &st : streams) {
         if (name == std::string(nq_stream_name(st.second.st))) {
           return st.second.st;
@@ -168,6 +185,7 @@ class Test {
       return invalid_stream;
     }
     nq_rpc_t NewRpc(const std::string &name) {
+      TRACE("NewRpc %p: streams %lu", this, streams.size());
       for (auto &st : streams) {
         if (name == std::string(nq_rpc_name(st.second.rpc))) {
           return st.second.rpc;
@@ -180,14 +198,17 @@ class Test {
       if (streams.find(sid) == streams.end()) {
         streams.emplace(sid, Stream(s));
       }
+      TRACE("AddStream2 %p: streams %lu", this, streams.size());
     } 
     void AddStream(nq_rpc_t rpc) {
       auto sid = nq_rpc_sid(rpc);
       if (streams.find(sid) == streams.end()) {
         streams.emplace(sid, Stream(rpc));
       }
+      TRACE("AddStream %p: streams %lu", this, streams.size());
     }
     bool RemoveStream(nq_stream_t s) {
+      TRACE("RemoveStream2 %p: streams %lu", this, streams.size());
       auto it = streams.find(nq_stream_sid(s));
       if (it != streams.end()) {
         streams.erase(it);
@@ -196,6 +217,7 @@ class Test {
       return false;
     }
     bool RemoveStream(nq_rpc_t rpc) {
+      TRACE("RemoveStream %p: streams %lu", this, streams.size());
       auto it = streams.find(nq_rpc_sid(rpc));
       if (it != streams.end()) {
         streams.erase(it);

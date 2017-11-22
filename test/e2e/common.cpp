@@ -187,6 +187,8 @@ void Test::RegisterCallback(Conn &tc) {
   nq_closure_init(ssh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
   nq_closure_init(ssh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
   nq_closure_init(ssh.on_stream_record, on_stream_record, &Test::OnStreamRecordSimple, ptc);
+  ssh.stream_reader = nq_closure_empty();
+  ssh.stream_writer = nq_closure_empty();
   nq_hdmap_stream_handler(hm, "sst", ssh);
   tc.AddStream(nq_conn_stream(tc.c, "sst"));
 }

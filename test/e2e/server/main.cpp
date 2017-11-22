@@ -5,7 +5,7 @@ static const char NotifySuccess[] = "notify success";
 
 using namespace nqtest;
 
-/* conn callback */
+/* conn callbacks */
 bool on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void *) {
   fprintf(stderr, "on_conn_open event:%d\n", hsev);
   return true;
@@ -17,7 +17,7 @@ nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char *detail, bool
 
 
 
-/* rpc stream callback */
+/* rpc callbacks */
 bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
   return true;
 }
@@ -75,6 +75,91 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
 
 
 
+/* stream callbacks */
+struct stream_context {
+  nq_size_t send_buf_len;
+  char *send_buf;
+};
+bool on_stream_open(void *p, nq_stream_t s, void **ppctx) {
+  stream_context *sc = reinterpret_cast<stream_context *>(malloc(sizeof(stream_context)));
+  if (sc == nullptr) { 
+    return false; 
+  }
+  sc->send_buf_len = 256;
+  sc->send_buf = reinterpret_cast<char *>(malloc(sc->send_buf_len));
+  if (sc->send_buf == nullptr) { 
+    free(sc);
+    return false; 
+  }
+  *ppctx = sc;
+  return true;
+}
+void on_stream_close(void *p, nq_stream_t s) {
+  stream_context *sc = reinterpret_cast<stream_context *>(nq_stream_ctx(s));
+  free(sc->send_buf);
+  free(sc);
+}
+void on_stream_record(void *p, nq_stream_t s, const void *data, nq_size_t len) {
+  auto tmp = MakeString(data, len);
+  auto tmp2 = tmp + tmp;
+  nq_stream_send(s, tmp2.c_str(), tmp2.length());
+}
+nq_size_t stream_writer(void *arg, nq_stream_t s, const void *data, nq_size_t len, void **pbuf) {
+  stream_context *c = reinterpret_cast<stream_context *>(nq_stream_ctx(s));
+  //append \n as delimiter
+  auto blen = c->send_buf_len;
+  while (c->send_buf_len < (len + 1)) {
+    c->send_buf_len <<= 1;
+  }
+  if (blen != c->send_buf_len) {
+    c->send_buf = reinterpret_cast<char *>(realloc(c->send_buf, c->send_buf_len));
+    ASSERT(c->send_buf);
+  }
+  memcpy(c->send_buf, data, len);
+  c->send_buf[len] = '\n';
+  *pbuf = c->send_buf;
+  return len + 1;
+}
+void *stream_reader(void *arg, const char *data, nq_size_t dlen, int *p_reclen) {
+  //auto c = (Conn *)arg;
+  //use text protocol (use \n as delimiter)
+  auto idx = MakeString(data, dlen).find('\n');
+  if (idx != std::string::npos) {
+    *p_reclen = idx;
+    return const_cast<void *>(reinterpret_cast<const void *>(data));
+  }
+  return nullptr;
+}
+
+
+/* setup stream */
+void setup_streams(nq_hdmap_t hm) {
+  nq_rpc_handler_t rh;
+  nq_closure_init(rh.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
+  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
+  nq_closure_init(rh.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
+  nq_closure_init(rh.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
+  nq_hdmap_rpc_handler(hm, "rpc", rh);
+
+  nq_stream_handler_t rsh;
+  nq_closure_init(rsh.on_stream_open, on_stream_open, on_stream_open, nullptr);
+  nq_closure_init(rsh.on_stream_close, on_stream_close, on_stream_close, nullptr);
+  nq_closure_init(rsh.on_stream_record, on_stream_record, on_stream_record, nullptr);
+  nq_closure_init(rsh.stream_reader, stream_reader, stream_reader, nullptr);
+  nq_closure_init(rsh.stream_writer, stream_writer, stream_writer, nullptr);
+  nq_hdmap_stream_handler(hm, "rst", rsh);
+
+  nq_stream_handler_t ssh;
+  nq_closure_init(ssh.on_stream_open, on_stream_open, on_stream_open, nullptr);
+  nq_closure_init(ssh.on_stream_close, on_stream_close, on_stream_close, nullptr);
+  nq_closure_init(ssh.on_stream_record, on_stream_record, on_stream_record, nullptr);
+  ssh.stream_reader = nq_closure_empty();
+  ssh.stream_writer = nq_closure_empty();
+  nq_hdmap_stream_handler(hm, "sst", ssh);
+
+}
+
+
 /* main */
 int main(int argc, char *argv[]){
   nq_server_t sv = nq_server_create(kThreads);
@@ -94,12 +179,7 @@ int main(int argc, char *argv[]){
   nq_closure_init(conf.on_close, on_conn_close, on_conn_close, nullptr);
   hm = nq_server_listen(sv, &addr, &conf);
 
-  nq_rpc_handler_t handler;
-  nq_closure_init(handler.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
-  nq_closure_init(handler.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
-  nq_closure_init(handler.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
-  nq_closure_init(handler.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
-  nq_hdmap_rpc_handler(hm, "rpc", handler);
+  setup_streams(hm);
 
   nq_server_start(sv, false);
 

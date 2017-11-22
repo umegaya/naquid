@@ -114,17 +114,21 @@ class NqBoxer {
           case Disconnect:
             p->InvokeStream(op->serial_, op->code_, s);
             break;
+          case Send:
+            p->InvokeStream(op->serial_, op->code_, 
+                           op->data_.ptr(), op->data_.length(), s);
+            break;
           case Call:
             p->InvokeStream(op->serial_, op->code_, op->call_.type_, 
-                            op->data_.ptr(), op->data_.length(), op->call_.on_reply_);
+                            op->data_.ptr(), op->data_.length(), op->call_.on_reply_, s);
             break;
           case Notify:
             p->InvokeStream(op->serial_, op->code_, op->notify_.type_, 
-                            op->data_.ptr(), op->data_.length());
+                            op->data_.ptr(), op->data_.length(), s);
             break;
           case Reply:
             p->InvokeStream(op->serial_, op->code_, op->reply_.result_, 
-                            op->reply_.msgid_, op->data_.ptr(), op->data_.length());
+                            op->reply_.msgid_, op->data_.ptr(), op->data_.length(), s);
             break;
           default:
             ASSERT(false);
