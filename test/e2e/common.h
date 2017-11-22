@@ -176,7 +176,6 @@ class Test {
       cond.notify_one();
     }
     nq_stream_t NewStream(const std::string &name) {
-      TRACE("NewStream %p: streams %lu", this, streams.size());
       for (auto &st : streams) {
         if (name == std::string(nq_stream_name(st.second.st))) {
           return st.second.st;
@@ -185,7 +184,6 @@ class Test {
       return invalid_stream;
     }
     nq_rpc_t NewRpc(const std::string &name) {
-      TRACE("NewRpc %p: streams %lu", this, streams.size());
       for (auto &st : streams) {
         if (name == std::string(nq_rpc_name(st.second.rpc))) {
           return st.second.rpc;
@@ -198,17 +196,14 @@ class Test {
       if (streams.find(sid) == streams.end()) {
         streams.emplace(sid, Stream(s));
       }
-      TRACE("AddStream2 %p: streams %lu", this, streams.size());
     } 
     void AddStream(nq_rpc_t rpc) {
       auto sid = nq_rpc_sid(rpc);
       if (streams.find(sid) == streams.end()) {
         streams.emplace(sid, Stream(rpc));
       }
-      TRACE("AddStream %p: streams %lu", this, streams.size());
     }
     bool RemoveStream(nq_stream_t s) {
-      TRACE("RemoveStream2 %p: streams %lu", this, streams.size());
       auto it = streams.find(nq_stream_sid(s));
       if (it != streams.end()) {
         streams.erase(it);
@@ -217,7 +212,6 @@ class Test {
       return false;
     }
     bool RemoveStream(nq_rpc_t rpc) {
-      TRACE("RemoveStream %p: streams %lu", this, streams.size());
       auto it = streams.find(nq_rpc_sid(rpc));
       if (it != streams.end()) {
         streams.erase(it);

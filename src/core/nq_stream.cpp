@@ -170,7 +170,7 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	parse_buffer_.append(ToCStr(p), len);
 	const char *pstr = parse_buffer_.c_str();
 	size_t plen = parse_buffer_.length();
-	nq_size_t read_ofs, reclen = nq::LengthCodec::Decode(&read_ofs, pstr, plen);
+	nq_size_t reclen = 0, read_ofs = nq::LengthCodec::Decode(&reclen, pstr, plen);
 	if (reclen > 0 && (reclen + read_ofs) <= plen) {
 	  nq_closure_call(on_recv_, on_stream_record, stream_->ToHandle<nq_stream_t>(), pstr + read_ofs, reclen);
 	  parse_buffer_.erase(0, reclen + read_ofs);

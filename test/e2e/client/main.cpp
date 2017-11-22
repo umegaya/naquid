@@ -9,7 +9,7 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(addr, test_rpc);
     if (!t.Run()) { ALERT_AND_EXIT("test_rpc fails"); }
   }//*/
-  /*{
+  {
     Test t(addr, test_stream);
     if (!t.Run()) { ALERT_AND_EXIT("test_stream fails"); }
   }//*/
