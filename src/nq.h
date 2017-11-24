@@ -66,6 +66,11 @@ typedef struct nq_rpc_tag { //this is essentially same as nq_stream, but would h
     uint64_t s; 
 } nq_rpc_t; 
 
+typedef struct nq_alarm_tag {
+	void *p;
+	uint64_t s;
+} nq_alarm_t;
+
 //TODO(iyatomi): reduce error code
 typedef enum {
 	NQ_OK = 0,
@@ -124,6 +129,8 @@ typedef void (*nq_on_rpc_reply_t)(void *, nq_rpc_t, nq_result_t, const void *, n
 
 typedef void *(*nq_create_stream_t)(void *, nq_conn_t);
 
+typedef void (*nq_on_alarm_t)(void *, nq_time_t *);
+
 typedef struct {
 	void *arg;
 	union {
@@ -145,6 +152,7 @@ typedef struct {
 		nq_on_rpc_notify_t on_rpc_notify;
 
 		nq_create_stream_t create_stream;
+		nq_on_alarm_t on_alarm;
 	};
 } nq_closure_t;
 
@@ -181,7 +189,7 @@ typedef struct {
 	//cert cache size. default 16 and how meny sessions accepted per loop. default 1024
 	int quic_cert_cache_size, accept_per_loop;
 
-	//total handshake time limit / no input limit. default 1000ms/500ms
+	//total handshake time limit / no input limit. default 1000ms/5000ms
 	nq_time_t handshake_timeout, idle_timeout; 
 } nq_svconf_t;
 
@@ -195,8 +203,14 @@ typedef struct {
 
 typedef struct {
 	nq_closure_t on_rpc_request, on_rpc_notify, on_rpc_open, on_rpc_close;
+	nq_time_t timeout; //call timeout
 	bool use_large_msgid; //use 4byte for msgid
 } nq_rpc_handler_t;
+
+typedef struct {
+	nq_closure_t callback;
+	nq_time_t timeout;
+} nq_rpc_opt_t;
 
 
 
@@ -290,6 +304,8 @@ NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn);
 NQAPI_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name);
 //get parent conn from rpc
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s);
+//get alarm from stream
+NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s);
 //check stream is valid. sugar for nq_conn_is_valid(nq_stream_conn(s));
 NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
@@ -300,7 +316,7 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
 //get context, which is set at on_stream_open
 NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s);
-//get stream name
+//get stream name, which is passed via nq_conn_stream
 NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
 
 
@@ -314,12 +330,16 @@ NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
 NQAPI_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name);
 //get parent conn from rpc
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc);
+//get alarm from stream or rpc
+NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc);
 //check rpc is valid. sugar for nq_conn_is_valid(nq_rpc_conn(rpc));
 NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
 NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc);
 //send arbiter byte array or object to stream peer. type should be positive
 NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply);
+//same as nq_rpc_call but can specify various options like per call timeout
+NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_rpc_opt_t *opts);
 //send arbiter byte array or object to stream peer, without receving reply. type should be positive
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen);
 //send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
@@ -328,7 +348,7 @@ NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t 
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t s);
 //get context, which is set at on_stream_open
 NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t s);
-//get rpc name
+//get rpc name, which is passed via nq_conn_rpc
 NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t s);
 
 
@@ -352,6 +372,15 @@ NQAPI_THREADSAFE nq_unix_time_t nq_time_unix();
 NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
 
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
+
+#define STOP_INVOKE_NQ_TIME (0)
+//configure alarm to invoke cb after current time exceeds first, at thread which owns nq_rpc/stream_t that creates this alarm.
+//if you set next invocation timestamp value(>= input value) to 3rd argument of cb, alarm scheduled to run that time, 
+//if you set the value to 0(STOP_INVOKE_NQ_TIME), it stopped (still valid and can reactivate with nq_alarm_set). 
+//otherwise alarm remove its memory, further use of nq_alarm_t will possibly cause crash
+NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t first, nq_closure_t cb);
+//destroy alarm. if you call nq_alarm_set after the alarm already called nq_alarm_destroy, it will possibly crash
+NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a);
 
 #if defined(__cplusplus)
 }

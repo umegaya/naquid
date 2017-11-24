@@ -15,6 +15,8 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
 	QuicDispatcher(config,
                  crypto_config.get(),
                  new QuicVersionManager(net::AllSupportedVersions()),
+                 //TODO(iyatomi): enable to pass worker.loop or this directory to QuicDispatcher ctor. 
+                 //main reason to wrap these object now, is QuicDispatcher need to store them with unique_ptr.
                  std::unique_ptr<QuicConnectionHelperInterface>(new NqStubConnectionHelper(worker.loop())), 
                  std::unique_ptr<QuicCryptoServerStream::Helper>(new NqStubCryptoServerStreamHelper(*this)),
                  std::unique_ptr<QuicAlarmFactory>(new NqStubAlarmFactory(worker.loop()))
@@ -24,7 +26,7 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
   index_(worker.index()), n_worker_(worker.server().n_worker()), 
   server_(worker.server()), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
-  server_map_(), thread_id_(worker.thread_id()) {
+  server_map_(), alarm_map_(), thread_id_(worker.thread_id()) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
   SetFromConfig(config);
@@ -106,8 +108,8 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
 
     auto s = new NqServerSession(connection, this, it->second);
     s->Initialize();
-    server_map_.Add(s);
-    server_map_.Activate(s); //make connection valid
+    server_map_.Add(s->session_index(), s);
+    server_map_.Activate(s->session_index(), s); //make connection valid
     if (!s->OnOpen(NQ_HS_START)) {
       auto c = Box(s);
       Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Disconnect));
@@ -154,6 +156,13 @@ nq_stream_t NqDispatcher::Box(NqStream *s) {
     ),
   };
 }
+nq_alarm_t NqDispatcher::Box(NqAlarm *a) {
+  AddAlarm(a);
+  return {
+    .p = static_cast<NqBoxer*>(this),
+    .s = NqAlarmSerialCodec::ServerEncode(a->alarm_index(), index_),
+  };
+}
 NqBoxer::UnboxResult 
 NqDispatcher::Unbox(uint64_t serial, NqSession::Delegate **unboxed) {
   if (!main_thread()) {
@@ -183,6 +192,19 @@ NqDispatcher::Unbox(uint64_t serial, NqStream **unboxed) {
   }
   return NqBoxer::UnboxResult::SerialExpire;
 }
+NqBoxer::UnboxResult 
+NqDispatcher::Unbox(uint64_t serial, NqAlarm **unboxed) {
+  if (!main_thread()) {
+    return NqBoxer::UnboxResult::NeedTransfer;
+  }
+  auto index = NqAlarmSerialCodec::ServerAlarmIndex(serial);
+  auto it = alarm_map_.find(index);
+  if (it != alarm_map_.end()) {
+    *unboxed = it->second;
+    return NqBoxer::UnboxResult::Ok;
+  }
+  return NqBoxer::UnboxResult::SerialExpire;
+}
 const NqSession::Delegate *NqDispatcher::FindConn(uint64_t serial, OpTarget target) const {
   switch (target) {
   case Conn:
@@ -198,6 +220,20 @@ const NqStream *NqDispatcher::FindStream(uint64_t serial) const {
   auto c = server_map().Active(NqStreamSerialCodec::ServerSessionIndex(serial));
   if (c == nullptr) { return nullptr; }
   return c->FindStreamForRead(NqStreamSerialCodec::ServerStreamId(serial));
+}
+void NqDispatcher::AddAlarm(NqAlarm *a) {
+  if (a->alarm_index() == 0) {
+    a->set_alarm_index(new_alarm_index());
+    alarm_map_.Add(a->alarm_index(), a);
+  } else {
+#if defined(DEBUG)
+    auto it = alarm_map_.find(a->alarm_index());
+    ASSERT(it != alarm_map_.end() && it->second == a);
+#endif
+  }
+}
+void NqDispatcher::RemoveAlarm(NqAlarmIndex index) {
+  alarm_map_.Remove(index);
 }
 }
 

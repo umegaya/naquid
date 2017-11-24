@@ -1,6 +1,7 @@
 #include <nq.h>
 #include "rpc.h"
 #include "stream.h"
+#include "timeout.h"
 
 using namespace nqtest;
 
@@ -13,9 +14,14 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(addr, test_stream);
     if (!t.Run()) { ALERT_AND_EXIT("test_stream fails"); }
   }//*/
-  /*{
-    Test t(addr, test_reconnect, 4);
-    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect pending fails"); }
+  {
+    Test::RunOptions o;
+    o.rpc_timeout = nq_time_sec(2);
+    o.idle_timeout = nq_time_sec(5);
+    o.handshake_timeout = nq_time_sec(5);
+
+    Test t(addr, test_timeout);
+    if (!t.Run(&o)) { ALERT_AND_EXIT("test_timeout fails"); }
   }//*/
   /*{
     Test t(addr, test_reconnect, 1);

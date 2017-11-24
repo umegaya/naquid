@@ -15,6 +15,7 @@ namespace net {
 class NqWorker;
 class NqServerSession;
 class NqServerConfig;
+class NqAlarmBase;
 class NqDispatcher : public QuicDispatcher, 
                      public nq::IoProcessor,
                      public QuicCryptoServerStream::Helper,
@@ -32,7 +33,9 @@ class NqDispatcher : public QuicDispatcher,
   NqServerLoop &loop_;
   NqPacketReader &reader_;
   QuicCompressedCertsCache cert_cache_;
-  NqSessionContainer<NqServerSession> server_map_;
+  typedef NqObjectExistenceMapMT<NqServerSession, NqSessionIndex> ServerMap;
+  ServerMap server_map_;
+  NqObjectExistenceMap<NqAlarm, NqAlarmIndex> alarm_map_;
   std::thread::id thread_id_;
  public:
   NqDispatcher(int port, const NqServerConfig& config, 
@@ -50,7 +53,8 @@ class NqDispatcher : public QuicDispatcher,
   inline NqLoop *loop() { return &loop_; }
   inline InvokeQueue *invoke_queues() { return invoke_queues_; }
   inline NqSessionIndex new_session_index() { return server_map_.NewIndex(); }
-  inline const NqSessionContainer<NqServerSession> &server_map() const { return server_map_; }
+  inline NqAlarmIndex new_alarm_index() { return alarm_map_.NewIndex(); }
+  inline const ServerMap &server_map() const { return server_map_; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
 
 
@@ -76,16 +80,21 @@ class NqDispatcher : public QuicDispatcher,
 
   //implements NqBoxer
   void Enqueue(Op *op) override;
+  NqLoop *Loop() override { return &loop_; }
   nq_conn_t Box(NqSession::Delegate *d) override;
   nq_stream_t Box(NqStream *s) override;
+  nq_alarm_t Box(NqAlarm *a) override;
   NqBoxer::UnboxResult Unbox(uint64_t serial, NqSession::Delegate **unboxed) override;
   NqBoxer::UnboxResult Unbox(uint64_t serial, NqStream **unboxed) override;
+  NqBoxer::UnboxResult Unbox(uint64_t serial, NqAlarm **unboxed) override;
   bool IsClient() const override { return false; }
   const NqSession::Delegate *FindConn(uint64_t serial, OpTarget target) const override;
   const NqStream *FindStream(uint64_t serial) const override;
+  void RemoveAlarm(NqAlarmIndex index) override;
 
  protected:
   void SetFromConfig(const NqServerConfig &conf);
+  void AddAlarm(NqAlarm *a);
   
   //implements QuicDispatcher
   QuicSession* CreateQuicSession(

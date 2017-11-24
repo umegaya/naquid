@@ -190,6 +190,11 @@ NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
   };
   return c;
 }
+NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s) {
+  ASSERT(nq_stream_is_valid(s));
+  auto pa = new NqAlarm();
+  return NqBoxer::From(s)->Box(pa);
+}
 NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s) {
   if (s.s == 0) { TRACE("invalid handle: %s", s.p); return false; }
   return NqBoxer::From(s)->Find(s) != nullptr;
@@ -242,6 +247,11 @@ NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   };
   return c;
 }
+NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc) {
+  ASSERT(nq_rpc_is_valid(rpc));
+  auto pa = new NqAlarm();
+  return NqBoxer::From(rpc)->Box(pa);
+}
 NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc) {
   if (rpc.s == 0) { TRACE("invalid handle: %s", rpc.p); return false; }
   return NqBoxer::From(rpc)->Find(rpc) != nullptr;
@@ -254,6 +264,11 @@ NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, 
   ASSERT(nq_rpc_is_valid(rpc));
   ASSERT(type > 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Call, type, data, datalen, on_reply);
+}
+NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_rpc_opt_t *opts) {
+  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(type > 0);
+  NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::CallEx, type, data, datalen, *opts);
 }
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen) {
   ASSERT(nq_rpc_is_valid(rpc));
@@ -301,4 +316,10 @@ NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d) {
 }
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d) {
 	return nq::clock::pause(d);
+}
+NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t invocation_ts, nq_closure_t cb) {
+  NqBoxer::From(a)->InvokeAlarm(a.s, NqBoxer::OpCode::Start, invocation_ts, cb);
+}
+NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a) {
+  NqBoxer::From(a)->InvokeAlarm(a.s, NqBoxer::OpCode::Finalize);
 }

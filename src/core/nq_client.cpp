@@ -53,8 +53,9 @@ void NqClient::InitializeSession() {
   QuicClientBase::InitializeSession();
   nq_session()->GetClientCryptoStream()->CryptoConnect();
   //make connection valid
-  loop_->client_map().Activate(this);
+  loop_->client_map().Activate(session_index_, this);
   connect_state_ = CONNECT;
+  alarm_.reset(); //free existing reconnection alarm
 }
 
 
@@ -62,6 +63,8 @@ void NqClient::InitializeSession() {
 void NqClient::OnAlarm() { 
   nq_closure_call(on_finalize_, on_conn_finalize, ToHandle());
   loop_->RemoveClient(this); 
+  alarm_.release(); //release QuicAlarm which should contain *this* pointer, to prevent double free.
+  delete this;
 }
 
 //implements QuicCryptoClientStream::ProofHandler
@@ -89,14 +92,16 @@ void NqClient::OnClose(QuicErrorCode error,
     next_reconnect_us_ts_ = loop_->NowInUsec() + next_connect_us;
     alarm_.reset(alarm_factory()->CreateAlarm(new ReconnectAlarm(this)));
     alarm_->Set(NqLoop::ToQuicTime(next_reconnect_us_ts_));
+    connect_state_ = DISCONNECT;
   } else {
     alarm_.reset(alarm_factory()->CreateAlarm(this));
     alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
-    //cannot touch this client memory afterward. alarm invocation automatically delete the object.
+    connect_state_ = FINALIZED;
+    //cannot touch this client memory afterward. alarm invocation automatically delete the object,
+    //via auto free of pointer which holds in QuicArenaScopedPtr<QuicAlarm::Delegate> of QuicAlarm.
   }
   //make connection invalid
   loop_->client_map().Deactivate(session_index_);
-  connect_state_ = DISCONNECT;
   return;
 }
 void NqClient::Disconnect() {

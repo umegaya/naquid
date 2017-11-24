@@ -15,15 +15,18 @@
 - [ ] API: reduce error code (can use app-defined error code almost anywhere)
 - [ ] API: more API to thread safe 
 - [ ] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
+- [ ] API: more detail control of rpc timeout
+- [ ] server: QuicAlarm should be more efficient
+  - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
 - [ ] test: high frequent reconnection test
 - [x] test: server side stream initiation
 - [ ] test: stream disconnection using on open callback 
 - [ ] test: client conn reconnection or finalization using on open callback
-- [ ] test: stream handle send/recv test
+- [x] test: stream handle send/recv test
 - [ ] test: robustness for connectivity change
 - [ ] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread
-- [x] bench: latency, throughput, compare with mrs, which is gaming specific udp network library
+- [x] bench: latency, throughput, compare with mrs, which is ENet based, gaming specific udp network library
   - 20~30% slower than mrs, but it may not big difference for naquid main use case (send/recv small packet very frequently)
 
 

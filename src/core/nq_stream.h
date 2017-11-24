@@ -7,8 +7,11 @@
 #include "net/quic/core/quic_spdy_stream.h"
 
 #include "basis/closure.h"
+#include "basis/header_codec.h"
 #include "basis/msgid_factory.h"
+#include "basis/timespec.h"
 #include "core/nq_loop.h"
+#include "core/nq_alarm.h"
 #include "core/nq_serial_codec.h"
 
 namespace net {
@@ -99,6 +102,7 @@ public:
   virtual void OnRecv(const void *p, nq_size_t len) = 0;
   virtual void Send(const void *p, nq_size_t len) = 0;  
   virtual void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) = 0;
+  virtual void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) = 0;
 
   //operation
   //following code assumes nq_stream_t and nq_rpc_t just has same way to create, 
@@ -122,6 +126,8 @@ public:
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
 
+  static constexpr size_t len_buff_len = nq::LengthCodec::EncodeLength(sizeof(nq_size_t));
+  static constexpr size_t header_buff_len = 8;  
  protected:
   NqSession *nq_session() { return stream_->nq_session(); }
 };
@@ -138,6 +144,7 @@ class NqSimpleStreamHandler : public NqStreamHandler {
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override;
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
+  void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) override { ASSERT(false); }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqSimpleStreamHandler);
@@ -161,6 +168,7 @@ class NqRawStreamHandler : public NqStreamHandler {
     }
   }
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
+  void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) override { ASSERT(false); }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqRawStreamHandler);
@@ -168,48 +176,50 @@ class NqRawStreamHandler : public NqStreamHandler {
 
 // A QUIC stream handles RPC style communication
 class NqSimpleRPCStreamHandler : public NqStreamHandler {
-  class Request : public QuicAlarm::Delegate {
+  class Request : public NqAlarmBase {
    public:
     Request(NqSimpleRPCStreamHandler *stream_handler, 
             nq_msgid_t msgid,
             nq_closure_t on_data) : 
-            stream_handler_(stream_handler), alarm_(nullptr), on_data_(on_data), msgid_(msgid) {}
+            NqAlarmBase(), 
+            stream_handler_(stream_handler), on_data_(on_data), msgid_(msgid) {}
     ~Request() {}
-    void OnAlarm() override { 
+    void OnFire(NqLoop *) override { 
       auto it = stream_handler_->req_map_.find(msgid_);
       if (it != stream_handler_->req_map_.end()) {
         nq_closure_call(on_data_, on_rpc_reply, stream_handler_->stream()->ToHandle<nq_rpc_t>(), NQ_ETIMEOUT, "", 0);
         stream_handler_->req_map_.erase(it);
       }
-      delete alarm_; //it deletes Requet object itself
+      delete this;
     }
-    inline void Cancel() { alarm_->Cancel(); }
    private:
     friend class NqSimpleRPCStreamHandler;
     NqSimpleRPCStreamHandler *stream_handler_; 
-    QuicAlarm *alarm_;
     nq_closure_t on_data_;
     nq_msgid_t msgid_/*, padd_[3]*/;
   };
-  void EntryRequest(nq_msgid_t msgid, nq_closure_t cb, uint64_t timeout_duration_us = 30 * 1000 * 1000);
+  void EntryRequest(nq_msgid_t msgid, nq_closure_t cb, nq_time_t timeout_duration_ts = 0);
  private:
   std::string parse_buffer_;
   nq_closure_t on_request_, on_notify_;
+  nq_time_t default_timeout_ts_;
   nq::MsgIdFactory<nq_msgid_t> msgid_factory_;
   std::map<uint32_t, Request*> req_map_;
   NqLoop *loop_;
  public:
-  NqSimpleRPCStreamHandler(NqStream *stream, nq_closure_t on_request, nq_closure_t on_notify, bool use_large_msgid) : 
+  NqSimpleRPCStreamHandler(NqStream *stream, 
+    nq_closure_t on_request, nq_closure_t on_notify, nq_time_t timeout, bool use_large_msgid) : 
     NqStreamHandler(stream), parse_buffer_(), 
-    on_request_(on_request), on_notify_(on_notify), msgid_factory_(), req_map_(),
+    on_request_(on_request), on_notify_(on_notify), default_timeout_ts_(timeout),
+    msgid_factory_(), req_map_(),
     loop_(stream->GetLoop()) {
-      if (!use_large_msgid) { msgid_factory_.set_limit(0xFFFF); }
-    };
+    if (!use_large_msgid) { msgid_factory_.set_limit(0xFFFF); }
+    if (default_timeout_ts_ == 0) { default_timeout_ts_ = 30 * 1000 * 1000; }
+  }
 
   ~NqSimpleRPCStreamHandler() {
     for (auto &kv : req_map_) {
-      kv.second->Cancel();
-      delete kv.second;
+      kv.second->Destroy(loop_);
     }
     req_map_.clear();
   }
@@ -218,8 +228,21 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override { ASSERT(false); }
   void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override;
+  void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) override;
   void Notify(uint16_t type, const void *p, nq_size_t len);
   void Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len);
+
+ protected:
+  inline void SendCommon(uint16_t type, nq_msgid_t msgid, const void *p, nq_size_t len) {
+    ASSERT(type > 0);
+    //pack and send buffer
+    char buffer[header_buff_len + len_buff_len + len];
+    size_t ofs = 0;
+    ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), msgid, buffer, sizeof(buffer));
+    ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
+    memcpy(buffer + ofs, p, len);
+    WriteBytes(buffer, ofs + len);      
+  }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqSimpleRPCStreamHandler);

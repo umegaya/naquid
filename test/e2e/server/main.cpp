@@ -16,6 +16,25 @@ nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char *detail, bool
 }
 
 
+/* alarm callback */
+struct alarm_context {
+  nq_time_t invoke_time, start;
+  nq_rpc_t rpc;
+  nq_msgid_t msgid;
+  nq_alarm_t alarm;
+};
+void on_alarm(void *p, nq_time_t *pnext) {
+  auto ac = (alarm_context *)p;
+  if (*pnext != ac->invoke_time) {
+    nq_rpc_reply(ac->rpc, RpcError::InternalError, ac->msgid, "", 0);
+    return;
+  }
+  TRACE("on_alarm for %u replies with %llu delay", ac->msgid, nq_time_now() - ac->start);
+  nq_rpc_reply(ac->rpc, RpcError::None, ac->msgid, "", 0);
+  free(ac);
+  //no write for *pnext will cause deletion of ac->alarm
+}
+
 
 /* rpc callbacks */
 bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
@@ -64,6 +83,20 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
         nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
       }
       break;
+    case RpcType::Sleep:
+      {
+        nq_time_t duration = nq::Endian::NetbytesToHost<nq_time_t>(data);
+        nq_closure_t cl;
+        alarm_context *ac = (alarm_context *)malloc(sizeof(alarm_context));
+        nq_closure_init(cl, on_alarm, on_alarm, ac);
+        ac->start = nq_time_now();
+        ac->invoke_time = ac->start + duration;
+        ac->rpc = rpc;
+        ac->msgid = msgid;
+        ac->alarm = nq_rpc_alarm(rpc);
+        nq_alarm_set(ac->alarm, ac->invoke_time, cl);
+      }
+      break;
   }
 }
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
@@ -72,7 +105,6 @@ void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, n
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {
 
 }
-
 
 
 /* stream callbacks */

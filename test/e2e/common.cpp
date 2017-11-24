@@ -161,7 +161,7 @@ void Test::OnRpcNotify(void *arg, nq_rpc_t rpc, uint16_t type, const void *data,
 }
 
 
-void Test::RegisterCallback(Conn &tc) {
+void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
   auto hm = nq_conn_hdmap(tc.c);
   auto ptc = &tc;
 
@@ -171,6 +171,7 @@ void Test::RegisterCallback(Conn &tc) {
   nq_closure_init(rh.on_rpc_request, on_rpc_request, &Test::OnRpcRequest, ptc);
   nq_closure_init(rh.on_rpc_notify, on_rpc_notify, &Test::OnRpcNotify, ptc);
   rh.use_large_msgid = false;
+  rh.timeout = options.rpc_timeout;
   nq_hdmap_rpc_handler(hm, "rpc", rh);
   tc.AddStream(nq_conn_rpc(tc.c, "rpc"));
 
@@ -194,12 +195,14 @@ void Test::RegisterCallback(Conn &tc) {
 }
 
 
-bool Test::Run(nq_time_t idle_timeout, nq_time_t timeout) {
+bool Test::Run(const RunOptions *opt) {
+  static RunOptions fallback;
+  RunOptions options = (opt != nullptr) ? *opt : fallback;
   nq_client_t cl = nq_client_create(256);
   nq_clconf_t conf = {
     .insecure = false,
-    .handshake_timeout = 0,
-    .idle_timeout = idle_timeout,
+    .handshake_timeout = options.handshake_timeout,
+    .idle_timeout = options.idle_timeout,
   };
   Conn *conns = new Conn[concurrency_];
   for (int i = 0; i < concurrency_; i++) {
@@ -207,10 +210,11 @@ bool Test::Run(nq_time_t idle_timeout, nq_time_t timeout) {
     nq_closure_init(conf.on_close, on_conn_close, &Test::OnConnClose, conns + i);
     nq_closure_init(conf.on_finalize, on_conn_finalize, &Test::OnConnFinalize, this);
     auto c = nq_client_connect(cl, &addr_, &conf);
-    conns[i].Init(this, c, i);
+    conns[i].Init(this, c, i, options);
   }
-  nq_time_t end = nq_time_now() + timeout;
-  while (!Finished() && (timeout == 0 || nq_time_now() < end)) {
+  auto execute_duration = options.execute_duration;
+  nq_time_t end = nq_time_now() + execute_duration;
+  while (!Finished() && (execute_duration == 0 || nq_time_now() < end)) {
     nq_client_poll(cl);
     for (int i = 0; i < concurrency_; i++) {
       if (conns[i].should_signal) {
@@ -230,7 +234,7 @@ bool Test::Run(nq_time_t idle_timeout, nq_time_t timeout) {
   }
   //wait all actual conn close
   while (concurrency_ > closed_conn_) {
-    if (timeout != 0 && nq_time_now() >= end) {
+    if (execute_duration != 0 && nq_time_now() >= end) {
       //should be closed within timedout
       delete []conns;
       ASSERT(false);
@@ -239,7 +243,7 @@ bool Test::Run(nq_time_t idle_timeout, nq_time_t timeout) {
     nq_client_poll(cl);
   }
   delete []conns;
-  if (timeout > 0) {
+  if (execute_duration > 0) {
     return true;
   }
   return IsSuccess();

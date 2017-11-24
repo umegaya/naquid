@@ -108,9 +108,18 @@ class ConnOpenStreamClosureCaller : public ClosureCallerBase {
 class Test {
  public:
   struct Conn;
+  struct RunOptions {
+    nq_time_t idle_timeout, handshake_timeout, rpc_timeout, execute_duration;
+    RunOptions() {
+      idle_timeout = nq_time_sec(60);
+      handshake_timeout = nq_time_sec(60);
+      rpc_timeout = nq_time_sec(30);
+      execute_duration = 0;
+    }
+  };
   typedef std::function<void (bool)> Latch;
   typedef std::function<void (Conn &conn)> TestProc;
-  typedef std::function<void (Conn &conn)> TestInitProc;
+  typedef std::function<void (Conn &conn, const RunOptions &options)> TestInitProc;
   enum CallbackType {
     RpcNotify,
     RpcRequest,
@@ -267,14 +276,14 @@ class Test {
     Latch NewLatch() {
       return t->NewLatch();
     }
-    void Init(Test *test, nq_conn_t conn, int idx) {
+    void Init(Test *test, nq_conn_t conn, int idx, const RunOptions &options) {
       send_buf = (char *)malloc(256);
       send_buf_len = 256;
       index = idx;
       t = test;
       c = conn;
       should_signal = false;
-      (t->init_ != nullptr ? t->init_ : Test::RegisterCallback)(*this);
+      (t->init_ != nullptr ? t->init_ : Test::RegisterCallback)(*this, options);
 
     }
   };
@@ -296,14 +305,15 @@ class Test {
     Start();
     return std::bind(&Test::End, this, std::placeholders::_1);
   }
-  bool Run(nq_time_t idle_timeout = 0, nq_time_t timeout = 0);
+  bool Run(const RunOptions *opt = nullptr);
 
  protected:
   void StartThread() { thread_start_++; }
-  void Start() { test_start_++; running_++; }
+  void Start() { test_start_++; running_++; TRACE("Start: running = %u\n", running_.load()); }
   void End(bool ok) { 
     ASSERT(ok);
     running_--; 
+    TRACE("End: running = %u\n", running_.load());
     while (true) {
             int32_t expect = result_.load();
             if (expect < 0) {
@@ -318,7 +328,7 @@ class Test {
   bool IsSuccess() const { return result_.load() == 1; }
   bool Finished() const { return test_start_.load() > 0 && thread_start_ == concurrency_ && running_.load() == 0; }
 
-  static void RegisterCallback(Conn &tc);
+  static void RegisterCallback(Conn &tc, const RunOptions &options);
 
   static bool OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void *now_always_null);
   static nq_time_t OnConnClose(void *arg, nq_conn_t c, nq_result_t r, const char *reason, bool closed_from_remote);
@@ -341,11 +351,9 @@ class Test {
 
 
 
-
 static inline std::string MakeString(const void *pvoid, nq_size_t length) {
   return std::string(static_cast<const char *>(pvoid), length);
 }
-
 
 
 
@@ -353,6 +361,14 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
   auto *pcc = new nqtest::ReplyClosureCaller(); \
   pcc->cb_ = callback; \
   nq_rpc_call(stream, type, buff, blen, pcc->closure()); \
+}
+#define RPCEX(stream, type, buff, blen, cb, to) { \
+  auto *pcc = new nqtest::ReplyClosureCaller(); \
+  pcc->cb_ = cb; \
+  nq_rpc_opt_t opt; \
+  opt.callback = pcc->closure(); \
+  opt.timeout = to; \
+  nq_rpc_call_ex(stream, type, buff, blen, &opt); \
 }
 
 #define WATCH_CONN(conn, type, callback) { \

@@ -13,14 +13,15 @@
 #include "basis/handler_map.h"
 
 namespace net {
+class NqAlarmInterface;
 class NqLoop : public nq::Loop,
                public QuicConnectionHelperInterface,
                public QuicAlarmFactory,
                public QuicClock {
  public:
   NqLoop() : nq::Loop(), 
-                   approx_now_in_usec_(0),
-                   alarm_map_() {}
+             approx_now_in_usec_(0),
+             alarm_map_() {}
 
   static QuicTime ToQuicTime(uint64_t from_us);
 
@@ -44,12 +45,19 @@ class NqLoop : public nq::Loop,
       const QuicWallTime& walltime) const override;
 
  public:
-  inline std::multimap<uint64_t, QuicAlarm*> &AlarmMap() { return alarm_map_; }
+  inline std::multimap<uint64_t, NqAlarmInterface*> &AlarmMap() { return alarm_map_; }
   void Poll();
   uint64_t NowInUsec() const;
+
+ protected:
+  friend class NqQuicAlarm;
+  friend class NqAlarmBase;
+  void SetAlarm(NqAlarmInterface *a, uint64_t timeout_in_us);
+  void CancelAlarm(NqAlarmInterface *a, uint64_t timeout_in_us);
+
  private:
   uint64_t approx_now_in_usec_;
   SimpleBufferAllocator buffer_allocator_;
-  std::multimap<uint64_t, QuicAlarm*> alarm_map_;
+  std::multimap<uint64_t, NqAlarmInterface*> alarm_map_;
 };
 }

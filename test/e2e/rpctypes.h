@@ -6,6 +6,7 @@ namespace nqtest {
     Raise = 2,
     NotifyText = 3,
     ServerStream = 4,
+    Sleep = 5,
 
     ServerRequest = 10000,
 
@@ -15,5 +16,6 @@ namespace nqtest {
     None = 0,
     Parse = -1,
     NoSuchStream = -2,
+    InternalError = -3,
   };
 }

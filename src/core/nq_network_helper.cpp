@@ -83,6 +83,7 @@ void NqNetworkHelper::CleanUpUDPSocketImpl(Fd fd) {
     loop_->Del(fd);
     int rc = nq::Syscall::Close(fd);
     DCHECK_EQ(0, rc);
+    fd_ = -1;
   }
 }
 

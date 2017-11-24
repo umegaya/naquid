@@ -1,6 +1,5 @@
 #include "core/nq_stream.h"
 
-#include "basis/header_codec.h"
 #include "basis/endian.h"
 #include "core/nq_loop.h"
 #include "core/nq_session.h"
@@ -68,6 +67,7 @@ NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
   case nq::HandlerMap::RPC: {
     s = new NqSimpleRPCStreamHandler(this, he->rpc.on_rpc_request, 
                                      he->rpc.on_rpc_notify, 
+                                    he->rpc.timeout,
                                     he->rpc.use_large_msgid);
     s->SetLifeCycleCallback(he->rpc.on_rpc_open, he->rpc.on_rpc_close);
   } break;
@@ -163,8 +163,6 @@ void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
 
 
 
-constexpr size_t len_buff_len = nq::LengthCodec::EncodeLength(sizeof(nq_size_t));
-constexpr size_t header_buff_len = 8;
 void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
   //greedy read and called back
 	parse_buffer_.append(ToCStr(p), len);
@@ -202,15 +200,12 @@ void NqRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
   
 
 
-void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, uint64_t timeout_duration_us) {
+void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, nq_time_t timeout_duration_ts) {
   auto req = new Request(this, msgid, cb);
   req_map_[msgid] = req;
-  auto alarm = loop_->CreateAlarm(req);
-  auto now = loop_->NowInUsec();
-  alarm->Set(NqLoop::ToQuicTime(now + timeout_duration_us));
-  //auto end = (alarm->deadline() - QuicTime::Zero()).ToMicroseconds();
-  //TRACE("entry req: start %llu end %llu", now, end);
-  req->alarm_ = alarm;
+  auto now = nq_time_now();
+  TRACE("EntryRequest timeout %llu ns", timeout_duration_ts);
+  req->Start(loop_, now + timeout_duration_ts);
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   TRACE("stream handler OnRecv %u bytes", len);
@@ -223,10 +218,12 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   do {
     //decode header
     read_ofs = nq::HeaderCodec::Decode(&type, &msgid, pstr, plen);
-    reclen = 0;
+    constexpr nq_size_t NO_RECLEN = 0xFFFFFFFF; //use non zero invalid value when user send 0 byte payload
+    reclen = NO_RECLEN;
     read_ofs += nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
     /* read_ofs => length of encoded header, reclen => actual payload length */
-    if (reclen == 0 || (read_ofs + reclen) > plen) {
+    if (reclen == NO_RECLEN || (read_ofs + reclen) > plen) {
+      //TRACE("short of buffer %u %u %u", reclen, read_ofs, plen);
       break;
     }
     //TRACE("msgid, type = %u %d", msgid, type);
@@ -244,8 +241,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
           req_map_.erase(it);
           //reply from serve side
           nq_closure_call(req->on_data_, on_rpc_reply, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
-          req->alarm_->Cancel(); //cancel firing alarm
-          delete req->alarm_; //it deletes req itself
+          req->Destroy(loop_); //cancel firing alarm and free memory for req
         } else {
           //probably timedout. caller should already be received timeout error
           //req object deleted in OnAlarm
@@ -283,18 +279,18 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
 void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
   //QuicConnection::ScopedPacketBundler bundler(
     //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
-  ASSERT(type > 0);
   nq_msgid_t msgid = msgid_factory_.New();
-  //pack and send buffer
-  char buffer[header_buff_len + len_buff_len + len];
-  size_t ofs = 0;
-  ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), msgid, buffer, sizeof(buffer));
-  ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
-  memcpy(buffer + ofs, p, len);
-  WriteBytes(buffer, ofs + len);  
-
-  EntryRequest(msgid, cb);
+  SendCommon(type, msgid, p, len);
+  EntryRequest(msgid, cb, default_timeout_ts_);
 }
+void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) {
+  //QuicConnection::ScopedPacketBundler bundler(
+    //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  nq_msgid_t msgid = msgid_factory_.New();
+  SendCommon(type, msgid, p, len);
+  EntryRequest(msgid, opt.callback, opt.timeout);
+}
+
 void NqSimpleRPCStreamHandler::Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len) {
   //QuicConnection::ScopedPacketBundler bundler(
     //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);

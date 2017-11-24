@@ -3,7 +3,7 @@
 using namespace nqtest;
 
 static void test_ping(nq_rpc_t rpc, Test::Conn &tc) {
-	auto done = tc.NewLatch();
+	auto done = tc.NewLatch(); //ok
 	auto now = nq_time_now();
 	char buff[sizeof(now)];
 	nq::Endian::HostToNetbytes(now, buff);
@@ -21,7 +21,7 @@ static void test_ping(nq_rpc_t rpc, Test::Conn &tc) {
 }
 
 static void test_raise(nq_rpc_t rpc, Test::Conn &tc) {
-	auto done = tc.NewLatch();
+	auto done = tc.NewLatch(); //ok
 	const int32_t code = -999;
 	const std::string msg = "test failure reason";
 	//pack payload
@@ -42,8 +42,8 @@ static void test_raise(nq_rpc_t rpc, Test::Conn &tc) {
 }
 
 static void test_notify(nq_rpc_t rpc, Test::Conn &tc) {
-	auto done = tc.NewLatch();
-	auto done2 = tc.NewLatch();
+	auto done = tc.NewLatch(); //ok
+	auto done2 = tc.NewLatch(); //ok
 	const std::string text = "notify this plz";
 	WATCH_STREAM(tc, rpc, RpcNotify, ([done, text](
 		nq_rpc_t rpc2, uint16_t type, const void *data, nq_size_t dlen) {
@@ -60,11 +60,18 @@ static void test_notify(nq_rpc_t rpc, Test::Conn &tc) {
 
 static void test_server_stream(nq_rpc_t rpc, const std::string &stream_name, Test::Conn &tc) {
 	auto done = tc.NewLatch();	//rpc reply
-	auto done2 = tc.NewLatch();	//server stream creation
+	auto done2 = tc.NewLatch();	//server stream creation ok
 	auto done3 = tc.NewLatch();	//server request
 	const std::string text = "create stream";
 
-	WATCH_CONN(tc, ConnOpenStream, ([&tc, done2, done3, text](nq_rpc_t rpc2, void **ppctx) {
+	WATCH_CONN(tc, ConnOpenStream, ([&tc, rpc, done2, done3, text](nq_rpc_t rpc2, void **ppctx) {
+		if (nq_rpc_sid(rpc) == nq_rpc_sid(rpc2)) {
+			//this is not server stream open. should notice after 
+			return true;
+		} else if ((nq_rpc_sid(rpc2) % 2) != 0) {
+			done2(false); //this is not server stream
+			return false;
+		}
 		TRACE("test_server_stream: stream creation");
 		void *ptr = reinterpret_cast<void *>(0x1234);
 		WATCH_STREAM(tc, rpc2, RpcRequest, ([rpc2, done3, text, ptr](
@@ -81,6 +88,7 @@ static void test_server_stream(nq_rpc_t rpc, const std::string &stream_name, Tes
 			auto reply = (std::string("from client:") + MakeString(data, dlen));
 			nq_rpc_reply(rpc3, RpcError::None, msgid, reply.c_str(), reply.length());
 			done3((std::string("from server:") + text) == MakeString(data, dlen) && type == RpcType::ServerRequest);
+			TRACE("test_server_stream: reply to server done");
 		}));
 		*ppctx = ptr;
 		done2(true);

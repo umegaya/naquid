@@ -10,6 +10,7 @@
 #include "core/nq_serial_codec.h"
 
 namespace net {
+class NqLoop;
 class NqBoxer {
  public:
   enum UnboxResult {
@@ -23,15 +24,18 @@ class NqBoxer {
     Reconnect,
     Send,
     Call,
+    CallEx,
     Reply,
     Notify,
     Flush,
     Finalize,
+    Start,
   };
   enum OpTarget : uint8_t {
     Invalid = 0,
     Conn = 1,
     Stream = 2,
+    Alarm = 3,
   };
   struct Op {
     uint64_t serial_;
@@ -60,12 +64,20 @@ class NqBoxer {
         uint16_t type_;
       } call_;
       struct {
+        nq_rpc_opt_t rpc_opt_;
+        uint16_t type_;
+      } call_ex_;
+      struct {
         uint16_t type_;
       } notify_;
       struct {
         nq_result_t result_;
         nq_msgid_t msgid_;
       } reply_;
+      struct {
+        nq_time_t invocation_ts_;
+        nq_closure_t callback_;
+      } alarm_;
     };
     Op(uint64_t serial, OpCode code, OpTarget target = OpTarget::Stream) : 
       serial_(serial), code_(code), target_(target) { data_.len_ = 0; }
@@ -79,6 +91,13 @@ class NqBoxer {
       call_.type_ = type;
       call_.on_reply_ = on_reply;
     }
+    Op(uint64_t serial, OpCode code, uint16_t type, const void *data, 
+       nq_size_t datalen, nq_rpc_opt_t rpc_opt, 
+       OpTarget target = OpTarget::Stream) :
+      serial_(serial), code_(code), target_(target), data_(data, datalen) {
+      call_ex_.type_ = type;
+      call_ex_.rpc_opt_ = rpc_opt;
+    }
     Op(uint64_t serial, OpCode code, uint16_t type, 
        const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) : 
       serial_(serial), code_(code), target_(target), data_(data, datalen) {
@@ -90,6 +109,13 @@ class NqBoxer {
       serial_(serial), code_(code), target_(target), data_(data, datalen) {
       reply_.result_ = result;
       reply_.msgid_ = msgid;
+    }
+    Op(uint64_t serial, OpCode code, nq_time_t ts, nq_closure_t cb, 
+      OpTarget target = OpTarget::Stream) : 
+      serial_(serial), code_(code), target_(target) {
+      alarm_.invocation_ts_ = ts;
+      alarm_.callback_ = cb;
+      data_.len_ = 0; 
     }
     ~Op() {}
   };
@@ -122,6 +148,10 @@ class NqBoxer {
             p->InvokeStream(op->serial_, op->code_, op->call_.type_, 
                             op->data_.ptr(), op->data_.length(), op->call_.on_reply_, s);
             break;
+          case CallEx:
+            p->InvokeStream(op->serial_, op->code_, op->call_ex_.type_, 
+                            op->data_.ptr(), op->data_.length(), op->call_ex_.rpc_opt_, s);
+            break;
           case Notify:
             p->InvokeStream(op->serial_, op->code_, op->notify_.type_, 
                             op->data_.ptr(), op->data_.length(), s);
@@ -129,6 +159,24 @@ class NqBoxer {
           case Reply:
             p->InvokeStream(op->serial_, op->code_, op->reply_.result_, 
                             op->reply_.msgid_, op->data_.ptr(), op->data_.length(), s);
+            break;
+          default:
+            ASSERT(false);
+            break;
+          }
+        } break;
+        case Alarm: {
+          NqAlarm *s;
+          if (p->Unbox(op->serial_, &s) != UnboxResult::Ok) {
+            break;
+          }
+          switch (op->code_) {
+          case Start:
+            p->InvokeAlarm(op->serial_, op->code_,
+                          op->alarm_.invocation_ts_, op->alarm_.callback_, s);
+            break;
+          case Finalize:
+            p->InvokeAlarm(op->serial_, op->code_, s);
             break;
           default:
             ASSERT(false);
@@ -146,12 +194,16 @@ class NqBoxer {
 
   //interfaces
   virtual void Enqueue(Op *op) = 0;
+  virtual NqLoop *Loop() = 0;
   virtual nq_conn_t Box(NqSession::Delegate *d) = 0;
   virtual nq_stream_t Box(NqStream *s) = 0;
+  virtual nq_alarm_t Box(NqAlarm *a) = 0;
   virtual UnboxResult Unbox(uint64_t serial, NqSession::Delegate **unboxed) = 0;
   virtual UnboxResult Unbox(uint64_t serial, NqStream **unboxed) = 0;
+  virtual UnboxResult Unbox(uint64_t serial, NqAlarm **unboxed) = 0;
   virtual const NqSession::Delegate *FindConn(uint64_t serial, OpTarget target) const = 0;
   virtual const NqStream *FindStream(uint64_t serial) const = 0;
+  virtual void RemoveAlarm(NqAlarmIndex index) = 0;
   virtual bool IsClient() const = 0;
 
   //invoker
@@ -179,7 +231,25 @@ class NqBoxer {
       Enqueue(new Op(serial, code, OpTarget::Conn));
     }
   }
-  //TODO(iyatomi): use direct pointer of NqStream to achieve faster operation
+  inline void InvokeAlarm(uint64_t serial, OpCode code, nq_time_t invocation_ts, nq_closure_t cb, NqAlarm *unboxed = nullptr) {
+    UnboxResult r = UnboxResult::Ok;
+    if (unboxed != nullptr || (r = Unbox(serial, &unboxed)) == UnboxResult::Ok) {
+      ASSERT(code == Start);
+      unboxed->Start(Loop(), invocation_ts, cb);
+    } else {
+      Enqueue(new Op(serial, code, invocation_ts, cb, OpTarget::Alarm));
+    }    
+  }
+  inline void InvokeAlarm(uint64_t serial, OpCode code, NqAlarm *unboxed = nullptr) {
+    UnboxResult r = UnboxResult::Ok;
+    if (unboxed != nullptr || (r = Unbox(serial, &unboxed)) == UnboxResult::Ok) {
+      ASSERT(code == Finalize);
+      RemoveAlarm(unboxed->alarm_index());
+      unboxed->Destroy(Loop());
+    } else {
+      Enqueue(new Op(serial, code, OpTarget::Alarm));
+    }    
+  }  //TODO(iyatomi): use direct pointer of NqStream to achieve faster operation
   //1. allocate NqStream by the way that reserved it to pool on destroy. 
   //2. then heap for NqStream never reused by other objects, boxer remain same (and we can set invalid value for serial)
   //3. nq_stream/rpc_t has NqStream pointer as value of member p. this value also passed to InvokeStream by storing it into Op
@@ -222,6 +292,19 @@ class NqBoxer {
     }
   }
   inline void InvokeStream(uint64_t serial, OpCode code, 
+                           uint16_t type, const void *data, 
+                           nq_size_t datalen, nq_rpc_opt_t &rpc_opt, NqStream *unboxed = nullptr) {
+    UnboxResult r = UnboxResult::Ok;
+    if (unboxed != nullptr || (r = Unbox(serial, &unboxed)) == UnboxResult::Ok) {
+      ASSERT(code == CallEx);
+      unboxed->Handler<NqStreamHandler>()->Send(type, data, datalen, rpc_opt);
+    } else if (r == UnboxResult::NeedTransfer) {
+      Enqueue(new Op(serial, code, type, data, datalen, rpc_opt));
+    } else {
+      ASSERT(r == UnboxResult::SerialExpire);
+    }
+  }
+  inline void InvokeStream(uint64_t serial, OpCode code, 
                            uint16_t type, const void *data, nq_size_t datalen, NqStream *unboxed = nullptr) {    
     UnboxResult r = UnboxResult::Ok;
     if (unboxed != nullptr || (r = Unbox(serial, &unboxed)) == UnboxResult::Ok) {
@@ -251,6 +334,7 @@ class NqBoxer {
   static inline NqBoxer *From(nq_conn_t c) { return (NqBoxer *)c.p; }
   static inline NqBoxer *From(nq_stream_t s) { return (NqBoxer *)s.p; }
   static inline NqBoxer *From(nq_rpc_t rpc) { return (NqBoxer *)rpc.p; }
+  static inline NqBoxer *From(nq_alarm_t a) { return (NqBoxer *)a.p; }
 
   inline const NqSession::Delegate *Find(nq_conn_t c) const { return c.s != 0 ? FindConn(c.s, Conn) : nullptr; }
   inline const NqStream *Find(nq_stream_t s) const { return s.s != 0 ? FindStream(s.s) : nullptr; }
