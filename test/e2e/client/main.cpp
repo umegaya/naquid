@@ -2,18 +2,23 @@
 #include "rpc.h"
 #include "stream.h"
 #include "timeout.h"
+#include "reconnect.h"
 
 using namespace nqtest;
 
 void test_suites(const nq_addr_t &addr, bool skip = true) {
+#if 0
+  TRACE("==================== test_rpc ====================");
   {
     Test t(addr, test_rpc);
     if (!t.Run()) { ALERT_AND_EXIT("test_rpc fails"); }
   }//*/
+  TRACE("==================== test_stream ====================");
   {
     Test t(addr, test_stream);
     if (!t.Run()) { ALERT_AND_EXIT("test_stream fails"); }
   }//*/
+  TRACE("==================== test_timeout ====================");
   {
     Test::RunOptions o;
     o.rpc_timeout = nq_time_sec(2);
@@ -23,9 +28,24 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(addr, test_timeout);
     if (!t.Run(&o)) { ALERT_AND_EXIT("test_timeout fails"); }
   }//*/
+#endif
+  TRACE("==================== test_reconnect_client ====================");
+  {
+    Test t(addr, test_reconnect_client);
+    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect fails"); }
+  }//*/
+  TRACE("==================== test_reconnect_server ====================");
+  {
+    auto tmp = addr;
+    tmp.port = 18443;
+    Test t(tmp, test_reconnect_server);
+    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect fails"); }
+  }//*/
   /*{
-    Test t(addr, test_reconnect, 1);
-    if (!t.Run(mtk_time_sec(0), mtk_time_sec(7))) { ALERT_AND_EXIT("test_reconnect failure fails"); }
+    auto tmp = addr;
+    tmp.port = 18443;
+    Test t(addr, test_reconnect_stress, 64);
+    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_stress fails"); }
   }//*/
   /*if (skip) {
     Test t(addr, test_bench, 256);

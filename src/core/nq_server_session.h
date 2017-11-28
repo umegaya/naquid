@@ -29,10 +29,11 @@ class NqServerSession : public NqSession,
 
   //implements NqSession::Delegate
   uint64_t Id() const override { return connection_id(); }
+  void *Context() const override { return context_; }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
-  bool OnOpen(nq_handshake_event_t hsev) override;
+  void OnOpen(nq_handshake_event_t hsev) override;
   void Disconnect() override;
   bool Reconnect() override; //only supported for client 
   bool IsClient() const override;
@@ -54,6 +55,7 @@ class NqServerSession : public NqSession,
   NqSessionIndex session_index_;
   std::map<QuicStreamId, NqServerStream*> read_map_;
   std::mutex read_map_mutex_;
+  void *context_;
 };
 
 }

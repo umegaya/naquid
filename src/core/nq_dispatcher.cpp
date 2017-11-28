@@ -88,6 +88,7 @@ bool NqDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& message,
                                             std::string* error_details) const {
   //TODO(iyatomi): reject when number of connection is too much, getting the config and 
   //total connection number from server_.
+  //TODO(iyatomi): if entering shutdown mode, always return false 
   return true;
 }
 
@@ -110,10 +111,7 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
     s->Initialize();
     server_map_.Add(s->session_index(), s);
     server_map_.Activate(s->session_index(), s); //make connection valid
-    if (!s->OnOpen(NQ_HS_START)) {
-      auto c = Box(s);
-      Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Disconnect));
-    }
+    s->OnOpen(NQ_HS_START);
     return s;
 }
 

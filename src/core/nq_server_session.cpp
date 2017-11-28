@@ -15,7 +15,7 @@ NqServerSession::NqServerSession(QuicConnection *connection,
   dispatcher_(dispatcher),
   port_config_(port_config),
   session_index_(dispatcher->new_session_index()),
-  read_map_(), read_map_mutex_() {
+  read_map_(), read_map_mutex_(), context_(nullptr) {
   init_crypto_stream();
 }
 
@@ -37,17 +37,17 @@ void NqServerSession::RemoveStreamForRead(QuicStreamId id) {
 void NqServerSession::OnClose(QuicErrorCode error,
                      const std::string& error_details,
                      ConnectionCloseSource close_by_peer_or_self) {
-  nq_closure_call(port_config_.server().on_close, on_conn_close, ToHandle(), 
+  nq_closure_call(port_config_.server().on_close, on_server_conn_close, ToHandle(), 
                   (int)error, 
                   error_details.c_str(), 
                   close_by_peer_or_self == ConnectionCloseSource::FROM_PEER);
   //TODO(iyatomi): destroy session (seems no one delete it)
   auto c = dispatcher_->Box(this);
-  //don't use invokeconn because it causes deletion of connection immediately.
+  //don't use invokeconn because it may cause deletion of connection immediately.
   dispatcher_->Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Finalize, NqBoxer::OpTarget::Conn));
 }
-bool NqServerSession::OnOpen(nq_handshake_event_t hsev) {
-  return nq_closure_call(port_config_.server().on_open, on_conn_open, ToHandle(), hsev, nullptr);
+void NqServerSession::OnOpen(nq_handshake_event_t hsev) {
+  nq_closure_call(port_config_.server().on_open, on_server_conn_open, ToHandle(), hsev, &context_);
 }
 void NqServerSession::Disconnect() {
   connection()->CloseConnection(QUIC_CONNECTION_CANCELLED, "server side close", 

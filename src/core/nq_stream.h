@@ -111,7 +111,7 @@ public:
   STATIC_ASSERT(sizeof(nq_stream_t) == sizeof(nq_rpc_t) && sizeof(nq_stream_t) == 16, "size difer");
   STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 0, "offset of p differ");
   STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 8, "offset of s differ");
-  //TODO(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
+  //FYI(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
   inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), &context_); }
   inline void OnClose() { nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); }
   inline void SetLifeCycleCallback(nq_closure_t on_open, nq_closure_t on_close) {

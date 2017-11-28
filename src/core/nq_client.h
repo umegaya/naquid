@@ -30,11 +30,15 @@ class NqClient : public QuicClientBase,
     DISCONNECT,
     CONNECT,
     FINALIZED,
+    RECONNECTING,
   };
   class ReconnectAlarm : public QuicAlarm::Delegate {
    public:
     ReconnectAlarm(NqClient *client) : client_(client) {}
-    void OnAlarm() { client_->StartConnect(); }
+    void OnAlarm() { 
+      client_->Initialize();
+      client_->StartConnect(); 
+    }
    private:
     NqClient *client_;
   };
@@ -128,10 +132,11 @@ class NqClient : public QuicClientBase,
 
   // implements NqSession::Delegate
   uint64_t Id() const override { return connect_state_ == CONNECT ? nq_session()->connection_id() : 0; }
+  void *Context() const override { return context_; }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
-  bool OnOpen(nq_handshake_event_t hsev) override;
+  void OnOpen(nq_handshake_event_t hsev) override;
   bool IsClient() const override { return true; }
   void Disconnect() override;
   bool Reconnect() override;
@@ -155,6 +160,7 @@ class NqClient : public QuicClientBase,
   StreamManager stream_manager_;
   uint64_t next_reconnect_us_ts_;
   ConnectState connect_state_;
+  void *context_;
 
   DISALLOW_COPY_AND_ASSIGN(NqClient);
 };

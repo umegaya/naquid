@@ -6,13 +6,34 @@ static const char NotifySuccess[] = "notify success";
 using namespace nqtest;
 
 /* conn callbacks */
-bool on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void *) {
+struct conn_context {
+  int count;
+};
+void on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void **ppctx) {
   fprintf(stderr, "on_conn_open event:%d\n", hsev);
-  return true;
+  if (hsev != NQ_HS_DONE) {
+    return;
+  }
+  auto ctx = (conn_context *)malloc(sizeof(conn_context));
+  ctx->count = 3;
+  *ppctx = ctx;
 }
-nq_time_t on_conn_close(void *, nq_conn_t, nq_result_t, const char *detail, bool) {
+bool g_reject = true;
+void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
+  fprintf(stderr, "on_conn_open event:%d\n", hsev);
+  if (hsev != NQ_HS_DONE) {
+    return;
+  }
+  if (g_reject) {
+    g_reject = true;
+    nq_conn_close(c);
+    return;
+  }
+  on_conn_open(arg, c, hsev, ppctx);
+}
+void on_conn_close(void *, nq_conn_t c, nq_result_t, const char *detail, bool) {
   fprintf(stderr, "on_conn_close reason:%s\n", detail);
-  return 0;
+  free(nq_conn_ctx(c));
 }
 
 
@@ -39,6 +60,19 @@ void on_alarm(void *p, nq_time_t *pnext) {
 /* rpc callbacks */
 bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
   return true;
+}
+bool on_rpc_open_reject(void *p, nq_rpc_t rpc, void **ppctx) {
+  auto c = nq_rpc_conn(rpc);
+  conn_context *ctx = reinterpret_cast<conn_context *>(nq_conn_ctx(c));
+  if (ctx == nullptr) {
+    ASSERT(false);
+    return false;
+  }
+  ctx->count--;
+  if (ctx->count <= 0) {
+    return on_rpc_open(p, rpc, ppctx);
+  }
+  return false;
 }
 void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
@@ -97,6 +131,13 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
         nq_alarm_set(ac->alarm, ac->invoke_time, cl);
       }
       break;
+    case RpcType::Close:
+      {
+        nq_conn_t c = nq_rpc_conn(rpc);
+        nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
+        nq_conn_close(c);
+      }
+      break;
   }
 }
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
@@ -125,6 +166,19 @@ bool on_stream_open(void *p, nq_stream_t s, void **ppctx) {
   }
   *ppctx = sc;
   return true;
+}
+bool on_stream_open_reject(void *p, nq_stream_t s, void **ppctx) {
+  auto c = nq_stream_conn(s);
+  conn_context *ctx = reinterpret_cast<conn_context *>(nq_conn_ctx(c));
+  if (ctx == nullptr) {
+    ASSERT(false);
+    return false;
+  }
+  ctx->count--;
+  if (ctx->count <= 0) {
+    return on_stream_open(p, s, ppctx);
+  }
+  return false;
 }
 void on_stream_close(void *p, nq_stream_t s) {
   stream_context *sc = reinterpret_cast<stream_context *>(nq_stream_ctx(s));
@@ -164,17 +218,56 @@ void *stream_reader(void *arg, const char *data, nq_size_t dlen, int *p_reclen) 
 }
 
 
-/* setup stream */
-void setup_streams(nq_hdmap_t hm) {
+/* setup server */
+struct server_config {
+  const char *quic_secret;
+  nq_closure_t on_server_conn_open;
+  nq_closure_t on_stream_open, on_raw_stream_open;
+  nq_closure_t on_rpc_open;
+};
+#define CONFIG_CB(conf, name, default_value, dest) { \
+  if (conf != nullptr && nq_closure_is_empty(conf->name)) { \
+    dest = conf->name; \
+  } else { \
+    nq_closure_init(dest, name, default_value, nullptr); \
+  } \
+}
+#define CONFIG_VAL(conf, name, default_value, dest) {\
+  if (conf != nullptr && conf->name != nullptr) { \
+    dest = conf->name; \
+  } else { \
+    dest = default_value; \
+  } \
+}
+void setup_server(nq_server_t sv, int port, server_config *svconfig) {
+  nq_addr_t addr = {
+    "0.0.0.0", 
+    "./test/e2e/server/certs/leaf_cert.pem", 
+    "./test/e2e/server/certs/leaf_cert.pkcs8", 
+    nullptr,
+    port
+  };
+
+  nq_svconf_t conf;
+  CONFIG_VAL(svconfig, quic_secret, "e336e27898ff1e17ac79e82fa0084999", conf.quic_secret);
+  conf.quic_cert_cache_size = 0;
+  conf.accept_per_loop = 1;
+  conf.handshake_timeout = nq_time_sec(120);
+  conf.idle_timeout = nq_time_sec(60);
+  CONFIG_CB(svconfig, on_server_conn_open, on_conn_open, conf.on_open);
+  nq_closure_init(conf.on_close, on_server_conn_close, on_conn_close, nullptr);
+
+  nq_hdmap_t hm = nq_server_listen(sv, &addr, &conf);
+
   nq_rpc_handler_t rh;
   nq_closure_init(rh.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
   nq_closure_init(rh.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
-  nq_closure_init(rh.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
+  CONFIG_CB(svconfig, on_rpc_open, on_rpc_open, rh.on_rpc_open);
   nq_closure_init(rh.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
   nq_hdmap_rpc_handler(hm, "rpc", rh);
 
   nq_stream_handler_t rsh;
-  nq_closure_init(rsh.on_stream_open, on_stream_open, on_stream_open, nullptr);
+  CONFIG_CB(svconfig, on_stream_open, on_stream_open, rsh.on_stream_open);
   nq_closure_init(rsh.on_stream_close, on_stream_close, on_stream_close, nullptr);
   nq_closure_init(rsh.on_stream_record, on_stream_record, on_stream_record, nullptr);
   nq_closure_init(rsh.stream_reader, stream_reader, stream_reader, nullptr);
@@ -182,13 +275,12 @@ void setup_streams(nq_hdmap_t hm) {
   nq_hdmap_stream_handler(hm, "rst", rsh);
 
   nq_stream_handler_t ssh;
-  nq_closure_init(ssh.on_stream_open, on_stream_open, on_stream_open, nullptr);
+  CONFIG_CB(svconfig, on_stream_open, on_stream_open, ssh.on_stream_open);
   nq_closure_init(ssh.on_stream_close, on_stream_close, on_stream_close, nullptr);
   nq_closure_init(ssh.on_stream_record, on_stream_record, on_stream_record, nullptr);
   ssh.stream_reader = nq_closure_empty();
   ssh.stream_writer = nq_closure_empty();
   nq_hdmap_stream_handler(hm, "sst", ssh);
-
 }
 
 
@@ -196,22 +288,18 @@ void setup_streams(nq_hdmap_t hm) {
 int main(int argc, char *argv[]){
   nq_server_t sv = nq_server_create(kThreads);
 
-  nq_hdmap_t hm;
-  nq_addr_t addr = {
-    "0.0.0.0", "./test/e2e/server/certs/leaf_cert.pem", "./test/e2e/server/certs/leaf_cert.pkcs8", nullptr,
-    8443
+  setup_server(sv, 8443, nullptr);
+  server_config scf = {
+    .quic_secret = "8b090e1a7f6b40a818f3563160bd43e1"
   };
-  nq_svconf_t conf;
-  conf.quic_secret = "e336e27898ff1e17ac79e82fa0084999";
-  conf.quic_cert_cache_size = 0;
-  conf.accept_per_loop = 1;
-  conf.handshake_timeout = nq_time_sec(120);
-  conf.idle_timeout = nq_time_sec(60);
-  nq_closure_init(conf.on_open, on_conn_open, on_conn_open, nullptr);
-  nq_closure_init(conf.on_close, on_conn_close, on_conn_close, nullptr);
-  hm = nq_server_listen(sv, &addr, &conf);
-
-  setup_streams(hm);
+  int reject_counter[4] = {
+    1, 2, 1, 1,
+  };
+  nq_closure_init(scf.on_server_conn_open, on_server_conn_open, on_conn_open_reject, reject_counter + 0);
+  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open_reject, reject_counter + 1);
+  nq_closure_init(scf.on_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 2);
+  nq_closure_init(scf.on_raw_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 3);
+  setup_server(sv, 18443, &scf);
 
   nq_server_start(sv, false);
 

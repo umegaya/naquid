@@ -7,6 +7,7 @@ namespace nqtest {
     NotifyText = 3,
     ServerStream = 4,
     Sleep = 5,
+    Close = 6,
 
     ServerRequest = 10000,
 

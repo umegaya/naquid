@@ -33,7 +33,8 @@ NqClient::NqClient(QuicSocketAddress server_address,
           on_open_(config.client().on_open), 
           on_finalize_(config.client().on_finalize),
           session_index_(loop->new_session_index()), 
-          stream_manager_(), connect_state_(DISCONNECT) {
+          stream_manager_(), connect_state_(DISCONNECT),
+          context_(nullptr) {
   set_server_address(server_address);
 }
 NqClient::~NqClient() {
@@ -43,10 +44,7 @@ NqClient::~NqClient() {
 
 std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* connection) {
   auto s = new NqClientSession(connection, loop_, this, *config());
-  if (!OnOpen(NQ_HS_START)) {
-    auto c = loop_->Box(this);
-    loop_->Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Disconnect));
-  }
+  OnOpen(NQ_HS_START);
   return QuicWrapUnique(s);
 }
 void NqClient::InitializeSession() {
@@ -61,7 +59,7 @@ void NqClient::InitializeSession() {
 
 // implements QuicAlarm::Delegate
 void NqClient::OnAlarm() { 
-  nq_closure_call(on_finalize_, on_conn_finalize, ToHandle());
+  nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
   loop_->RemoveClient(this); 
   alarm_.release(); //release QuicAlarm which should contain *this* pointer, to prevent double free.
   delete this;
@@ -77,39 +75,64 @@ void NqClient::OnProofVerifyDetailsAvailable(const ProofVerifyDetails& verify_de
 }
 
 //implements NqSession::Delegate
-bool NqClient::OnOpen(nq_handshake_event_t hsev) { 
-  return nq_closure_call(on_open_, on_conn_open, ToHandle(), hsev, nullptr); 
+void NqClient::OnOpen(nq_handshake_event_t hsev) { 
+  nq_closure_call(on_open_, on_client_conn_open, ToHandle(), hsev, &context_); 
 }
 void NqClient::OnClose(QuicErrorCode error,
              const std::string& error_details,
              ConnectionCloseSource close_by_peer_or_self) {
-  uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, on_conn_close, ToHandle(), 
+  uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, on_client_conn_close, ToHandle(), 
                                               (int)error, 
                                               error_details.c_str(), 
                                               close_by_peer_or_self == ConnectionCloseSource::FROM_PEER));
-  //TODO: schedule reconnection somehow, if chromium stack does not do it
-  if (next_connect_us > 0 && !destroyed()) {
+  if (destroyed()) {
+    alarm_.reset(alarm_factory()->CreateAlarm(this));
+    alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
+    //cannot touch this client memory afterward. alarm invocation automatically delete the object,
+    //via auto free of pointer which holds in QuicArenaScopedPtr<QuicAlarm::Delegate> of QuicAlarm.
+  } else if (next_connect_us > 0 || connect_state_ == RECONNECTING) {
     next_reconnect_us_ts_ = loop_->NowInUsec() + next_connect_us;
     alarm_.reset(alarm_factory()->CreateAlarm(new ReconnectAlarm(this)));
     alarm_->Set(NqLoop::ToQuicTime(next_reconnect_us_ts_));
-    connect_state_ = DISCONNECT;
+    connect_state_ = RECONNECTING;
   } else {
-    alarm_.reset(alarm_factory()->CreateAlarm(this));
-    alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
-    connect_state_ = FINALIZED;
-    //cannot touch this client memory afterward. alarm invocation automatically delete the object,
-    //via auto free of pointer which holds in QuicArenaScopedPtr<QuicAlarm::Delegate> of QuicAlarm.
+    //client become disconnect state, but reconnection not scheduled. 
+    //user program need to call nq_conn_reset to re-establish connection, 
+    //or nq_conn_close to remove completely.
+    connect_state_ = DISCONNECT;
   }
   //make connection invalid
   loop_->client_map().Deactivate(session_index_);
   return;
 }
 void NqClient::Disconnect() {
-  connect_state_ = FINALIZED;
-  QuicClientBase::Disconnect(); 
+  if (connect_state_ != FINALIZED && alarm_ != nullptr) {
+    alarm_->Cancel();
+    alarm_.reset();
+  }
+  if (connect_state_ == CONNECT) {
+    connect_state_ = FINALIZED;
+    QuicClientBase::Disconnect(); 
+  } else if (connect_state_ == DISCONNECT || connect_state_ == RECONNECTING) {
+    connect_state_ = FINALIZED;
+    alarm_.reset(alarm_factory()->CreateAlarm(this));
+    alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
+  } else {
+    //finalize/reconnecting do nothing, because this client already scheduled to destroy.
+    ASSERT(alarm_ != nullptr);
+  }
 }
 bool NqClient::Reconnect() {
-  QuicClientBase::Disconnect(); 
+  if (connect_state_ == CONNECT) {
+    connect_state_ = RECONNECTING;
+    QuicClientBase::Disconnect(); 
+  } else if (connect_state_ == DISCONNECT) {
+    Initialize();
+    StartConnect();    
+  } else {
+    //finalize do nothing, because this client already scheduled to destroy.
+    ASSERT(alarm_ != nullptr);
+  }
   return true;
 }
 uint64_t NqClient::ReconnectDurationUS() const {

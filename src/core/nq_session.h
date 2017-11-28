@@ -29,10 +29,11 @@ class NqSession : public QuicSession {
    public:
     virtual ~Delegate() {}
     virtual uint64_t Id() const = 0;
+    virtual void *Context() const = 0;
     virtual void OnClose(QuicErrorCode error,
                          const std::string& error_details,
                          ConnectionCloseSource close_by_peer_or_self) = 0;
-    virtual bool OnOpen(nq_handshake_event_t hsev) = 0;
+    virtual void OnOpen(nq_handshake_event_t hsev) = 0;
 
     virtual void Disconnect() = 0;
     virtual bool Reconnect() = 0; //only supported for client 

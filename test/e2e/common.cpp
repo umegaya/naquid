@@ -7,14 +7,19 @@ nq_stream_t Test::Conn::invalid_stream = { const_cast<char *>("invalid"), 0 };
 nq_rpc_t Test::Conn::invalid_rpc { const_cast<char *>("invalid"), 0 };
 
 
-bool Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void *now_always_null) {
+void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
   if (hsev != NQ_HS_DONE) {
-    return true;
+    return;
   }
   auto tc = (Conn *)arg;
   if (tc->th.joinable()) {
+    //already start
     tc->should_signal = true;
-    return true; //already start
+    nq_closure_t clsr;
+    if (tc->FindClosure(CallbackType::ConnOpen, clsr)) {
+      nq_closure_call(clsr, on_client_conn_open, c, hsev, ppctx);
+    }
+    return; 
   }
   auto cid = nq_conn_cid(c);
   tc->th = std::thread([tc, cid] {
@@ -31,16 +36,24 @@ bool Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void *n
     }
   });
   tc->t->StartThread();
-  return true;
+  return;
 }
-nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_result_t r, const char *reason, bool closed_from_remote) {
+nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_result_t r, const char *reason, bool close_from_remote) {
   auto tc = (Conn *)arg;
   tc->should_signal = true;
+  nq_closure_t clsr;
+  if (tc->FindClosure(CallbackType::ConnClose, clsr)) {
+    return nq_closure_call(clsr, on_client_conn_close, c, r, reason, close_from_remote);
+  }
   return nq_time_sec(1);
 }
-void Test::OnConnFinalize(void *arg, nq_conn_t c) {
-  auto t = (Test *)arg;
-  t->closed_conn_++;
+void Test::OnConnFinalize(void *arg, nq_conn_t c, void *ctx) {
+  auto tc = (Conn *)arg;
+  tc->t->closed_conn_++;
+  nq_closure_t clsr;
+  if (tc->FindClosure(CallbackType::ConnFinalize, clsr)) {
+    nq_closure_call(clsr, on_client_conn_finalize, c, ctx);
+  }
 }
 
 
@@ -206,9 +219,9 @@ bool Test::Run(const RunOptions *opt) {
   };
   Conn *conns = new Conn[concurrency_];
   for (int i = 0; i < concurrency_; i++) {
-    nq_closure_init(conf.on_open, on_conn_open, &Test::OnConnOpen, conns + i);
-    nq_closure_init(conf.on_close, on_conn_close, &Test::OnConnClose, conns + i);
-    nq_closure_init(conf.on_finalize, on_conn_finalize, &Test::OnConnFinalize, this);
+    nq_closure_init(conf.on_open, on_client_conn_open, &Test::OnConnOpen, conns + i);
+    nq_closure_init(conf.on_close, on_client_conn_close, &Test::OnConnClose, conns + i);
+    nq_closure_init(conf.on_finalize, on_client_conn_finalize, &Test::OnConnFinalize, conns + i);
     auto c = nq_client_connect(cl, &addr_, &conf);
     conns[i].Init(this, c, i, options);
   }

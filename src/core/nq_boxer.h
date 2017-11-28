@@ -208,8 +208,9 @@ class NqBoxer {
 
   //invoker
   inline void InvokeConn(uint64_t serial, OpCode code, NqSession::Delegate *unboxed = nullptr) {
-    UnboxResult r = UnboxResult::Ok;
-    if (unboxed != nullptr || (r = Unbox(serial, &unboxed)) == UnboxResult::Ok) {
+    //UnboxResult r = UnboxResult::Ok;
+    //always enter queue to be safe when this call inside protocol handler
+    if (unboxed != nullptr) {
       switch (code) {
       case Disconnect:
         unboxed->Disconnect();

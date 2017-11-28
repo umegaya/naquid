@@ -102,6 +102,70 @@ class ConnOpenStreamClosureCaller : public ClosureCallerBase {
     return pcc->cb_(rpc, ppctx);
   }
 };
+class ConnCloseStreamClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (nq_rpc_t)> cb_;
+ public:
+  ConnCloseStreamClosureCaller() : cb_() {}
+  ~ConnCloseStreamClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_rpc_close, &ConnCloseStreamClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_rpc_t rpc) { 
+    auto pcc = (ConnCloseStreamClosureCaller *)arg;
+    return pcc->cb_(rpc);
+  }
+};
+class ConnOpenClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (nq_conn_t, nq_handshake_event_t, void **)> cb_;
+ public:
+  ConnOpenClosureCaller() : cb_() {}
+  ~ConnOpenClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_client_conn_open, &ConnOpenClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_conn_t conn, nq_handshake_event_t hsev, void **ppctx) { 
+    auto pcc = (ConnOpenClosureCaller *)arg;
+    return pcc->cb_(conn, hsev, ppctx);
+  }
+};
+class ConnCloseClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<nq_time_t (nq_conn_t, nq_result_t, const char*, bool)> cb_;
+ public:
+  ConnCloseClosureCaller() : cb_() {}
+  ~ConnCloseClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_client_conn_close, &ConnCloseClosureCaller::Call, this);
+    return clsr;
+  }
+  static nq_time_t Call(void *arg, nq_conn_t conn, nq_result_t result, const char *detail, bool from_remote) { 
+    auto pcc = (ConnCloseClosureCaller *)arg;
+    return pcc->cb_(conn, result, detail, from_remote);
+  }
+};
+class ConnFinalizeClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (nq_conn_t, void*)> cb_;
+ public:
+  ConnFinalizeClosureCaller() : cb_() {}
+  ~ConnFinalizeClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_client_conn_finalize, &ConnFinalizeClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_conn_t conn, void *ctx) { 
+    auto pcc = (ConnFinalizeClosureCaller *)arg;
+    return pcc->cb_(conn, ctx);
+  }
+};
 
 
 
@@ -126,6 +190,9 @@ class Test {
     StreamRecord,
     ConnOpenStream,
     ConnCloseStream,
+    ConnOpen,
+    ConnClose,
+    ConnFinalize,
     CallbackType_Max,
   };
   struct RequestData {
@@ -330,9 +397,9 @@ class Test {
 
   static void RegisterCallback(Conn &tc, const RunOptions &options);
 
-  static bool OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void *now_always_null);
+  static void OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx);
   static nq_time_t OnConnClose(void *arg, nq_conn_t c, nq_result_t r, const char *reason, bool closed_from_remote);
-  static void OnConnFinalize(void *arg, nq_conn_t c);
+  static void OnConnFinalize(void *arg, nq_conn_t c, void *ctx);
 
   static bool OnStreamOpen(void *arg, nq_stream_t s, void **pctx);
   static void OnStreamClose(void *arg, nq_stream_t s);

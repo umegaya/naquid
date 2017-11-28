@@ -60,8 +60,8 @@ class NqServerConfig : public NqConfig {
   NqServerConfig(const nq_addr_t &addr) : 
     NqConfig(), addr_(addr), crypto_options_() {
     memset(&server_, 0, sizeof(server_));
-    nq_closure_init(server_.on_open, on_conn_open, NoopOnOpen, nullptr);
-    nq_closure_init(server_.on_close, on_conn_close, NoopOnClose, nullptr);
+    nq_closure_init(server_.on_open, on_server_conn_open, NoopOnOpen, nullptr);
+    nq_closure_init(server_.on_close, on_server_conn_close, NoopOnClose, nullptr);
     Setup();
   }
   NqServerConfig(const nq_addr_t &addr, const nq_svconf_t &conf) : 
@@ -72,8 +72,8 @@ class NqServerConfig : public NqConfig {
   const nq_svconf_t &server() const { return server_; }
   std::unique_ptr<QuicCryptoServerConfig> NewCryptoConfig(QuicClock *clock) const;
  protected:
-  static bool NoopOnOpen(void *, nq_conn_t, nq_handshake_event_t, void *) { return false; }
-  static nq_time_t NoopOnClose(void *, nq_conn_t, nq_result_t, const char*, bool) { return 0; }
+  static void NoopOnOpen(void *, nq_conn_t, nq_handshake_event_t, void **) {}
+  static void NoopOnClose(void *, nq_conn_t, nq_result_t, const char*, bool) {}
 };
 
 } //net

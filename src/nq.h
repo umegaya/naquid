@@ -37,7 +37,7 @@ typedef uint64_t nq_cid_t;
 
 typedef uint64_t nq_sid_t;
 
-typedef uint64_t nq_time_t;	//nano seconds timestamp
+typedef uint64_t nq_time_t; //nano seconds timestamp
 
 typedef time_t nq_unix_time_t; //place holder for unix timestamp
 
@@ -67,45 +67,56 @@ typedef struct nq_rpc_tag { //this is essentially same as nq_stream, but would h
 } nq_rpc_t; 
 
 typedef struct nq_alarm_tag {
-	void *p;
-	uint64_t s;
+  void *p;
+  uint64_t s;
 } nq_alarm_t;
 
 //TODO(iyatomi): reduce error code
 typedef enum {
-	NQ_OK = 0,
-	NQ_ESYSCALL = -1,
-	NQ_ETIMEOUT = -2,
-	NQ_EALLOC = -3,
-	NQ_NOT_SUPPORT = -4,
-	NQ_GOAWAY = -5,
+  NQ_OK = 0,
+  NQ_ESYSCALL = -1,
+  NQ_ETIMEOUT = -2,
+  NQ_EALLOC = -3,
+  NQ_NOT_SUPPORT = -4,
+  NQ_GOAWAY = -5,
 } nq_error_t;
 
 typedef enum {
-	NQ_HS_START = 0, //client: client send first packet, server: server receive initial packet
-	NQ_HS_DONE = 10,  //client: receive SHLO, server: accept CHLO
+  NQ_HS_START = 0, //client: client send first packet, server: server receive initial packet
+  NQ_HS_DONE = 10,  //client: receive SHLO, server: accept CHLO
 } nq_handshake_event_t;
 
 typedef struct {
-	const char *host, *cert, *key, *ca;
-	int port;
+  const char *host, *cert, *key, *ca;
+  int port;
 } nq_addr_t;
 
 typedef void (*nq_logger_t)(const char *, size_t, bool);
 
 //closure
-//connection opening and opened. receive handshake progress (only start now) and done event.
-//returns false indicates shutdown connection (both server and client)
-//TODO(iyatomi): give more imformation for deciding shutdown connection through 4th paramter
-typedef bool (*nq_on_conn_open_t)(void *, nq_conn_t, nq_handshake_event_t, void *);
-//connection closed. after this called, nq_stream_t created by given nq_conn_t, will be invalid.
-//nq_conn_t itself will be invalid if this callback return 0, 
-//otherwise, behavior will be differnt between client and server.
-typedef nq_time_t (*nq_on_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
-//connection finalized, by calling nq_conn_close. just after this callback is done, 
-//memory corresponding to the nq_conn_t, will freed. 
-typedef void (*nq_on_conn_finalize_t)(void *, nq_conn_t);
 
+
+//receive client handshake progress and done event.
+//optionally you can set arbiter pointer via last argument, which can be retrieved via nq_conn_ctx afterward.
+//TODO(iyatomi): give more imformation for deciding shutdown connection from nq_conn_t
+typedef void (*nq_on_client_conn_open_t)(void *, nq_conn_t, nq_handshake_event_t, void **);
+//client connection closed. after this called, nq_stream_t/nq_rpc_t created by given nq_conn_t, will be invalid.
+//last boolean indicates connection is closed from local or remote. if this function returns positive value, 
+//connection automatically reconnect with back off which equals to returned value.
+typedef nq_time_t (*nq_on_client_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
+//client connection finalized. just after this callback is done, memory corresponding to the nq_conn_t, will be freed. 
+//because nq_conn_t is already invalidate when this callback invokes, almost nq_conn_* API returns invalid value in this callback.
+//so the callback is basically for cleanup user defined resourse, like closure arg pointer (1st arg) or user context (3rd arg).
+typedef void (*nq_on_client_conn_finalize_t)(void *, nq_conn_t, void *);
+
+
+//server connection opened. same as nq_on_client_conn_open_t.
+typedef nq_on_client_conn_open_t nq_on_server_conn_open_t;
+//server connection closed. no reconnection feature
+typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
+
+
+//stream opened return false to reject stream
 typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void **);
 //stream closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_stream_close_t)(void *, nq_stream_t);
@@ -117,6 +128,8 @@ typedef nq_size_t (*nq_stream_writer_t)(void *, nq_stream_t, const void *, nq_si
 
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
 
+
+//rpc opened return false to reject 
 typedef bool (*nq_on_rpc_open_t)(void *, nq_rpc_t, void **);
 
 typedef void (*nq_on_rpc_close_t)(void *, nq_rpc_t);
@@ -132,28 +145,31 @@ typedef void *(*nq_create_stream_t)(void *, nq_conn_t);
 typedef void (*nq_on_alarm_t)(void *, nq_time_t *);
 
 typedef struct {
-	void *arg;
-	union {
-		void *ptr;
-		nq_on_conn_open_t on_conn_open;
-		nq_on_conn_close_t on_conn_close;
-		nq_on_conn_finalize_t on_conn_finalize;
+  void *arg;
+  union {
+    void *ptr;
+    nq_on_client_conn_open_t on_client_conn_open;
+    nq_on_client_conn_close_t on_client_conn_close;
+    nq_on_client_conn_finalize_t on_client_conn_finalize;
 
-		nq_on_stream_open_t on_stream_open;
-		nq_on_stream_close_t on_stream_close;
-		nq_stream_reader_t stream_reader;
-		nq_stream_writer_t stream_writer;
-		nq_on_stream_record_t on_stream_record;
+    nq_on_server_conn_open_t on_server_conn_open;
+    nq_on_server_conn_close_t on_server_conn_close;
 
-		nq_on_rpc_open_t on_rpc_open;
-		nq_on_rpc_close_t on_rpc_close;
-		nq_on_rpc_request_t on_rpc_request;
-		nq_on_rpc_reply_t on_rpc_reply;
-		nq_on_rpc_notify_t on_rpc_notify;
+    nq_on_stream_open_t on_stream_open;
+    nq_on_stream_close_t on_stream_close;
+    nq_stream_reader_t stream_reader;
+    nq_stream_writer_t stream_writer;
+    nq_on_stream_record_t on_stream_record;
 
-		nq_create_stream_t create_stream;
-		nq_on_alarm_t on_alarm;
-	};
+    nq_on_rpc_open_t on_rpc_open;
+    nq_on_rpc_close_t on_rpc_close;
+    nq_on_rpc_request_t on_rpc_request;
+    nq_on_rpc_reply_t on_rpc_reply;
+    nq_on_rpc_notify_t on_rpc_notify;
+
+    nq_create_stream_t create_stream;
+    nq_on_alarm_t on_alarm;
+  };
 } nq_closure_t;
 
 NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr);
@@ -161,55 +177,63 @@ NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr);
 NQAPI_THREADSAFE nq_closure_t nq_closure_empty();
 
 #define nq_closure_init(__pclsr, __type, __cb, __arg) { \
-	(__pclsr).arg = (void *)(__arg); \
-	(__pclsr).__type = (__cb); \
+  (__pclsr).arg = (void *)(__arg); \
+  (__pclsr).__type = (__cb); \
 }
 
 #define nq_closure_call(__pclsr, __type, ...) ((__pclsr).__type((__pclsr).arg, __VA_ARGS__))
 
 //config
 typedef struct {
-	//connection open/close watcher
-	nq_closure_t on_open, on_close, on_finalize;
+  //connection open/close/finalize watcher
+  nq_closure_t on_open, on_close, on_finalize;
 
-	//set true to ignore proof verification
-	bool insecure; 
-	
-	//total handshake time limit / no input limit. default 1000ms/500ms
-	nq_time_t handshake_timeout, idle_timeout; 
+  //set true to ignore proof verification
+  bool insecure; 
+
+  //set true to use raw connection, which does not send stream name to specify stream type
+  //it just callbacks/sends packet as it is
+  bool raw;
+  
+  //total handshake time limit / no input limit. default 1000ms/500ms
+  nq_time_t handshake_timeout, idle_timeout; 
 } nq_clconf_t;
 
 typedef struct {
-	//connection open/close watcher
-	nq_closure_t on_open, on_close;
+  //connection open/close watcher
+  nq_closure_t on_open, on_close;
 
-	//quic secret. need to specify arbiter (hopefully unique) string
-	const char *quic_secret;
+  //quic secret. need to specify arbiter (hopefully unique) string
+  const char *quic_secret;
 
-	//cert cache size. default 16 and how meny sessions accepted per loop. default 1024
-	int quic_cert_cache_size, accept_per_loop;
+  //set true to use raw connection, which does not accept stream name to specify stream type.
+  //it just callbacks/sends packet as it is
+  bool raw;
 
-	//total handshake time limit / no input limit. default 1000ms/5000ms
-	nq_time_t handshake_timeout, idle_timeout; 
+  //cert cache size. default 16 and how meny sessions accepted per loop. default 1024
+  int quic_cert_cache_size, accept_per_loop;
+
+  //total handshake time limit / no input limit. default 1000ms/5000ms
+  nq_time_t handshake_timeout, idle_timeout; 
 } nq_svconf_t;
 
 //handlers
 typedef nq_closure_t nq_stream_factory_t;
 
 typedef struct {
-	nq_closure_t on_stream_record, on_stream_open, on_stream_close;
-	nq_closure_t stream_reader, stream_writer;
+  nq_closure_t on_stream_record, on_stream_open, on_stream_close;
+  nq_closure_t stream_reader, stream_writer;
 } nq_stream_handler_t;
 
 typedef struct {
-	nq_closure_t on_rpc_request, on_rpc_notify, on_rpc_open, on_rpc_close;
-	nq_time_t timeout; //call timeout
-	bool use_large_msgid; //use 4byte for msgid
+  nq_closure_t on_rpc_request, on_rpc_notify, on_rpc_open, on_rpc_close;
+  nq_time_t timeout; //call timeout
+  bool use_large_msgid; //use 4byte for msgid
 } nq_rpc_handler_t;
 
 typedef struct {
-	nq_closure_t callback;
-	nq_time_t timeout;
+  nq_closure_t callback;
+  nq_time_t timeout;
 } nq_rpc_opt_t;
 
 
@@ -275,11 +299,11 @@ NQAPI_BOOTSTRAP bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_
 //
 // --------------------------
 //can change handler map of connection, which is usually inherit from nq_client_t or nq_server_t
-// TODO(iyatomi): make it NQAPI_THREADSAFE
 NQAPI_THREADSAFE nq_hdmap_t nq_conn_hdmap(nq_conn_t conn);
 //close and destroy conn/associated stream eventually, so never touch conn/stream/rpc after calling this API.
 NQAPI_THREADSAFE void nq_conn_close(nq_conn_t conn); 
-//this just restart connection, never destroy. but associated stream/rpc all destroyed. (client only)
+//this just restart connection, if connection not start, start it, otherwise close connection once, then start again.
+//it never destroy connection itself, but associated stream/rpc all destroyed. (client only)
 NQAPI_THREADSAFE void nq_conn_reset(nq_conn_t conn); 
 //flush buffered packets
 NQAPI_THREADSAFE void nq_conn_flush(nq_conn_t conn);
@@ -291,6 +315,8 @@ NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn);
 NQAPI_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get QUIC connection id. CAUTION: for client side, only after on_open and before on_close callback called, it returns valid value.
 NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn);
+//get context, which is set at on_conn_open
+NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn);
 
 
 

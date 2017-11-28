@@ -39,16 +39,15 @@ H INVALID_HANDLE(const char *msg) {
   return h;
 }
 
-static void noop_callback(...) {}
 static nq_closure_t g_empty_closure {
   .arg = nullptr,
-  .ptr = reinterpret_cast<void *>(noop_callback),
+  .ptr = nullptr,
 };
 NQAPI_THREADSAFE nq_closure_t nq_closure_empty() {
   return g_empty_closure;
 }
 NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr) {
-  return clsr.ptr == g_empty_closure.ptr;
+  return clsr.ptr == nullptr;
 }
 
 
@@ -165,6 +164,10 @@ NQAPI_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
 NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
   auto c = NqBoxer::From(conn)->Find(conn);
   return c != nullptr ? c->Id() : 0;
+}
+NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn) {
+  auto c = NqBoxer::From(conn)->Find(conn);
+  return c != nullptr ? c->Context() : nullptr;  
 }
 
 
