@@ -8,6 +8,7 @@ namespace nqtest {
     ServerStream = 4,
     Sleep = 5,
     Close = 6,
+    SetupReject = 7,
 
     ServerRequest = 10000,
 

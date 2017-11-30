@@ -41,8 +41,11 @@ class NqStream : public QuicStream {
 
   void Disconnect();
 
+  virtual void **ContextBuffer() = 0;
+
   inline const std::string &protocol() const { return buffer_; }
   inline bool establish_side() const { return establish_side_; }
+  inline uint64_t stream_serial() const { return handle_.s; }
   bool set_protocol(const std::string &name);
   NqSessionIndex session_index() const;
   nq_conn_t conn();
@@ -70,6 +73,7 @@ class NqClientStream : public NqStream {
     NqStream(id, nq_session, establish_side, priority) {}
 
   void OnClose() override;
+  void **ContextBuffer() override;
 
   inline NqStreamNameId name_id() const { return name_id_; }
   inline NqStreamIndexPerNameId index_per_name_id() const { return index_per_name_id_; }
@@ -77,12 +81,15 @@ class NqClientStream : public NqStream {
   inline void set_index_per_name_id(NqStreamIndexPerNameId idx) { index_per_name_id_ = idx; }
 };
 class NqServerStream : public NqStream {
+  void *context_;
  public:
   NqServerStream(QuicStreamId id, 
            NqSession* nq_session, 
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority) : 
-    NqStream(id, nq_session, establish_side, priority) {}
+    NqStream(id, nq_session, establish_side, priority), context_(nullptr) {}
+  inline void *context() { return context_; }
+  void **ContextBuffer() override { return &context_; }
   void OnClose() override;
 };
 
@@ -92,10 +99,9 @@ class NqStreamHandler {
 protected:
   NqStream *stream_;
   nq_closure_t on_open_, on_close_;
-  void *context_;
   bool proto_sent_;
 public:
-  NqStreamHandler(NqStream *stream) : stream_(stream), context_(nullptr), proto_sent_(false) {}
+  NqStreamHandler(NqStream *stream) : stream_(stream), proto_sent_(false) {}
   virtual ~NqStreamHandler() {}
   
   //interface
@@ -112,7 +118,7 @@ public:
   STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 0, "offset of p differ");
   STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 8, "offset of s differ");
   //FYI(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
-  inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), &context_); }
+  inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), stream_->ContextBuffer()); }
   inline void OnClose() { nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); }
   inline void SetLifeCycleCallback(nq_closure_t on_open, nq_closure_t on_close) {
     on_open_ = on_open;
@@ -121,7 +127,6 @@ public:
   inline void Disconnect() { stream_->Disconnect(); }
   inline void ProtoSent() { proto_sent_ = true; }
   inline NqStream *stream() { return stream_; }
-  inline void *context() const { return context_; }
   void WriteBytes(const char *p, nq_size_t len);
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
@@ -192,6 +197,9 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
       }
       delete this;
     }
+    inline void GoAway() {
+      nq_closure_call(on_data_, on_rpc_reply, stream_handler_->stream()->ToHandle<nq_rpc_t>(), NQ_EGOAWAY, "", 0);
+    }
    private:
     friend class NqSimpleRPCStreamHandler;
     NqSimpleRPCStreamHandler *stream_handler_; 
@@ -214,11 +222,12 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     msgid_factory_(), req_map_(),
     loop_(stream->GetLoop()) {
     if (!use_large_msgid) { msgid_factory_.set_limit(0xFFFF); }
-    if (default_timeout_ts_ == 0) { default_timeout_ts_ = 30 * 1000 * 1000; }
+    if (default_timeout_ts_ == 0) { default_timeout_ts_ = nq_time_sec(30); }
   }
 
   ~NqSimpleRPCStreamHandler() {
     for (auto &kv : req_map_) {
+      kv.second->GoAway();
       kv.second->Destroy(loop_);
     }
     req_map_.clear();

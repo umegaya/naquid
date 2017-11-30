@@ -76,6 +76,9 @@ void NqClient::OnProofVerifyDetailsAvailable(const ProofVerifyDetails& verify_de
 
 //implements NqSession::Delegate
 void NqClient::OnOpen(nq_handshake_event_t hsev) { 
+  if (hsev == NQ_HS_DONE) {
+    stream_manager_.RecoverOutgoingStreams(nq_session());
+  }
   nq_closure_call(on_open_, on_client_conn_open, ToHandle(), hsev, &context_); 
 }
 void NqClient::OnClose(QuicErrorCode error,
@@ -151,6 +154,7 @@ NqClientStream *NqClient::FindOrCreateStream(NqStreamNameId name_id, NqStreamInd
   return stream_manager_.FindOrCreateStream(
     nq_session(), name_id, index_per_name_id, connect_state_ == CONNECT);
 }
+//this is not thread safe and only guard at nq.cpp nq_conn_rpc, nq_conn_stream.
 QuicStream *NqClient::NewStream(const std::string &name) {
   auto s = static_cast<NqClientStream *>(nq_session()->CreateOutgoingDynamicStream());
   if (!stream_manager_.OnOpen(name, s)) {
@@ -168,27 +172,25 @@ QuicCryptoStream *NqClient::NewCryptoStream(NqSession* session) {
 
 //StreamManager
 NqStreamNameId NqClient::StreamManager::Add(const std::string &name) {
+  //this may race with NqClientStream *Find call
+  std::unique_lock<std::mutex> lock(entries_mutex_);
   //add entry to name <=> conversion map
   for (int i = 0; i < out_entries_.size(); i++) {
     if (out_entries_[i].name_ == name) {
       return static_cast<NqStreamNameId>(i + 1);
     }
   }
-  Entry e;
-  e.name_ = name;
-  {
-    //this may race with NqClientStream *Find call
-    std::unique_lock<std::mutex> lock(entries_mutex_);
-    out_entries_.push_back(e);
-  }
+  EntryGroup eg;
+  eg.name_ = name;
+  out_entries_.push_back(eg);
   return static_cast<NqStreamNameId>(out_entries_.size());
 }
-const NqClientStream *NqClient::StreamManager::Find(
+NqClient::StreamManager::Entry *NqClient::StreamManager::FindEntry(
   NqStreamNameId id, NqStreamIndexPerNameId index) const {
   std::unique_lock<std::mutex> lock(const_cast<StreamManager *>(this)->entries_mutex_);
   if (id == CLIENT_INCOMING_STREAM_NAME_ID) {
     if (index < in_entries_.size()) {
-      return in_entries_[index];
+      return const_cast<StreamManager::Entry*>(&(in_entries_[index]));
     }
     ASSERT(false);
     return nullptr;
@@ -196,7 +198,30 @@ const NqClientStream *NqClient::StreamManager::Find(
   if (id > out_entries_.size()) { return nullptr; } 
   const auto &e = out_entries_[id - 1];
   if (e.streams_.size() <= index) { return nullptr; }
-  return e.streams_[index]; 
+  return const_cast<StreamManager::Entry*>(&(e.streams_[index]));
+}
+void NqClient::StreamManager::RecoverOutgoingStreams(NqClientSession *session) {
+    for (int i = 0; i < out_entries_.size(); i++) {
+      auto name_id = (NqStreamNameId)(i + 1);
+      auto &e = out_entries_[i];
+      for (int j = 0; j < e.streams_.size(); j++) {
+        TRACE("RecoverOutgoingStreams: create for %d %d", i, j);
+        auto index_per_name_id = (NqStreamIndexPerNameId)(j);
+        auto s = e.Stream(index_per_name_id);
+        if (s == nullptr) {
+          s = static_cast<NqClientStream *>(session->CreateOutgoingDynamicStream());
+          s->set_protocol(e.name_);
+          s->set_name_id(name_id);
+          s->set_index_per_name_id(index_per_name_id);
+          s->InitHandle();
+          //this may race with NqClientStream *Find call
+          std::unique_lock<std::mutex> lock(entries_mutex_);
+          e.SetStream(s);
+        } else {
+          TRACE("RecoverOutgoingStreams: create for %d %d: already exists %p", i, j, s);          
+        }
+      }
+    }
 }
 bool NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
   std::unique_lock<std::mutex> lock(entries_mutex_);
@@ -204,13 +229,13 @@ bool NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
   if (in_empty_indexes_.size() > 0) {
     idx = in_empty_indexes_.top();
     in_empty_indexes_.pop();
-    in_entries_[idx] = s;
+    in_entries_[idx].SetStream(s);
   } else if (in_entries_.size() >= 65536) {
     ASSERT(false);
     return false;
   } else {
     idx = in_entries_.size();
-    in_entries_.push_back(s);
+    in_entries_.emplace_back(s);
   }
   s->set_name_id(CLIENT_INCOMING_STREAM_NAME_ID);
   s->set_index_per_name_id(idx);
@@ -218,49 +243,44 @@ bool NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
 }
 void NqClient::StreamManager::OnIncomingClose(NqClientStream *s) {
   std::unique_lock<std::mutex> lock(entries_mutex_);
-  if (s->index_per_name_id() >= in_entries_.size()) {
-    ASSERT(false);
-    return;
-  }
-  in_entries_[s->index_per_name_id()] = nullptr;
+  ASSERT(s->index_per_name_id() < in_entries_.size());
+  in_entries_[s->index_per_name_id()].ClearStream();
   //pool empty index for incoming slots
   in_empty_indexes_.push(s->index_per_name_id());
 }
 
 void NqClient::StreamManager::OnOutgoingClose(NqClientStream *s) {
   auto name_id = s->name_id();
-  if (name_id > out_entries_.size()) { 
-    ASSERT(false);
-    return; 
-  } else if (name_id == CLIENT_INCOMING_STREAM_NAME_ID) {
-    ASSERT(false);
-    return;
-  }
+  ASSERT(name_id <= out_entries_.size());
+  ASSERT(name_id != CLIENT_INCOMING_STREAM_NAME_ID);
+
   auto &e = out_entries_[name_id - 1]; 
   ASSERT(e.streams_.size() > s->index_per_name_id());
   //invalidate
-  //this may race with NqClientStream *Find call
+  //this may race with FindEntry call
   std::unique_lock<std::mutex> lock(entries_mutex_);
-  e.streams_[s->index_per_name_id()] = nullptr;
+  e.ClearStream(s);
 }
 bool NqClient::StreamManager::OnOutgoingOpen(const std::string &name, NqClientStream *s) {
   ASSERT((s->id() % 2) != 0); //must be incoming stream from server (server outgoing stream)
-  s->set_protocol(name);
   auto name_id = Add(name);
+  s->set_protocol(name);
   s->set_name_id(name_id);
   if (name_id > out_entries_.size()) { 
     return false; 
   } 
-  auto &e = out_entries_[name_id - 1];
-  if (e.streams_.size() >= 65535) {
-    ASSERT(false);
-    return false;
+  {
+    std::unique_lock<std::mutex> lock(entries_mutex_);
+    auto &e = out_entries_[name_id - 1];
+    if (e.streams_.size() >= 65535) {
+      ASSERT(false);
+      return false;
+    }
+    size_t sz = e.streams_.size();
+    s->set_index_per_name_id(sz);
+    //this may race with FindEntry call
+    e.streams_.emplace_back(s);
   }
-  size_t sz = e.streams_.size();
-  s->set_index_per_name_id(sz);
-  //this may race with NqClientStream *Find call
-  std::unique_lock<std::mutex> lock(entries_mutex_);
-  e.streams_.push_back(s);
   return true;
 }
 NqClientStream *NqClient::StreamManager::FindOrCreateStream(
@@ -271,23 +291,26 @@ NqClientStream *NqClient::StreamManager::FindOrCreateStream(
   if (name_id > out_entries_.size()) { 
     return nullptr; 
   } else if (name_id == CLIENT_INCOMING_STREAM_NAME_ID) {
-    if (in_entries_.size() <= index_per_name_id) {
-      return in_entries_[index_per_name_id];
+    if (in_entries_.size() > index_per_name_id) {
+      return in_entries_[index_per_name_id].Stream();
     }
     return nullptr;
   }
   auto &e = out_entries_[name_id - 1];
   ASSERT(e.streams_.size() > index_per_name_id);
-  auto s = e.streams_[index_per_name_id];
+  auto s = e.streams_[index_per_name_id].Stream();
   if (s == nullptr && connected) {
     s = static_cast<NqClientStream *>(session->CreateOutgoingDynamicStream());
     s->set_protocol(e.name_);
     s->set_name_id(name_id);
     s->set_index_per_name_id(index_per_name_id);
     s->InitHandle();
-    //this may race with NqClientStream *Find call
-    std::unique_lock<std::mutex> lock(entries_mutex_);
-    e.streams_[index_per_name_id] = s;
+    //this may race with FindEntry call
+    {
+      std::unique_lock<std::mutex> lock(entries_mutex_);
+      e = out_entries_[name_id - 1];
+      e.SetStream(s);
+    }
   }
   return s;
 }

@@ -34,6 +34,15 @@ void NqServerSession::RemoveStreamForRead(QuicStreamId id) {
 }
 
 //implements NqSession::Delegate
+void *NqServerSession::StreamContext(uint64_t stream_serial) const {
+  auto sid = NqStreamSerialCodec::ServerStreamId(stream_serial);
+  auto s = FindStreamForRead(sid);
+  if (s != nullptr) {
+    return static_cast<NqServerStream *>(const_cast<NqStream *>(s))->context();
+  } else {
+    return nullptr;
+  }
+}
 void NqServerSession::OnClose(QuicErrorCode error,
                      const std::string& error_details,
                      ConnectionCloseSource close_by_peer_or_self) {
@@ -75,6 +84,7 @@ QuicStream* NqServerSession::CreateOutgoingDynamicStream() {
   read_map_[s->id()] = s;
   return s;
 }
+//this is not thread safe and only guard at nq.cpp nq_conn_rpc, nq_conn_stream.
 QuicStream *NqServerSession::NewStream(const std::string &name) {
   auto s = reinterpret_cast<NqStream *>(CreateOutgoingDynamicStream());
   s->set_protocol(name);

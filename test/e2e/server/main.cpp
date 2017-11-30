@@ -10,7 +10,7 @@ struct conn_context {
   int count;
 };
 void on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void **ppctx) {
-  fprintf(stderr, "on_conn_open event:%d\n", hsev);
+  TRACE("on_conn_open event:%d\n", hsev);
   if (hsev != NQ_HS_DONE) {
     return;
   }
@@ -18,21 +18,22 @@ void on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void **ppctx) {
   ctx->count = 3;
   *ppctx = ctx;
 }
-bool g_reject = true;
+int g_reject = 2;
 void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  fprintf(stderr, "on_conn_open event:%d\n", hsev);
+  TRACE("on_conn_open_reject event:%d\n", hsev);
   if (hsev != NQ_HS_DONE) {
     return;
   }
-  if (g_reject) {
-    g_reject = true;
+  if (g_reject > 0) {
+    g_reject--;
+    TRACE("on_conn_open_reject g_reject:%d\n", g_reject);
     nq_conn_close(c);
     return;
   }
   on_conn_open(arg, c, hsev, ppctx);
 }
 void on_conn_close(void *, nq_conn_t c, nq_result_t, const char *detail, bool) {
-  fprintf(stderr, "on_conn_close reason:%s\n", detail);
+  TRACE("on_conn_close reason:%s\n", detail);
   free(nq_conn_ctx(c));
 }
 
@@ -77,14 +78,14 @@ bool on_rpc_open_reject(void *p, nq_rpc_t rpc, void **ppctx) {
 void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
-  TRACE("rpc req: %u", type);
+  //TRACE("rpc req: %u", type);
   switch (type) {
-    case RpcType::Ping:
+    case RpcType::Ping: {
       ASSERT(len == sizeof(nq_time_t));
       //auto peer_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-      //fprintf(stderr, "peer_ts => %llu\n", peer_ts);
+      //auto seq = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
       nq_rpc_reply(rpc, RpcError::None, msgid, data, len);
-      break;
+    } break;
     case RpcType::Raise:
       nq_rpc_reply(rpc, nq::Endian::NetbytesToHost<int32_t>(data), msgid, 
         static_cast<const char *>(data) + sizeof(int32_t), len - sizeof(int32_t));
@@ -136,6 +137,12 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
         nq_conn_t c = nq_rpc_conn(rpc);
         nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
         nq_conn_close(c);
+      }
+      break;
+    case RpcType::SetupReject:
+      {
+        g_reject = 2;
+        nq_rpc_reply(rpc, RpcError::None, msgid, data, len);
       }
       break;
   }
@@ -226,7 +233,7 @@ struct server_config {
   nq_closure_t on_rpc_open;
 };
 #define CONFIG_CB(conf, name, default_value, dest) { \
-  if (conf != nullptr && nq_closure_is_empty(conf->name)) { \
+  if (conf != nullptr && !nq_closure_is_empty(conf->name)) { \
     dest = conf->name; \
   } else { \
     nq_closure_init(dest, name, default_value, nullptr); \
@@ -251,7 +258,7 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   nq_svconf_t conf;
   CONFIG_VAL(svconfig, quic_secret, "e336e27898ff1e17ac79e82fa0084999", conf.quic_secret);
   conf.quic_cert_cache_size = 0;
-  conf.accept_per_loop = 1;
+  conf.accept_per_loop = 0;
   conf.handshake_timeout = nq_time_sec(120);
   conf.idle_timeout = nq_time_sec(60);
   CONFIG_CB(svconfig, on_server_conn_open, on_conn_open, conf.on_open);
@@ -296,7 +303,7 @@ int main(int argc, char *argv[]){
     1, 2, 1, 1,
   };
   nq_closure_init(scf.on_server_conn_open, on_server_conn_open, on_conn_open_reject, reject_counter + 0);
-  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open_reject, reject_counter + 1);
+  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open, reject_counter + 1);
   nq_closure_init(scf.on_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 2);
   nq_closure_init(scf.on_raw_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 3);
   setup_server(sv, 18443, &scf);

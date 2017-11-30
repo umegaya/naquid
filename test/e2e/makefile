@@ -1,12 +1,14 @@
+DEBUG=True
+
 .PHONY: client
 client:
 	-mkdir -p ./client/build
-	cd client/build && (rm client || true) && cmake .. && make
+	cd client/build && (rm client || true) && cmake -DDEBUG:BOOL=$(DEBUG) .. && make
 
 .PHONY: server
 server:
 	-mkdir -p ./server/build
-	cd server/build && (rm server || true) && cmake .. && make
+	cd server/build && (rm server || true) && cmake -DDEBUG:BOOL=$(DEBUG) .. && make
 
 test: server client
 	ulimit -n 2048 && cd ./server/build && ./server &

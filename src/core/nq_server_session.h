@@ -30,6 +30,7 @@ class NqServerSession : public NqSession,
   //implements NqSession::Delegate
   uint64_t Id() const override { return connection_id(); }
   void *Context() const override { return context_; }
+  void *StreamContext(uint64_t stream_serial) const override;
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;

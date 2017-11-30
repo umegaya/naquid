@@ -6,6 +6,7 @@ LIB=nq
 # osx/linux
 TEST_OS=osx
 DEBUG=False
+TEST_DEBUG=True
 JOB=4
 
 define ct_run
@@ -26,7 +27,7 @@ bundle:
 
 testlib:
 	-@mkdir -p build/t
-	cd build/t && cmake -DDEBUG:BOOLEAN=True -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/testlib.cmake $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	cd build/t && cmake -DDEBUG:BOOL=$(TEST_DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/testlib.cmake $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
 
 linux_internal: 
 	-@mkdir -p build/linux
@@ -69,7 +70,11 @@ patch:
 sync: inject patch
 
 testsv:
-	make -C test/e2e server
+	make -C test/e2e server DEBUG=$(TEST_DEBUG)
 
 testcl:
-	make -C test/e2e client
+	make -C test/e2e client DEBUG=$(TEST_DEBUG)
+
+testclean:
+	-@rm -r build/t
+	make -C test/e2e clean DEBUG=$(TEST_DEBUG)

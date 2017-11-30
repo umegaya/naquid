@@ -21,12 +21,11 @@ void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **
     }
     return; 
   }
-  auto cid = nq_conn_cid(c);
+  auto cid = c.s;
   tc->th = std::thread([tc, cid] {
     auto t = tc->t;
-    auto c = tc->c;
     if (cid != 0) {
-      TRACE("launch connection_id=%llu", nq_conn_cid(c));
+      TRACE("launch connection_id=%llx", cid);
       t->testproc_(*tc);
     } else {
       //run as immediate failure
@@ -41,6 +40,7 @@ void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **
 nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_result_t r, const char *reason, bool close_from_remote) {
   auto tc = (Conn *)arg;
   tc->should_signal = true;
+  tc->disconnect++;
   nq_closure_t clsr;
   if (tc->FindClosure(CallbackType::ConnClose, clsr)) {
     return nq_closure_call(clsr, on_client_conn_close, c, r, reason, close_from_remote);

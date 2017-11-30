@@ -11,6 +11,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11 -DOPENSSL_NO_ASM -DOSATOMIC_USE_INL
 include_directories(src src/chromium src/chromium/third_party/icu/source/common ext)
 include_directories(SYSTEM src/chromium/third_party/protobuf/src src/chromium/third_party/boringssl/src/include)
 if (DEBUG)
+	message( FATAL_ERROR "should not be debug build ${DEBUG}, CMake will exit." )
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -DDEBUG")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -DDEBUG")
 else()

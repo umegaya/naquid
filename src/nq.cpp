@@ -157,17 +157,19 @@ NQAPI_THREADSAFE nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
   auto c = const_cast<NqSession::Delegate *>(NqBoxer::From(conn)->Find(conn));
 	return c != nullptr ? c->ResetHandlerMap()->ToHandle() : nullptr;
 }
-NQAPI_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn) {
+NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn) {
   auto c = NqBoxer::From(conn)->Find(conn);
-  return c != nullptr ? c->ReconnectDurationUS() : 0;
-}
-NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
-  auto c = NqBoxer::From(conn)->Find(conn);
-  return c != nullptr ? c->Id() : 0;
+  return c != nullptr ? nq_time_usec(c->ReconnectDurationUS()) : 0;
 }
 NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn) {
   auto c = NqBoxer::From(conn)->Find(conn);
-  return c != nullptr ? c->Context() : nullptr;  
+  return c != nullptr ? c->Context() : nullptr;
+}
+//these are hidden API for test, because returned value is unstable
+//when used with client connection (under reconnection)
+NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
+  auto c = NqBoxer::From(conn)->Find(conn);
+  return c != nullptr ? c->Id() : 0;
 }
 
 
@@ -177,13 +179,12 @@ NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
-  NqSession::Delegate *d;
+NqSession::Delegate *d;
   return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
     d->NewStreamCast<NqStream>(name)->ToHandle<nq_stream_t>() : 
-    INVALID_HANDLE<nq_stream_t>("fail to unbox");
+    INVALID_HANDLE<nq_stream_t>("fail to unbox"); 
 }
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
-  ASSERT(nq_stream_is_valid(s));
   auto b = NqBoxer::From(s);
   nq_conn_t c = {
     .p = s.p, 
@@ -194,7 +195,6 @@ NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
   return c;
 }
 NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s) {
-  ASSERT(nq_stream_is_valid(s));
   auto pa = new NqAlarm();
   return NqBoxer::From(s)->Box(pa);
 }
@@ -207,18 +207,19 @@ NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s) {
 	NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Disconnect);
 }
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
-  ASSERT(nq_stream_is_valid(s));
+  ASSERT(nq_conn_is_valid(nq_stream_conn(s)));
   NqBoxer::From(s)->InvokeStream(s.s, NqBoxer::OpCode::Send, data, datalen);
 }
+NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s) {
+  auto d = NqBoxer::From(s)->FindConnFromStream(s);
+  return d != nullptr ? d->StreamContext(s.s) : nullptr;
+}
+//these are hidden API for test, because returned value is unstable
+//when used with client connection (under reconnection)
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s) {
   ASSERT(nq_stream_is_valid(s));
   auto st = NqBoxer::From(s)->Find(s);
   return st != nullptr ? st->id() : 0;
-}
-NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s) {
-  ASSERT(nq_stream_is_valid(s));
-  auto st = NqBoxer::From(s)->Find(s);
-  return st != nullptr ? st->Handler<NqStreamHandler>()->context() : 0;
 }
 NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s) {
   ASSERT(nq_stream_is_valid(s));
@@ -234,13 +235,12 @@ NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {
-  NqSession::Delegate *d;
+NqSession::Delegate *d;
   return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
     d->NewStreamCast<NqStream>(name)->ToHandle<nq_rpc_t>() : 
-    INVALID_HANDLE<nq_rpc_t>("fail to unbox");
+    INVALID_HANDLE<nq_rpc_t>("fail to unbox"); 
 }
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
-  ASSERT(nq_rpc_is_valid(rpc));
   auto b = NqBoxer::From(rpc);
   nq_conn_t c = {
     .p = rpc.p, 
@@ -251,7 +251,6 @@ NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   return c;
 }
 NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc) {
-  ASSERT(nq_rpc_is_valid(rpc));
   auto pa = new NqAlarm();
   return NqBoxer::From(rpc)->Box(pa);
 }
@@ -264,34 +263,35 @@ NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc) {
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Disconnect);
 }
 NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
-  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(type > 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Call, type, data, datalen, on_reply);
 }
 NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_rpc_opt_t *opts) {
-  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(type > 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::CallEx, type, data, datalen, *opts);
 }
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen) {
-  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(type > 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Notify, type, data, datalen);
 }
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
-  ASSERT(nq_rpc_is_valid(rpc));
+  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(result <= 0);
   NqBoxer::From(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen);
 }
+NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t rpc) {
+  auto d = NqBoxer::From(rpc)->FindConnFromRpc(rpc);
+  return d != nullptr ? d->StreamContext(rpc.s) : nullptr;
+}
+//these are hidden API for test, because returned value is unstable
+//when used with client connection (under reconnection)
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc) {
   ASSERT(nq_rpc_is_valid(rpc));
   auto st = NqBoxer::From(rpc)->Find(rpc);
   return st != nullptr ? st->id() : 0;
-}
-NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t rpc) {
-  ASSERT(nq_rpc_is_valid(rpc));
-  auto st = NqBoxer::From(rpc)->Find(rpc);
-  return st != nullptr ? st->Handler<NqStreamHandler>()->context() : 0;
 }
 NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t rpc) {
   ASSERT(nq_rpc_is_valid(rpc));

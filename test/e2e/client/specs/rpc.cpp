@@ -76,7 +76,7 @@ static void test_server_stream(nq_rpc_t rpc, const std::string &stream_name, Tes
 		void *ptr = reinterpret_cast<void *>(0x1234);
 		WATCH_STREAM(tc, rpc2, RpcRequest, ([rpc2, done3, text, ptr](
 			nq_rpc_t rpc3, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t dlen){
-			TRACE("test_server_stream: server sent request");
+			TRACE("test_server_stream: server sent request %u", msgid);
 			if (nq_rpc_sid(rpc2) != nq_rpc_sid(rpc3)) {
 				done3(false);
 				return;
@@ -85,10 +85,19 @@ static void test_server_stream(nq_rpc_t rpc, const std::string &stream_name, Tes
 				done3(false);
 				return;
 			}
-			auto reply = (std::string("from client:") + MakeString(data, dlen));
+			auto reqstr = MakeString(data, dlen);
+			auto reply = (std::string("from client:") + reqstr);
 			nq_rpc_reply(rpc3, RpcError::None, msgid, reply.c_str(), reply.length());
-			done3((std::string("from server:") + text) == MakeString(data, dlen) && type == RpcType::ServerRequest);
 			TRACE("test_server_stream: reply to server done");
+			if ((std::string("from server:") + text) == reqstr && type == RpcType::ServerRequest) {
+				auto a = nq_rpc_alarm(rpc3);
+				ALARM(a, nq_time_msec(100), ([done3](nq_time_t *next) {
+					TRACE("alarm!");
+					done3(true);
+				}));
+			} else {
+				done3(false);
+			}
 		}));
 		*ppctx = ptr;
 		done2(true);

@@ -16,11 +16,20 @@ file(GLOB_RECURSE src [
 	"../common.cpp"
 ])
 
+file(GLOB_RECURSE bench_src [
+	"./bench.cpp" 
+])
+
+
 find_library(core_foundation CoreFoundation)
 find_library(cocoa Cocoa)
 find_library(iokit IOKit)
 find_library(security Security)
 
 link_directories(../../../build/t)
+
 add_executable(client ${src})
 target_link_libraries(client nq ${core_foundation} ${cocoa} ${iokit} ${security})
+
+	add_executable(bench ${bench_src})
+	target_link_libraries(bench nq ${core_foundation} ${cocoa} ${iokit} ${security})

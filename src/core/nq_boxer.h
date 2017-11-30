@@ -338,6 +338,9 @@ class NqBoxer {
   static inline NqBoxer *From(nq_alarm_t a) { return (NqBoxer *)a.p; }
 
   inline const NqSession::Delegate *Find(nq_conn_t c) const { return c.s != 0 ? FindConn(c.s, Conn) : nullptr; }
+  inline const NqSession::Delegate *FindConnFromStream(nq_stream_t s) const { return s.s != 0 ? FindConn(s.s, Stream) : nullptr; }
+  inline const NqSession::Delegate *FindConnFromRpc(nq_rpc_t rpc) const { return rpc.s != 0 ? FindConn(rpc.s, Stream) : nullptr; }
+
   inline const NqStream *Find(nq_stream_t s) const { return s.s != 0 ? FindStream(s.s) : nullptr; }
   inline const NqStream *Find(nq_rpc_t rpc) const { return rpc.s != 0 ? FindStream(rpc.s) : nullptr; }
 

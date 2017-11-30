@@ -35,6 +35,7 @@ class ReplyClosureCaller : public ClosureCallerBase {
   static void Call(void *arg, nq_rpc_t rpc, nq_result_t r, const void *p, nq_size_t l) {
     auto pcc = (ReplyClosureCaller *)arg;
     pcc->cb_(rpc, r, p, l);
+    delete pcc;
   }
 };
 
@@ -166,7 +167,26 @@ class ConnFinalizeClosureCaller : public ClosureCallerBase {
     return pcc->cb_(conn, ctx);
   }
 };
-
+class AlarmClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (nq_time_t*)> cb_;
+ public:
+  AlarmClosureCaller() : cb_() {}
+  ~AlarmClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_alarm, &AlarmClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_time_t *tm) { 
+    auto pcc = (AlarmClosureCaller *)arg;
+    auto ptm = *tm;
+    pcc->cb_(tm);
+    if (*tm != 0 && *tm <= ptm) {
+      delete pcc;
+    }
+  }  
+};
 
 
 class Test {
@@ -222,7 +242,7 @@ class Test {
       }
     };
    public:
-    int index;
+    int index, disconnect;
     std::thread th;
     std::mutex mtx;
     Test *t;
@@ -347,6 +367,7 @@ class Test {
       send_buf = (char *)malloc(256);
       send_buf_len = 256;
       index = idx;
+      disconnect = 0;
       t = test;
       c = conn;
       should_signal = false;
@@ -428,6 +449,11 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
   auto *pcc = new nqtest::ReplyClosureCaller(); \
   pcc->cb_ = callback; \
   nq_rpc_call(stream, type, buff, blen, pcc->closure()); \
+}
+#define ALARM(a, first, callback) {\
+  auto *pcc = new nqtest::AlarmClosureCaller(); \
+  pcc->cb_ = callback; \
+  nq_alarm_set(a, nq_time_now() + first, pcc->closure()); \
 }
 #define RPCEX(stream, type, buff, blen, cb, to) { \
   auto *pcc = new nqtest::ReplyClosureCaller(); \

@@ -137,6 +137,15 @@ void NqClientStream::OnClose() {
   auto c = static_cast<NqClient *>(nq_session()->delegate());
   c->stream_manager().OnClose(this);
 }
+void **NqClientStream::ContextBuffer() {
+  ASSERT(nq_session()->delegate()->IsClient());
+  auto c = static_cast<NqClient *>(nq_session()->delegate());  
+  auto serial = stream_serial();
+  return c->stream_manager().FindContextBuffer(
+    NqStreamSerialCodec::ClientStreamNameId(serial), 
+    NqStreamSerialCodec::ClientStreamIndexPerName(serial)
+  );
+}
 
 
 
@@ -218,11 +227,11 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   do {
     //decode header
     read_ofs = nq::HeaderCodec::Decode(&type, &msgid, pstr, plen);
-    constexpr nq_size_t NO_RECLEN = 0xFFFFFFFF; //use non zero invalid value when user send 0 byte payload
-    reclen = NO_RECLEN;
-    read_ofs += nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
-    /* read_ofs => length of encoded header, reclen => actual payload length */
-    if (reclen == NO_RECLEN || (read_ofs + reclen) > plen) {
+    /* tmp_ofs => length of encoded header, reclen => actual payload length */
+    auto tmp_ofs = nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
+    if (tmp_ofs == 0) { break; }
+    read_ofs += tmp_ofs;
+    if ((read_ofs + reclen) > plen) {
       //TRACE("short of buffer %u %u %u", reclen, read_ofs, plen);
       break;
     }

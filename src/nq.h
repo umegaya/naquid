@@ -77,8 +77,8 @@ typedef enum {
   NQ_ESYSCALL = -1,
   NQ_ETIMEOUT = -2,
   NQ_EALLOC = -3,
-  NQ_NOT_SUPPORT = -4,
-  NQ_GOAWAY = -5,
+  NQ_ENOTSUPPORT = -4,
+  NQ_EGOAWAY = -5,
 } nq_error_t;
 
 typedef enum {
@@ -116,7 +116,7 @@ typedef nq_on_client_conn_open_t nq_on_server_conn_open_t;
 typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
 
 
-//stream opened return false to reject stream
+//stream opened. return false to reject stream
 typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void **);
 //stream closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_stream_close_t)(void *, nq_stream_t);
@@ -129,9 +129,9 @@ typedef nq_size_t (*nq_stream_writer_t)(void *, nq_stream_t, const void *, nq_si
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
 
 
-//rpc opened return false to reject 
+//rpc opened. return false to reject 
 typedef bool (*nq_on_rpc_open_t)(void *, nq_rpc_t, void **);
-
+//rpc closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_rpc_close_t)(void *, nq_rpc_t);
 
 typedef void (*nq_on_rpc_request_t)(void *, nq_rpc_t, uint16_t, nq_msgid_t, const void *, nq_size_t);
@@ -305,18 +305,18 @@ NQAPI_THREADSAFE void nq_conn_close(nq_conn_t conn);
 //this just restart connection, if connection not start, start it, otherwise close connection once, then start again.
 //it never destroy connection itself, but associated stream/rpc all destroyed. (client only)
 NQAPI_THREADSAFE void nq_conn_reset(nq_conn_t conn); 
-//flush buffered packets
+//flush buffered packets of all stream
 NQAPI_THREADSAFE void nq_conn_flush(nq_conn_t conn);
 //check connection is client mode or not.
 NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
 //check conn is valid. invalid means fail to create or closed, or temporary disconnected (will reconnect soon).
 NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn);
 //get reconnect wait duration in us. 0 means does not wait reconnection
-NQAPI_THREADSAFE uint64_t nq_conn_reconnect_wait(nq_conn_t conn);
-//get QUIC connection id. CAUTION: for client side, only after on_open and before on_close callback called, it returns valid value.
-NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn);
+NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get context, which is set at on_conn_open
 NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn);
+//check equality of nq_conn_t
+static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.p == c2.p && c1.s == c2.s; }
 
 
 
@@ -338,12 +338,14 @@ NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s);
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s);
 //send arbiter byte array/arbiter object to stream peer. 
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
-//get QUIC stream id, CAUTION: this is not unique among all stream created. if you need global uniqueness, please use 16 byte value of nq_stream_t
-NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
 //get context, which is set at on_stream_open
 NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s);
-//get stream name, which is passed via nq_conn_stream
+//check equality of nq_stream_t
+static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.p == c2.p && c1.s == c2.s; }
+//will deprecate
+NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
 NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
+
 
 
 // --------------------------
@@ -370,12 +372,14 @@ NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *dat
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen);
 //send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
-//get QUIC stream id, CAUTION: this is not unique among all rpc created. if you need global uniqueness, please use 16 byte value of nq_rpc_t
-NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t s);
 //get context, which is set at on_stream_open
 NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t s);
-//get rpc name, which is passed via nq_conn_rpc
-NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t s);
+//check equality of nq_rpc_t
+static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.p == c2.p && c1.s == c2.s; }
+//will deprecate
+NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc);
+NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t rpc);
+
 
 
 // --------------------------
@@ -400,10 +404,12 @@ NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
 
 #define STOP_INVOKE_NQ_TIME (0)
-//configure alarm to invoke cb after current time exceeds first, at thread which owns nq_rpc/stream_t that creates this alarm.
+//configure alarm to invoke cb after current time exceeds first, 
+//at thread which handle receive callback of nq_rpc/stream_t that creates this alarm.
 //if you set next invocation timestamp value(>= input value) to 3rd argument of cb, alarm scheduled to run that time, 
 //if you set the value to 0(STOP_INVOKE_NQ_TIME), it stopped (still valid and can reactivate with nq_alarm_set). 
 //otherwise alarm remove its memory, further use of nq_alarm_t will possibly cause crash
+//suitable if you want to create some kind of poll method of your connection.
 NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t first, nq_closure_t cb);
 //destroy alarm. if you call nq_alarm_set after the alarm already called nq_alarm_destroy, it will possibly crash
 NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a);

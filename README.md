@@ -13,6 +13,8 @@
 - [ ] conn: more cert check
 - [ ] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
 - [ ] conn: handle connectivity change (if not handled)
+- [ ] conn: try to use let's encrypt cert (with corresponding host name) by default
+- [ ] stream: consider the way that can access sid/ctx/name of client stream (now cannot during reconnection wait)
 - [ ] API: reduce error code (can use app-defined error code almost anywhere)
 - [ ] API: more API to thread safe 
 - [ ] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
@@ -26,8 +28,8 @@
 - [ ] test: stream disconnection using on open callback 
 - [ ] test: client conn reconnection or finalization using on open callback
 - [x] test: stream handle send/recv test
-- [ ] conn: timeout test for handshake / rpc call
-- [ ] test: robustness for connectivity change
+- [x] test: timeout test for handshake / rpc call
+- [ ] test: ensure robustness for connectivity change
 - [ ] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread
 - [x] bench: latency, throughput, compare with mrs, which is ENet based, gaming specific udp network library
@@ -53,6 +55,7 @@
     - client: active
       - client connection object retained over reconnection. so its possible client connection object alive but connection is not active (eg. on reconnection wait)
       - no need to recreate nq_conn_t or nq_stream/rpc_t on reconnection. its automatically rebound to new session delegate or stream, after establishment.
+        - note that stream rebind only occurs on writing stream (lazy rebind). 
     - server: passive
       - server connection object is the exactly same life cycle with connection itself
       - disconnect == every resouce related with the connection is deleted. 

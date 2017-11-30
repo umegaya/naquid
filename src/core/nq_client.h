@@ -44,11 +44,30 @@ class NqClient : public QuicClientBase,
   };
   class StreamManager {
     struct Entry {
-      std::vector<NqClientStream*> streams_;
-      std::string name_;
+      NqClientStream *handle_;
+      void *context_;
+      Entry(NqClientStream *h) : handle_(h), context_(nullptr) {}
+      inline void SetStream(NqClientStream *s) { handle_ = s; }
+      inline void ClearStream() { handle_ = nullptr; }
+      inline NqClientStream *Stream() { return handle_; }
+      inline void *Context() { return context_; }
+      inline void **ContextBuffer() { return &context_; }
     };
-    std::vector<Entry> out_entries_;
-    std::vector<NqClientStream*> in_entries_;
+    struct EntryGroup {
+      std::vector<Entry> streams_;
+      std::string name_;
+      inline void SetStream(NqClientStream *s) {
+        streams_[s->index_per_name_id()].SetStream(s);
+      }
+      inline void ClearStream(NqClientStream *s) {
+        streams_[s->index_per_name_id()].ClearStream();
+      }
+      inline NqClientStream *Stream(NqStreamIndexPerNameId idx) {
+        return streams_[idx].Stream();
+      }
+    };
+    std::vector<EntryGroup> out_entries_;
+    std::vector<Entry> in_entries_;
     std::stack<NqStreamIndexPerNameId> in_empty_indexes_;
     std::mutex entries_mutex_;
    public:
@@ -69,14 +88,29 @@ class NqClient : public QuicClientBase,
       NqStreamNameId name_id, 
       NqStreamIndexPerNameId index_per_name_id, 
       bool connected);
+
+    //recover all created outgoing streams on reconnection done
+    void RecoverOutgoingStreams(NqClientSession *session);
     
     //it should be used by non-owner thread of this client. 
-    const NqClientStream *Find(NqStreamNameId id, NqStreamIndexPerNameId index) const;
+    inline const NqClientStream *Find(NqStreamNameId id, NqStreamIndexPerNameId index) const {
+      auto *e = FindEntry(id, index);
+      return e == nullptr ? nullptr : e->Stream();
+    }
+    inline void *FindContext(NqStreamNameId id, NqStreamIndexPerNameId index) const {
+      auto *e = FindEntry(id, index);
+      return e == nullptr ? nullptr : e->Context();
+    }
+    inline void **FindContextBuffer(NqStreamNameId id, NqStreamIndexPerNameId index) {
+      auto *e = FindEntry(id, index);
+      return e == nullptr ? nullptr : e->ContextBuffer();
+    }
     inline const std::string &Find(NqStreamNameId id) const {
       static std::string empty_;
       return id <= out_entries_.size() ? out_entries_[id - 1].name_ : empty_;
     }
    protected:
+    Entry *FindEntry(NqStreamNameId id, NqStreamIndexPerNameId index) const;
     NqStreamNameId Add(const std::string &name);
     bool OnOutgoingOpen(const std::string &name, NqClientStream *s);
     void OnOutgoingClose(NqClientStream *s);
@@ -133,6 +167,10 @@ class NqClient : public QuicClientBase,
   // implements NqSession::Delegate
   uint64_t Id() const override { return connect_state_ == CONNECT ? nq_session()->connection_id() : 0; }
   void *Context() const override { return context_; }
+  void *StreamContext(uint64_t stream_serial) const override {
+    return stream_manager_.FindContext(NqStreamSerialCodec::ClientStreamNameId(stream_serial), 
+                                       NqStreamSerialCodec::ClientStreamIndexPerName(stream_serial));
+  }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
