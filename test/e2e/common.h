@@ -277,14 +277,18 @@ class Test {
           return st.second.st;
         }
       }
+      ASSERT(false);
       return invalid_stream;
     }
     nq_rpc_t NewRpc(const std::string &name) {
       for (auto &st : streams) {
-        if (name == std::string(nq_rpc_name(st.second.rpc))) {
+        auto n = nq_rpc_name(st.second.rpc);
+        TRACE("names %s %s %p %llx", n, name.c_str(), st.second.rpc.p, st.second.rpc.s);
+        if (name == std::string(n)) {
           return st.second.rpc;
         }
       }
+      ASSERT(false);
       return invalid_rpc;
     }
     void AddStream(nq_stream_t s) {

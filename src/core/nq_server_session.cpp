@@ -9,15 +9,37 @@
 
 namespace net {
 NqServerSession::NqServerSession(QuicConnection *connection,
-                                 NqDispatcher *dispatcher,
                                  const NqServer::PortConfig &port_config)
-  : NqSession(connection, dispatcher, this, port_config), //dispatcher implements QuicSession::Visitor interface
-  dispatcher_(dispatcher),
+  : NqSession(connection, dispatcher_, this, port_config), //dispatcher implements QuicSession::Visitor interface
   port_config_(port_config),
-  session_index_(dispatcher->new_session_index()),
+  session_index_(dispatcher_->new_session_index()),
   read_map_(), read_map_mutex_(), context_(nullptr) {
   init_crypto_stream();
 }
+//implement custom allocator
+void* NqServerSession::operator new(std::size_t sz) {
+  ASSERT(false);
+  auto r = reinterpret_cast<NqServerSession *>(std::malloc(sz));
+  r->dispatcher_ = nullptr;
+  return r;
+}
+void* NqServerSession::operator new(std::size_t sz, NqDispatcher* d) {
+  auto r = reinterpret_cast<NqServerSession *>(d->session_allocator().Alloc(sz));
+  r->dispatcher_ = d;
+  return r;
+}
+void NqServerSession::operator delete(void *p) noexcept {
+  auto r = reinterpret_cast<NqServerSession *>(p);
+  if (r->dispatcher_ == nullptr) {
+    std::free(r);
+  } else {
+    r->dispatcher_->session_allocator().Free(r);
+  }
+}
+void NqServerSession::operator delete(void *p, NqDispatcher *d) noexcept {
+  d->session_allocator().Free(p);
+}
+
 
 NqStream *NqServerSession::FindStream(QuicStreamId id) {
   auto it = dynamic_streams().find(id);
@@ -34,6 +56,8 @@ void NqServerSession::RemoveStreamForRead(QuicStreamId id) {
 }
 
 //implements NqSession::Delegate
+NqLoop *NqServerSession::GetLoop() { return dispatcher_->loop(); }
+NqBoxer *NqServerSession::GetBoxer() { return dispatcher_; }
 void *NqServerSession::StreamContext(uint64_t stream_serial) const {
   auto sid = NqStreamSerialCodec::ServerStreamId(stream_serial);
   auto s = FindStreamForRead(sid);
@@ -69,7 +93,7 @@ bool NqServerSession::IsClient() const {
   return false;
 }
 QuicStream* NqServerSession::CreateIncomingDynamicStream(QuicStreamId id) {
-  auto s = new NqServerStream(id, this, false);
+  auto s = new(dispatcher_) NqServerStream(id, this, false);
   s->InitHandle();
   ActivateStream(QuicWrapUnique(s));
   std::unique_lock<std::mutex> lock(read_map_mutex_);
@@ -77,7 +101,7 @@ QuicStream* NqServerSession::CreateIncomingDynamicStream(QuicStreamId id) {
   return s;
 }
 QuicStream* NqServerSession::CreateOutgoingDynamicStream() {
-  auto s = new NqServerStream(GetNextOutgoingStreamId(), this, true);
+  auto s = new(dispatcher_) NqServerStream(GetNextOutgoingStreamId(), this, true);
   s->InitHandle();
   ActivateStream(QuicWrapUnique(s));
   std::unique_lock<std::mutex> lock(read_map_mutex_);

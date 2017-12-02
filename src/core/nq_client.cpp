@@ -12,6 +12,7 @@
 #include "core/nq_stream.h"
 #include "core/nq_network_helper.h"
 #include "core/nq_stub_interface.h"
+#include "core/nq_client_loop.h"
 
 namespace net {
 
@@ -19,20 +20,20 @@ NqClient::NqClient(QuicSocketAddress server_address,
                            const QuicServerId& server_id,
                            const QuicVersionVector& supported_versions,
                            const NqClientConfig &config,
-                           NqClientLoop* loop,
                            std::unique_ptr<ProofVerifier> proof_verifier)
+  //FYI(iyatomi): loop_ should be initialized inside of 
   : QuicClientBase(
           server_id,
           supported_versions,
           config,
-          new NqStubConnectionHelper(*loop),
-          new NqStubAlarmFactory(*loop),
-          QuicWrapUnique(new NqNetworkHelper(loop, this)),
-          std::move(proof_verifier)), loop_(loop), 
+          new NqStubConnectionHelper(*loop_),
+          new NqStubAlarmFactory(*loop_),
+          QuicWrapUnique(new NqNetworkHelper(loop_, this)),
+          std::move(proof_verifier)), 
           on_close_(config.client().on_close), 
           on_open_(config.client().on_open), 
           on_finalize_(config.client().on_finalize),
-          session_index_(loop->new_session_index()), 
+          session_index_(loop_->new_session_index()), 
           stream_manager_(), connect_state_(DISCONNECT),
           context_(nullptr) {
   set_server_address(server_address);
@@ -40,6 +41,29 @@ NqClient::NqClient(QuicSocketAddress server_address,
 NqClient::~NqClient() {
   ResetSession();
 }
+void* NqClient::operator new(std::size_t sz) {
+  ASSERT(false);
+  auto r = reinterpret_cast<NqClient *>(std::malloc(sz));
+  r->loop_ = nullptr;
+  return r;
+}
+void* NqClient::operator new(std::size_t sz, NqClientLoop* l) {
+  auto r = reinterpret_cast<NqClient *>(l->client_allocator().Alloc(sz));
+  r->loop_ = l;
+  return r;
+}
+void NqClient::operator delete(void *p) noexcept {
+  auto r = reinterpret_cast<NqClient *>(p);
+  if (r->loop_ == nullptr) {
+    std::free(r);
+  } else {
+    r->loop_->client_allocator().Free(r);
+  }
+}
+void NqClient::operator delete(void *p, NqClientLoop *l) noexcept {
+  l->client_allocator().Free(p);
+}
+
 
 
 std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* connection) {
@@ -55,6 +79,7 @@ void NqClient::InitializeSession() {
   connect_state_ = CONNECT;
   alarm_.reset(); //free existing reconnection alarm
 }
+nq_conn_t NqClient::ToHandle() { return loop_->Box(this); }
 
 
 // implements QuicAlarm::Delegate
@@ -75,6 +100,8 @@ void NqClient::OnProofVerifyDetailsAvailable(const ProofVerifyDetails& verify_de
 }
 
 //implements NqSession::Delegate
+NqLoop *NqClient::GetLoop() { return loop_; }
+NqBoxer *NqClient::GetBoxer() { return static_cast<NqBoxer *>(loop_); }
 void NqClient::OnOpen(nq_handshake_event_t hsev) { 
   if (hsev == NQ_HS_DONE) {
     stream_manager_.RecoverOutgoingStreams(nq_session());
@@ -314,4 +341,25 @@ NqClientStream *NqClient::StreamManager::FindOrCreateStream(
   }
   return s;
 }
+bool NqClient::StreamManager::OnOpen(const std::string &name, NqClientStream *s) {
+  return ((s->id() % 2) == 0) ? OnIncomingOpen(s) : OnOutgoingOpen(name, s);
+}
+void NqClient::StreamManager::OnClose(NqClientStream *s) {
+  if ((s->id() % 2) == 0) {
+    OnIncomingClose(s);
+  } else {
+    OnOutgoingClose(s);
+  }
+}
+void NqClient::StreamManager::EntryGroup::SetStream(NqClientStream *s) {
+  streams_[s->index_per_name_id()].SetStream(s);
+}
+void NqClient::StreamManager::EntryGroup::ClearStream(NqClientStream *s) {
+  streams_[s->index_per_name_id()].ClearStream();
+}
+NqClientStream *
+NqClient::StreamManager::EntryGroup::Stream(NqStreamIndexPerNameId idx) {
+  return streams_[idx].Stream();
+}
+
 }  // namespace net

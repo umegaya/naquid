@@ -2,7 +2,7 @@
 
 #include "basis/timespec.h"
 
-#include "core/nq_client.h"
+#include "core/nq_client_loop.h"
 #include "core/nq_server.h"
 #include "core/nq_stream.h"
 
@@ -56,9 +56,9 @@ NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr) {
 // client API
 //
 // --------------------------
-NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd) {
+NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint) {
   g_at_exit_manager = nq_at_exit_manager(); //anchor
-	auto l = new NqClientLoop();
+	auto l = new NqClientLoop(max_nfd, max_stream_hint);
 	if (l->Open(max_nfd) < 0) {
 		return nullptr;
 	}
@@ -179,12 +179,13 @@ NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
-NqSession::Delegate *d;
+  NqSession::Delegate *d;
   return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
     d->NewStreamCast<NqStream>(name)->ToHandle<nq_stream_t>() : 
     INVALID_HANDLE<nq_stream_t>("fail to unbox"); 
 }
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
+  ASSERT(s.s != 0);
   auto b = NqBoxer::From(s);
   nq_conn_t c = {
     .p = s.p, 
@@ -235,12 +236,13 @@ NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {
-NqSession::Delegate *d;
+  NqSession::Delegate *d;
   return NqBoxer::From(conn)->Unbox(conn.s, &d) == NqBoxer::UnboxResult::Ok ? 
     d->NewStreamCast<NqStream>(name)->ToHandle<nq_rpc_t>() : 
     INVALID_HANDLE<nq_rpc_t>("fail to unbox"); 
 }
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
+  ASSERT(rpc.s != 0);
   auto b = NqBoxer::From(rpc);
   nq_conn_t c = {
     .p = rpc.p, 

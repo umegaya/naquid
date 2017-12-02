@@ -6,7 +6,6 @@
 #include "core/nq_session.h"
 #include "core/nq_server.h"
 #include "core/nq_config.h"
-#include "core/nq_dispatcher.h"
 
 namespace net {
 class NqStream;
@@ -14,7 +13,6 @@ class NqServerSession : public NqSession,
                         public NqSession::Delegate {
  public:
   NqServerSession(QuicConnection *connection,
-                  NqDispatcher *dispatcher,
                   const NqServer::PortConfig &port_config);
 
   inline nq_conn_t ToHandle() { return GetBoxer()->Box(this); }
@@ -42,12 +40,17 @@ class NqServerSession : public NqSession,
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
-  NqLoop *GetLoop() override { return dispatcher_->loop(); }
-  NqBoxer *GetBoxer() override { return dispatcher_; }
+  NqLoop *GetLoop() override;
+  NqBoxer *GetBoxer() override;
   NqSessionIndex SessionIndex() const override { return session_index_; }
   uint64_t ReconnectDurationUS() const override { return 0; }
   QuicConnection *Connection() override { return connection(); }
 
+  //implement custom allocator
+  void* operator new(std::size_t sz);
+  void* operator new(std::size_t sz, NqDispatcher* d);
+  void operator delete(void *p) noexcept;
+  void operator delete(void *p, NqDispatcher *d) noexcept;
 
  private:
   NqDispatcher *dispatcher_;

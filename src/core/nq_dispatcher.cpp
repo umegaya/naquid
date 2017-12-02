@@ -26,7 +26,8 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
   index_(worker.index()), n_worker_(worker.server().n_worker()), 
   server_(worker.server()), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
-  server_map_(), alarm_map_(), thread_id_(worker.thread_id()) {
+  server_map_(), alarm_map_(), thread_id_(worker.thread_id()),
+  session_allocator_(config.server().max_session_hint), stream_allocator_(config.server().max_stream_hint) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
   SetFromConfig(config);
@@ -107,7 +108,7 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
       CreatePerConnectionWriter(),
       /* owns_writer= */ true, Perspective::IS_SERVER, GetSupportedVersions());
 
-    auto s = new NqServerSession(connection, this, it->second);
+    auto s = new(this) NqServerSession(connection, it->second);
     s->Initialize();
     server_map_.Add(s->session_index(), s);
     server_map_.Activate(s->session_index(), s); //make connection valid

@@ -11,14 +11,15 @@
 
 #include "net/tools/quic/quic_client_base.h"
 
+#include "basis/allocator.h"
 #include "basis/closure.h"
-#include "core/nq_client_loop.h"
 #include "core/nq_client_session.h"
 #include "core/nq_config.h"
 
 namespace net {
 
 class QuicServerId;
+class NqClientLoop;
 class NqClientStream;
 
 class NqClient : public QuicClientBase, 
@@ -56,15 +57,9 @@ class NqClient : public QuicClientBase,
     struct EntryGroup {
       std::vector<Entry> streams_;
       std::string name_;
-      inline void SetStream(NqClientStream *s) {
-        streams_[s->index_per_name_id()].SetStream(s);
-      }
-      inline void ClearStream(NqClientStream *s) {
-        streams_[s->index_per_name_id()].ClearStream();
-      }
-      inline NqClientStream *Stream(NqStreamIndexPerNameId idx) {
-        return streams_[idx].Stream();
-      }
+      void SetStream(NqClientStream *s);
+      void ClearStream(NqClientStream *s);
+      NqClientStream *Stream(NqStreamIndexPerNameId idx);
     };
     std::vector<EntryGroup> out_entries_;
     std::vector<Entry> in_entries_;
@@ -73,16 +68,9 @@ class NqClient : public QuicClientBase,
    public:
     StreamManager() : out_entries_(), in_entries_(), in_empty_indexes_(), entries_mutex_() {}
     
-    inline bool OnOpen(const std::string &name, NqClientStream *s) {
-      return ((s->id() % 2) == 0) ? OnIncomingOpen(s) : OnOutgoingOpen(name, s);
-    }
-    inline void OnClose(NqClientStream *s) {
-      if ((s->id() % 2) == 0) {
-        OnIncomingClose(s);
-      } else {
-        OnOutgoingClose(s);
-      }
-    }
+    bool OnOpen(const std::string &name, NqClientStream *s);
+    void OnClose(NqClientStream *s);
+
     NqClientStream *FindOrCreateStream(
       NqClientSession *session, 
       NqStreamNameId name_id, 
@@ -123,7 +111,6 @@ class NqClient : public QuicClientBase,
            const QuicServerId& server_id,
            const QuicVersionVector& supported_versions,
            const NqClientConfig &config,
-           NqClientLoop* loop,
            std::unique_ptr<ProofVerifier> proof_verifier);
   ~NqClient() override;
 
@@ -136,7 +123,8 @@ class NqClient : public QuicClientBase,
   inline NqSessionIndex session_index() const { return session_index_; }
   inline StreamManager &stream_manager() { return stream_manager_; }
   inline const StreamManager &stream_manager() const { return stream_manager_; }
-  inline nq_conn_t ToHandle() { return loop_->Box(this); }
+  inline NqClientLoop *client_loop() { return loop_; }
+  nq_conn_t ToHandle();
   NqClientStream *FindOrCreateStream(NqStreamNameId name_id, NqStreamIndexPerNameId index_per_name_id);
 
 
@@ -183,11 +171,16 @@ class NqClient : public QuicClientBase,
   nq::HandlerMap *ResetHandlerMap() override;
   QuicStream* NewStream(const std::string &name) override;
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
-  NqLoop *GetLoop() override { return loop_; }
-  NqBoxer *GetBoxer() override { return static_cast<NqBoxer *>(loop_); }
+  NqLoop *GetLoop() override;
+  NqBoxer *GetBoxer() override;
   NqSessionIndex SessionIndex() const override { return session_index_; }
   QuicConnection *Connection() override { return session()->connection(); }
 
+  //implement custom allocator
+  void* operator new(std::size_t sz);
+  void* operator new(std::size_t sz, NqClientLoop* l);
+  void operator delete(void *p) noexcept;
+  void operator delete(void *p, NqClientLoop *l) noexcept;
 
  private:
   NqClientLoop* loop_;

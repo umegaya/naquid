@@ -7,20 +7,23 @@
 #include "net/quic/core/quic_crypto_server_stream.h"
 #include "net/quic/core/crypto/quic_compressed_certs_cache.h"
 
+#include "basis/allocator.h"
 #include "core/nq_worker.h"
 #include "core/nq_boxer.h"
+#include "core/nq_server_session.h"
+#include "core/nq_stream.h"
 #include "core/nq_serial_codec.h"
 
 namespace net {
 class NqWorker;
-class NqServerSession;
 class NqServerConfig;
 class NqAlarmBase;
 class NqDispatcher : public QuicDispatcher, 
                      public nq::IoProcessor,
                      public QuicCryptoServerStream::Helper,
                      public NqPacketReader::Delegate,
-                     public NqBoxer {
+                     public NqBoxer,
+                     public QuicStreamAllocator {
   static const int kNumSessionsToCreatePerSocketEvent = 1024;
   static const int kDefaultCertCacheSize = 16; 
   typedef NqWorker::InvokeQueue InvokeQueue;
@@ -37,6 +40,9 @@ class NqDispatcher : public QuicDispatcher,
   ServerMap server_map_;
   NqObjectExistenceMap<NqAlarm, NqAlarmIndex> alarm_map_;
   std::thread::id thread_id_;
+  nq::Allocator<NqServerSession> session_allocator_;
+  nq::Allocator<NqServerStream> stream_allocator_;
+
  public:
   NqDispatcher(int port, const NqServerConfig& config, 
                std::unique_ptr<QuicCryptoServerConfig> crypto_config, 
@@ -56,7 +62,12 @@ class NqDispatcher : public QuicDispatcher,
   inline NqAlarmIndex new_alarm_index() { return alarm_map_.NewIndex(); }
   inline const ServerMap &server_map() const { return server_map_; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
+  inline nq::Allocator<NqServerSession> &session_allocator() { return session_allocator_; }
+  inline nq::Allocator<NqServerStream> &stream_allocator() { return stream_allocator_; }
 
+  //implements QuicStreamAllocator
+  void *Alloc(size_t sz) override { return stream_allocator_.Alloc(sz); }
+  void Free(void *p) override { return stream_allocator_.Free(p); }
 
   //implements nq::IoProcessor
   void OnEvent(nq::Fd fd, const Event &e) override;

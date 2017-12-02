@@ -42,6 +42,12 @@ namespace test {
 class QuicStreamPeer;
 }  // namespace test
 
+class QuicStreamAllocator {
+ public:
+  virtual void *Alloc(std::size_t sz) = 0;
+  virtual void Free(void *) = 0;
+};
+
 class QuicSession;
 
 class QUIC_EXPORT_PRIVATE QuicStream : public StreamNotifierInterface {
@@ -397,6 +403,33 @@ class QUIC_EXPORT_PRIVATE QuicStream : public StreamNotifierInterface {
   const QuicByteCount buffered_data_threshold_;
 
   DISALLOW_COPY_AND_ASSIGN(QuicStream);
+
+  //if not nullptr, assure this stream to be allocated with it.
+  QuicStreamAllocator* allocator_;
+
+ public:
+  inline QuicStreamAllocator *stream_allocator() { return allocator_; }
+  inline void* operator new(std::size_t sz) {
+    auto r = reinterpret_cast<QuicStream *>(std::malloc(sz));
+    r->allocator_ = nullptr;
+    return r;
+  }
+  inline void* operator new(std::size_t sz, QuicStreamAllocator* a) {
+    auto r = reinterpret_cast<QuicStream *>(a->Alloc(sz));
+    r->allocator_ = a;
+    return r;
+  }
+  inline void operator delete(void *p) noexcept {
+    auto r = reinterpret_cast<QuicStream *>(p);
+    if (r->allocator_ == nullptr) {
+      std::free(r);
+    } else {
+      r->allocator_->Free(r);
+    }
+  }
+  inline void operator delete(void *p, QuicStreamAllocator *a) noexcept {
+    a->Free(p);
+  }
 };
 
 }  // namespace net

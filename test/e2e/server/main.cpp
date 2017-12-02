@@ -257,8 +257,10 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
 
   nq_svconf_t conf;
   CONFIG_VAL(svconfig, quic_secret, "e336e27898ff1e17ac79e82fa0084999", conf.quic_secret);
-  conf.quic_cert_cache_size = 0;
-  conf.accept_per_loop = 0;
+  conf.quic_cert_cache_size = 0; //use default
+  conf.accept_per_loop = 0; //use default
+  conf.max_session_hint = 1024;
+  conf.max_stream_hint = 1024 * 4;
   conf.handshake_timeout = nq_time_sec(120);
   conf.idle_timeout = nq_time_sec(60);
   CONFIG_CB(svconfig, on_server_conn_open, on_conn_open, conf.on_open);
@@ -267,6 +269,7 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   nq_hdmap_t hm = nq_server_listen(sv, &addr, &conf);
 
   nq_rpc_handler_t rh;
+  rh.timeout = 0; //use default
   nq_closure_init(rh.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
   nq_closure_init(rh.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
   CONFIG_CB(svconfig, on_rpc_open, on_rpc_open, rh.on_rpc_open);

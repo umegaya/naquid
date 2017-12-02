@@ -129,12 +129,11 @@ NqClient *NqClientLoop::Create(const std::string &host,
     return nullptr;
   }
   auto supported_versions = AllSupportedVersions();//versions_.GetSupportedVersions();
-  auto c = new NqClient(
+  auto c = new(this) NqClient(
     server_address,
     server_id, 
     supported_versions,
     config,
-    this,
     config.NewProofVerifier()
   );
   if (!c->Initialize()) {

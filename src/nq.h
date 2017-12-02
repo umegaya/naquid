@@ -213,6 +213,9 @@ typedef struct {
   //cert cache size. default 16 and how meny sessions accepted per loop. default 1024
   int quic_cert_cache_size, accept_per_loop;
 
+  //allocation hint about max sessoin and max stream
+  int max_session_hint, max_stream_hint;
+
   //total handshake time limit / no input limit. default 1000ms/5000ms
   nq_time_t handshake_timeout, idle_timeout; 
 } nq_svconf_t;
@@ -244,7 +247,7 @@ typedef struct {
 //
 // --------------------------
 // create client object which have max_nfd of connection. 
-NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd);
+NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint);
 // do actual network IO. need to call periodically
 NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.

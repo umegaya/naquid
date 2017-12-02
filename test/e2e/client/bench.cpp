@@ -89,7 +89,7 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
 
 /* main */
 int main(int argc, char *argv[]){
-  nq_client_t cl = nq_client_create(N_CLIENT); //N_CLIENT connection client
+  nq_client_t cl = nq_client_create(N_CLIENT, N_CLIENT * 4); //N_CLIENT connection client
 
   nq_hdmap_t hm;
   hm = nq_client_hdmap(cl);

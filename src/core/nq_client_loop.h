@@ -6,16 +6,19 @@
 #include "net/quic/core/quic_server_id.h"
 #include "net/quic/core/quic_version_manager.h"
 
+#include "basis/allocator.h"
 #include "core/nq_loop.h"
 #include "core/nq_config.h"
 #include "core/nq_boxer.h"
+#include "core/nq_client.h"
+#include "core/nq_stream.h"
 
 namespace net {
-class NqClient;
 class NqAlarm;
 class NqClientLoop : public NqLoop,
                      public NqBoxer,
-                     public QuicSession::Visitor {
+                     public QuicSession::Visitor,
+                     public QuicStreamAllocator {
   nq::HandlerMap handler_map_;
   typedef NqObjectExistenceMapMT<NqClient, NqSessionIndex> ClientMap;
   ClientMap client_map_;
@@ -23,8 +26,13 @@ class NqClientLoop : public NqLoop,
   NqBoxer::Processor processor_;
   QuicVersionManager versions_;
   std::thread::id thread_id_;
+  nq::Allocator<NqClient> client_allocator_;
+  nq::Allocator<NqClientStream> stream_allocator_;
+
  public:
-  NqClientLoop() : handler_map_(), client_map_(), alarm_map_(), processor_(), versions_(net::AllSupportedVersions()) {
+  NqClientLoop(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
+    processor_(), versions_(net::AllSupportedVersions()),
+    client_allocator_(max_client_hint), stream_allocator_(max_stream_hint) {
     set_main_thread();
   }
   ~NqClientLoop() { Close(); }
@@ -45,6 +53,7 @@ class NqClientLoop : public NqLoop,
   inline void set_main_thread() { thread_id_ = std::this_thread::get_id(); }
   inline const ClientMap &client_map() const { return client_map_; }
   inline ClientMap &client_map() { return client_map_; }
+  inline nq::Allocator<NqClient> &client_allocator() { return client_allocator_; }
 
   static inline NqClientLoop *FromHandle(nq_client_t cl) { return (NqClientLoop *)cl; }
   static bool ParseUrl(const std::string &host, 
@@ -53,6 +62,10 @@ class NqClientLoop : public NqLoop,
                        QuicServerId& server_id, 
                        QuicSocketAddress &address, 
                        QuicConfig &config);
+
+  //implements QuicStreamAllocator
+  void *Alloc(size_t sz) override { return stream_allocator_.Alloc(sz); }
+  void Free(void *p) override { return stream_allocator_.Free(p); }
 
   //implements NqBoxer
   void Enqueue(NqBoxer::Op *op) override { processor_.enqueue(op); }

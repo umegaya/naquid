@@ -211,7 +211,7 @@ void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
 bool Test::Run(const RunOptions *opt) {
   static RunOptions fallback;
   RunOptions options = (opt != nullptr) ? *opt : fallback;
-  nq_client_t cl = nq_client_create(256);
+  nq_client_t cl = nq_client_create(256, 256 * 4);
   nq_clconf_t conf = {
     .insecure = false,
     .handshake_timeout = options.handshake_timeout,
