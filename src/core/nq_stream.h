@@ -8,7 +8,7 @@
 
 #include "basis/closure.h"
 #include "basis/header_codec.h"
-#include "basis/msgid_factory.h"
+#include "basis/id_factory.h"
 #include "basis/timespec.h"
 #include "core/nq_loop.h"
 #include "core/nq_alarm.h"
@@ -22,17 +22,20 @@ class NqBoxer;
 class NqStreamHandler;
 
 class NqStream : public QuicStream {
+ protected:
+  void *stream_ptr_;
+  nq::atomic<uint64_t> stream_serial_;
+ private:
   std::unique_ptr<NqStreamHandler> handler_;
   std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name
   SpdyPriority priority_;
-  nq_stream_t handle_;
   bool establish_side_;
  public:
   NqStream(QuicStreamId id, 
            NqSession* nq_session, 
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority);
-  ~NqStream() override {}
+  ~NqStream() override { ASSERT(stream_serial_ == 0); }
 
   NqLoop *GetLoop();
 
@@ -40,45 +43,48 @@ class NqStream : public QuicStream {
   void OnClose() override;
 
   void Disconnect();
+  nq_alarm_t NewAlarm();
 
   virtual void **ContextBuffer() = 0;
+  virtual void InitSerial() = 0;
+  virtual NqBoxer *GetBoxer() = 0;
+  inline void InvalidateSerial() { stream_serial_ = 0; }
 
   inline const std::string &protocol() const { return buffer_; }
   inline bool establish_side() const { return establish_side_; }
-  inline uint64_t stream_serial() const { return handle_.s; }
-  bool set_protocol(const std::string &name);
+  inline uint64_t stream_serial() const { return stream_serial_; }
   NqSessionIndex session_index() const;
+
+  NqSession *nq_session();
+  const NqSession *nq_session() const;
+  bool set_protocol(const std::string &name);
   nq_conn_t conn();
 
-  void InitHandle();
   template <class T> inline T *Handler() const { return static_cast<T *>(handler_.get()); }
-  template <class H> inline H ToHandle() { return { .p = handle_.p, .s = handle_.s }; }
+  template <class H> inline H ToHandle() { return { .p = stream_ptr_, .s = stream_serial_ }; }
 
  protected:
   friend class NqStreamHandler;
   friend class NqDispatcher;
-  NqSession *nq_session();
-  const NqSession *nq_session() const;
   NqStreamHandler *CreateStreamHandler(const std::string &name);
 };
 
 class NqClientStream : public NqStream {
-  NqStreamNameId name_id_;
-  NqStreamIndexPerNameId index_per_name_id_;
+  NqStreamIndex stream_index_;
  public:
   NqClientStream(QuicStreamId id, 
            NqSession* nq_session, 
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority) : 
-    NqStream(id, nq_session, establish_side, priority) {}
+    NqStream(id, nq_session, establish_side, priority), stream_index_(0) {}
 
+  inline void set_stream_index(NqStreamIndex idx) { stream_index_ = idx; }
+  inline NqStreamIndex stream_index() const { return stream_index_; }
+
+  NqBoxer *GetBoxer() override;
+  void InitSerial() override;
   void OnClose() override;
   void **ContextBuffer() override;
-
-  inline NqStreamNameId name_id() const { return name_id_; }
-  inline NqStreamIndexPerNameId index_per_name_id() const { return index_per_name_id_; }
-  inline void set_name_id(NqStreamNameId id) { name_id_ = id; }
-  inline void set_index_per_name_id(NqStreamIndexPerNameId idx) { index_per_name_id_ = idx; }
 };
 class NqServerStream : public NqStream {
   void *context_;
@@ -88,9 +94,13 @@ class NqServerStream : public NqStream {
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority) : 
     NqStream(id, nq_session, establish_side, priority), context_(nullptr) {}
+
   inline void *context() { return context_; }
-  void **ContextBuffer() override { return &context_; }
+
+  NqBoxer *GetBoxer() override;
+  void InitSerial() override;
   void OnClose() override;
+  void **ContextBuffer() override { return &context_; }
 };
 
 
@@ -211,7 +221,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   std::string parse_buffer_;
   nq_closure_t on_request_, on_notify_;
   nq_time_t default_timeout_ts_;
-  nq::MsgIdFactory<nq_msgid_t> msgid_factory_;
+  nq::IdFactory<nq_msgid_t> msgid_factory_;
   std::map<uint32_t, Request*> req_map_;
   NqLoop *loop_;
  public:

@@ -28,6 +28,7 @@ set(lib_src
 	./src/basis/endian.cpp
 	./src/basis/timespec.cpp
 
+	./src/core/nq_alarm.cpp
 	./src/core/nq_at_exit.cpp
 	./src/core/nq_client.cpp
 	./src/core/nq_client_loop.cpp

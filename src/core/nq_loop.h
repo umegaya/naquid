@@ -11,6 +11,7 @@
 
 #include "basis/loop.h"
 #include "basis/handler_map.h"
+#include "core/nq_serial_codec.h"
 
 namespace net {
 class NqAlarmInterface;
@@ -21,7 +22,12 @@ class NqLoop : public nq::Loop,
  public:
   NqLoop() : nq::Loop(), 
              approx_now_in_usec_(0),
-             alarm_map_() {}
+             alarm_map_(), 
+             current_locked_session_id(0) {}
+
+  inline void LockSession(NqSessionIndex idx) { current_locked_session_id = idx + 1; }
+  inline void UnlockSession() { current_locked_session_id = 0; }
+  inline bool IsSessionLocked(NqSessionIndex idx) const { return current_locked_session_id == (1 + idx); }
 
   static QuicTime ToQuicTime(uint64_t from_us);
 
@@ -59,5 +65,6 @@ class NqLoop : public nq::Loop,
   uint64_t approx_now_in_usec_;
   SimpleBufferAllocator buffer_allocator_;
   std::multimap<uint64_t, NqAlarmInterface*> alarm_map_;
+  nq::atomic<NqSessionIndex> current_locked_session_id;
 };
 }

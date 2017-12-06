@@ -13,7 +13,7 @@ const int kLoopFlags = NqLoop::EV_READ | NqLoop::EV_WRITE;
 
 NqNetworkHelper::NqNetworkHelper(
     NqLoop* loop,
-    QuicClientBase* client)
+    NqClient* client)
     : loop_(loop),
       fd_(-1),
       packets_dropped_(0),
@@ -123,7 +123,10 @@ QuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
 
 void NqNetworkHelper::OnRecv(NqPacketReader::Packet *p) {
   //self == server, peer == client
+  loop_->LockSession(client_->session_index());
+  std::unique_lock<std::mutex> session_lock(client_->static_mutex());
   client_->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
+  loop_->UnlockSession();
 }
 
 }  // namespace net

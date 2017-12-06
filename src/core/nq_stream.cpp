@@ -5,6 +5,8 @@
 #include "core/nq_session.h"
 #include "core/nq_client.h"
 #include "core/nq_server_session.h"
+#include "core/nq_client_loop.h"
+#include "core/nq_dispatcher.h"
 
 namespace net {
 
@@ -16,11 +18,15 @@ NqStream::NqStream(QuicStreamId id, NqSession* nq_session,
   establish_side_(establish_side) {
   nq_session->RegisterStreamPriority(id, priority);
 }
-void NqStream::InitHandle() { 
-  handle_ = nq_session()->delegate()->GetBoxer()->Box(this); 
-}
 NqLoop *NqStream::GetLoop() { 
   return nq_session()->delegate()->GetLoop(); 
+}
+nq_alarm_t NqStream::NewAlarm() {
+  auto a = GetBoxer()->NewAlarm();
+  return {
+    .p = a,
+    .s = a->alarm_serial(),
+  };
 }
 NqSession *NqStream::nq_session() { 
   return static_cast<NqSession *>(session()); 
@@ -29,7 +35,9 @@ const NqSession *NqStream::nq_session() const {
   return static_cast<const NqSession *>(session()); 
 }
 NqSessionIndex NqStream::session_index() const { 
-  return nq_session()->delegate()->SessionIndex(); 
+  return NqStreamSerialCodec::IsClient(stream_serial_) ? 
+    NqStreamSerialCodec::ClientSessionIndex(stream_serial_) : 
+    NqStreamSerialCodec::ServerSessionIndex(stream_serial_); 
 }
 nq_conn_t NqStream::conn() { 
   return nq_session()->conn(); 
@@ -82,6 +90,7 @@ void NqStream::Disconnect() {
 }
 void NqStream::OnClose() {
   handler_->OnClose();
+  InvalidateSerial();
 }
 void NqStream::OnDataAvailable() {
   QuicConnection::ScopedPacketBundler bundler(
@@ -130,6 +139,19 @@ void NqStream::OnDataAvailable() {
 
 
 
+NqBoxer *NqClientStream::GetBoxer() {
+  return static_cast<NqBoxer *>(static_cast<NqClientLoop *>(stream_allocator()));
+}
+void NqClientStream::InitSerial() { 
+  stream_ptr_ = nq_session()->delegate();
+  auto session_serial = nq_session()->delegate()->SessionSerial();
+  ASSERT(NqConnSerialCodec::IsClient(session_serial));
+  stream_serial_ =  
+    NqStreamSerialCodec::ClientEncode(
+      NqConnSerialCodec::ClientSessionIndex(session_serial), 
+      stream_index_ //need to give stable stream index instead of stream_id, which will change on reconnection.
+    ); 
+}
 void NqClientStream::OnClose() {
   //it's generally unsafe. delegate is not assured to be NqClient*
   ASSERT(nq_session()->delegate()->IsClient());
@@ -142,18 +164,27 @@ void **NqClientStream::ContextBuffer() {
   auto c = static_cast<NqClient *>(nq_session()->delegate());  
   auto serial = stream_serial();
   return c->stream_manager().FindContextBuffer(
-    NqStreamSerialCodec::ClientStreamNameId(serial), 
-    NqStreamSerialCodec::ClientStreamIndexPerName(serial)
-  );
+    NqStreamSerialCodec::ClientStreamIndex(serial));
 }
 
 
 
+NqBoxer *NqServerStream::GetBoxer() {
+  return static_cast<NqBoxer *>(static_cast<NqDispatcher *>(stream_allocator()));
+}
+void NqServerStream::InitSerial() {
+  stream_ptr_ = nq_session()->delegate();
+  auto session_serial = nq_session()->delegate()->SessionSerial();
+  ASSERT(!NqConnSerialCodec::IsClient(session_serial));
+  stream_serial_ = NqStreamSerialCodec::ServerEncode(
+    NqConnSerialCodec::ServerSessionIndex(session_serial), 
+    id(), 
+    NqConnSerialCodec::ServerWorkerIndex(session_serial)
+  );   
+}
 void NqServerStream::OnClose() {
   ASSERT(!nq_session()->delegate()->IsClient());
   NqStream::OnClose();
-  auto c = static_cast<NqServerSession *>(nq_session());
-  c->RemoveStreamForRead(id());
 }
 
 

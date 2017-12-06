@@ -14,19 +14,27 @@ class NqServerSession : public NqSession,
  public:
   NqServerSession(QuicConnection *connection,
                   const NqServer::PortConfig &port_config);
+  ~NqServerSession() { ASSERT(session_serial_ == 0); }
 
-  inline nq_conn_t ToHandle() { return GetBoxer()->Box(this); }
-  inline NqSessionIndex session_index() const { return session_index_; }
+  nq_conn_t ToHandle();
   NqStream *FindStream(QuicStreamId id);
-  const NqStream *FindStreamForRead(QuicStreamId id) const;
-  void RemoveStreamForRead(QuicStreamId id);
+  NqStream *FindStreamBySerial(uint64_t s);
+  void InitSerial();
+  inline void InvalidateSerial() { session_serial_ = 0; }  
+
+  std::mutex &static_mutex();
+  NqBoxer *boxer();
+  inline uint64_t session_serial() const { return session_serial_; }
+  inline NqSessionIndex session_index() const { 
+    return NqConnSerialCodec::ServerSessionIndex(session_serial_); }
+
 
   //implements QuicSession
   QuicStream* CreateIncomingDynamicStream(QuicStreamId id) override;
   QuicStream* CreateOutgoingDynamicStream() override;
 
+
   //implements NqSession::Delegate
-  uint64_t Id() const override { return connection_id(); }
   void *Context() const override { return context_; }
   void *StreamContext(uint64_t stream_serial) const override;
   void OnClose(QuicErrorCode error,
@@ -41,10 +49,10 @@ class NqServerSession : public NqSession,
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
   NqLoop *GetLoop() override;
-  NqBoxer *GetBoxer() override;
-  NqSessionIndex SessionIndex() const override { return session_index_; }
   uint64_t ReconnectDurationUS() const override { return 0; }
   QuicConnection *Connection() override { return connection(); }
+  uint64_t SessionSerial() const override { return session_serial(); }
+
 
   //implement custom allocator
   void* operator new(std::size_t sz);
@@ -56,9 +64,7 @@ class NqServerSession : public NqSession,
   NqDispatcher *dispatcher_;
   const NqServer::PortConfig &port_config_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
-  NqSessionIndex session_index_;
-  std::map<QuicStreamId, NqServerStream*> read_map_;
-  std::mutex read_map_mutex_;
+  uint64_t session_serial_;
   void *context_;
 };
 

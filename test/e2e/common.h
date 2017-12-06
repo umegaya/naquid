@@ -380,11 +380,11 @@ class Test {
     }
   };
  protected:
-  nq::atm_int_t running_;
-  nq::atm_int_t result_;
-  nq::atm_int_t test_start_;
-  nq::atm_int_t thread_start_;
-  nq::atm_int_t closed_conn_;
+  nq::atomic<int> running_;
+  nq::atomic<int> result_;
+  nq::atomic<int> test_start_;
+  nq::atomic<int> thread_start_;
+  nq::atomic<int> closed_conn_;
   TestProc testproc_;
   TestInitProc init_;
   nq_addr_t addr_;

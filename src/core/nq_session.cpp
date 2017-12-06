@@ -23,8 +23,7 @@ const QuicCryptoStream* NqSession::GetCryptoStream() const {
   return crypto_stream_.get();
 }
 
-//NqSession::Delegate
-nq_conn_t NqSession::Delegate::BoxSelf() { return GetBoxer()->Box(this); }
+
 
 //implements QuicConnectionVisitorInterface
 void NqSession::OnConnectionClosed(QuicErrorCode error,

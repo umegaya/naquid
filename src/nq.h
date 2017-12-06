@@ -52,23 +52,23 @@ typedef struct nq_server_tag *nq_server_t; //NqServer
 typedef struct nq_hdmap_tag *nq_hdmap_t; //nq::HandlerMap
 
 typedef struct nq_conn_tag {
-    void *p;    //NqBoxer
-    uint64_t s; 
+    void *p;    //NqSession::Delegate
+    uint64_t s; //session_index (0-30bit) | reserved (31-63bit)
 } nq_conn_t;
 
 typedef struct nq_stream_tag {
-    void *p;    //NqBoxer
-    uint64_t s; 
+    void *p;    //NqSessoin::Delegate(client)/NqServerStream(server)
+    uint64_t s; //session_index (0-30bit) | client_flag (1bit) | stream_index (32-63bit)
 } nq_stream_t; 
 
 typedef struct nq_rpc_tag { //this is essentially same as nq_stream, but would helpful to prevent misuse of rpc/stream
-    void *p;
-    uint64_t s; 
+    void *p;    //NqSessoin::Delegate(client)/NqServerStream(server)
+    uint64_t s; //session_index (0-30bit) | client_flag (1bit) | stream_index (32-63bit)
 } nq_rpc_t; 
 
 typedef struct nq_alarm_tag {
-  void *p;
-  uint64_t s;
+  void *p;      //NqAlarm
+  uint64_t s;   //alarm_index (0-31bit) | reserved (32 - 63bit)
 } nq_alarm_t;
 
 //TODO(iyatomi): reduce error code
@@ -191,8 +191,8 @@ typedef struct {
   //set true to ignore proof verification
   bool insecure; 
 
-  //set true to use raw connection, which does not send stream name to specify stream type
-  //it just callbacks/sends packet as it is
+  //NYI: set true to use raw connection, which does not send stream name to specify stream type
+  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
   bool raw;
   
   //total handshake time limit / no input limit. default 1000ms/500ms
@@ -206,8 +206,8 @@ typedef struct {
   //quic secret. need to specify arbiter (hopefully unique) string
   const char *quic_secret;
 
-  //set true to use raw connection, which does not accept stream name to specify stream type.
-  //it just callbacks/sends packet as it is
+  //NYI: set true to use raw connection, which does not accept stream name to specify stream type.
+  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
   bool raw;
 
   //cert cache size. default 16 and how meny sessions accepted per loop. default 1024
@@ -257,7 +257,7 @@ NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl);
 // TODO(iyatomi): make it NQAPI_THREADSAFE
 NQAPI_BOOTSTRAP nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
 // get handler map of the client. 
-NQAPI_THREADSAFE nq_hdmap_t nq_client_hdmap(nq_client_t cl);
+NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl);
 // set thread id that calls nq_client_poll.
 // call this if thread which polls this nq_client_t is different from creator thread.
 NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl);

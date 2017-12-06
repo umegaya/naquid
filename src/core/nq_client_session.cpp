@@ -10,14 +10,14 @@ QuicStream* NqClientSession::CreateIncomingDynamicStream(QuicStreamId id) {
   auto c = static_cast<NqClient *>(delegate());
   auto s = new(c->client_loop()) NqClientStream(id, this, false);
   c->stream_manager().OnOpen("", s);
-  s->InitHandle();
+  s->InitSerial();
   ActivateStream(QuicWrapUnique(s));
   return s;
 }
 QuicStream* NqClientSession::CreateOutgoingDynamicStream() {
   auto c = static_cast<NqClient *>(delegate());
   auto s = new(c->client_loop()) NqClientStream(GetNextOutgoingStreamId(), this, true);
-  //InitHandle called in NqClient::NewStream, after name_id and index_per_name_id decided.
+  //InitSerial and StreamManager::OnOpen called in NqClient::NewStream.
   ActivateStream(QuicWrapUnique(s));
   return s;
 }

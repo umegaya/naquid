@@ -15,6 +15,7 @@
 - [ ] conn: handle connectivity change (if not handled)
 - [ ] conn: try to use let's encrypt cert (with corresponding host name) by default
 - [ ] stream: consider the way that can access sid/ctx/name of client stream (now cannot during reconnection wait)
+- [ ] API: use direct pointer to access conn/stream
 - [ ] API: reduce error code (can use app-defined error code almost anywhere)
 - [ ] API: more API to thread safe 
 - [ ] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
@@ -23,10 +24,12 @@
   - giving special option to nq_client_connect's nq_clconf_t or nq_svconf_t
 - [x] server: QuicAlarm should be more efficient
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
+- [ ] client: remove stub alarm and connection helper interface
+  - override NqLoop operator new/delete to avoid freeing with unique_ptr of QuicClientBase
 - [ ] test: high frequent reconnection test
 - [x] test: server side stream initiation
-- [ ] test: stream disconnection using on open callback 
-- [ ] test: client conn reconnection or finalization using on open callback
+- [x] test: stream disconnection using on open callback 
+- [x] test: client conn reconnection or finalization using on open callback
 - [x] test: stream handle send/recv test
 - [x] test: timeout test for handshake / rpc call
 - [ ] test: ensure robustness for connectivity change

@@ -15,13 +15,14 @@
 namespace net {
 // An implementation of the QuicClientBase::NetworkHelper based off
 // the epoll server.
+class NqClient;
 class NqNetworkHelper : public QuicClientBase::NetworkHelper,
                         public nq::IoProcessor,
                         public NqPacketReader::Delegate {
  public:
   // Create a quic client, which will have events managed by an externally owned
   // EpollServer.
-  NqNetworkHelper(NqLoop* loop, QuicClientBase* client);
+  NqNetworkHelper(NqLoop* loop, NqClient* client);
   ~NqNetworkHelper() override;
 
   // implements nq::IoProcessor
@@ -46,7 +47,7 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
 
 
   // Accessors provided for convenience, not part of any interface.
-  QuicClientBase* client() { return client_; }
+  NqClient* client() { return client_; }
 
  private:
   // If |fd| is an open UDP socket, unregister and close it. Otherwise, do
@@ -77,7 +78,7 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
   // space than allowed on the stack.
   std::unique_ptr<NqPacketReader> packet_reader_;
 
-  QuicClientBase* client_;
+  NqClient* client_;
 
   DISALLOW_COPY_AND_ASSIGN(NqNetworkHelper);
 };

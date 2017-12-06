@@ -11,11 +11,47 @@ namespace net {
 NqServerSession::NqServerSession(QuicConnection *connection,
                                  const NqServer::PortConfig &port_config)
   : NqSession(connection, dispatcher_, this, port_config), //dispatcher implements QuicSession::Visitor interface
-  port_config_(port_config),
-  session_index_(dispatcher_->new_session_index()),
-  read_map_(), read_map_mutex_(), context_(nullptr) {
+  port_config_(port_config), context_(nullptr) {
   init_crypto_stream();
 }
+nq_conn_t NqServerSession::ToHandle() { 
+  return {
+    .p = this,
+    .s = session_serial_,
+  }; 
+}
+std::mutex &NqServerSession::static_mutex() {
+  return dispatcher_->session_allocator().BSS(this)->mutex();
+}
+NqBoxer *NqServerSession::boxer() { 
+  return static_cast<NqBoxer *>(dispatcher_); 
+}
+
+
+
+NqStream *NqServerSession::FindStream(QuicStreamId id) {
+  auto it = dynamic_streams().find(id);
+  return it != dynamic_streams().end() ? static_cast<NqStream *>(it->second.get()) : nullptr;
+}
+NqStream *NqServerSession::FindStreamBySerial(uint64_t s) {
+  //TODO(iyatomi): now assume not so much stream with one session. 
+  //in that case, below code probably faster because of good memory locality. 
+  //but better to handle so-many-stream per session case separately
+  for (auto &kv : dynamic_streams()) {
+    auto st = static_cast<NqStream *>(kv.second.get());
+    if (st->stream_serial() == s) {
+      return st;
+    }
+  }
+  return nullptr;
+}
+void NqServerSession::InitSerial() {
+  auto session_index = dispatcher_->server_map().Add(this);
+  session_serial_ = NqConnSerialCodec::ServerEncode(session_index, connection_id(), dispatcher_->worker_num());
+}
+
+
+
 //implement custom allocator
 void* NqServerSession::operator new(std::size_t sz) {
   ASSERT(false);
@@ -41,28 +77,16 @@ void NqServerSession::operator delete(void *p, NqDispatcher *d) noexcept {
 }
 
 
-NqStream *NqServerSession::FindStream(QuicStreamId id) {
-  auto it = dynamic_streams().find(id);
-  return it != dynamic_streams().end() ? static_cast<NqStream *>(it->second.get()) : nullptr;
-}
-const NqStream *NqServerSession::FindStreamForRead(QuicStreamId id) const {
-  std::unique_lock<std::mutex> lock(const_cast<NqServerSession*>(this)->read_map_mutex_);
-  auto it = read_map_.find(id);
-  return it != read_map_.end() ? it->second : nullptr;
-}
-void NqServerSession::RemoveStreamForRead(QuicStreamId id) {
-  std::unique_lock<std::mutex> lock(read_map_mutex_);
-  read_map_.erase(id);  
-}
 
 //implements NqSession::Delegate
-NqLoop *NqServerSession::GetLoop() { return dispatcher_->loop(); }
-NqBoxer *NqServerSession::GetBoxer() { return dispatcher_; }
+NqLoop *NqServerSession::GetLoop() { 
+  return dispatcher_->loop(); 
+}
 void *NqServerSession::StreamContext(uint64_t stream_serial) const {
-  auto sid = NqStreamSerialCodec::ServerStreamId(stream_serial);
-  auto s = FindStreamForRead(sid);
+  auto sid = NqStreamSerialCodec::ServerStreamIndex(stream_serial);
+  auto s = const_cast<NqServerSession *>(this)->FindStream(sid);
   if (s != nullptr) {
-    return static_cast<NqServerStream *>(const_cast<NqStream *>(s))->context();
+    return static_cast<NqServerStream *>(s)->context();
   } else {
     return nullptr;
   }
@@ -74,10 +98,9 @@ void NqServerSession::OnClose(QuicErrorCode error,
                   (int)error, 
                   error_details.c_str(), 
                   close_by_peer_or_self == ConnectionCloseSource::FROM_PEER);
-  //TODO(iyatomi): destroy session (seems no one delete it)
-  auto c = dispatcher_->Box(this);
+  InvalidateSerial();
   //don't use invokeconn because it may cause deletion of connection immediately.
-  dispatcher_->Enqueue(new NqBoxer::Op(c.s, NqBoxer::OpCode::Finalize, NqBoxer::OpTarget::Conn));
+  dispatcher_->Enqueue(new NqBoxer::Op(session_serial_, this, NqBoxer::OpCode::Finalize, NqBoxer::OpTarget::Conn));
 }
 void NqServerSession::OnOpen(nq_handshake_event_t hsev) {
   nq_closure_call(port_config_.server().on_open, on_server_conn_open, ToHandle(), hsev, &context_);
@@ -94,18 +117,14 @@ bool NqServerSession::IsClient() const {
 }
 QuicStream* NqServerSession::CreateIncomingDynamicStream(QuicStreamId id) {
   auto s = new(dispatcher_) NqServerStream(id, this, false);
-  s->InitHandle();
+  s->InitSerial();
   ActivateStream(QuicWrapUnique(s));
-  std::unique_lock<std::mutex> lock(read_map_mutex_);
-  read_map_[id] = s;
   return s;
 }
 QuicStream* NqServerSession::CreateOutgoingDynamicStream() {
   auto s = new(dispatcher_) NqServerStream(GetNextOutgoingStreamId(), this, true);
-  s->InitHandle();
+  s->InitSerial();
   ActivateStream(QuicWrapUnique(s));
-  std::unique_lock<std::mutex> lock(read_map_mutex_);
-  read_map_[s->id()] = s;
   return s;
 }
 //this is not thread safe and only guard at nq.cpp nq_conn_rpc, nq_conn_stream.

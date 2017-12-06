@@ -10,6 +10,8 @@
 #include "basis/defs.h"
 #include "basis/handler_map.h"
 #include "core/nq_serial_codec.h"
+#include "core/nq_static_section.h"
+
 
 namespace net {
 class NqLoop;
@@ -28,7 +30,6 @@ class NqSession : public QuicSession {
   class Delegate {
    public:
     virtual ~Delegate() {}
-    virtual uint64_t Id() const = 0;
     virtual void *Context() const = 0;
     virtual void *StreamContext(uint64_t stream_serial) const = 0;
     virtual void OnClose(QuicErrorCode error,
@@ -44,9 +45,8 @@ class NqSession : public QuicSession {
     virtual const nq::HandlerMap *GetHandlerMap() const = 0;
     virtual nq::HandlerMap *ResetHandlerMap() = 0;
     virtual NqLoop *GetLoop() = 0;
-    virtual NqBoxer *GetBoxer() = 0;
-    virtual NqSessionIndex SessionIndex() const = 0;
     virtual QuicConnection *Connection() = 0;
+    virtual uint64_t SessionSerial() const = 0;
 
     //this is not thread safe and only guard at nq.cpp nq_conn_rpc, nq_conn_stream.
     template <class S> S *NewStreamCast(const std::string &name) {
@@ -77,7 +77,7 @@ class NqSession : public QuicSession {
   inline bool IsClient() const { return connection()->perspective() == Perspective::IS_CLIENT; }
   inline Delegate *delegate() { return delegate_; }
   inline const Delegate *delegate() const { return delegate_; }
-  inline nq_conn_t conn() { return delegate_->BoxSelf(); }
+  inline nq_conn_t conn() { return { .p = delegate_, .s = delegate_->SessionSerial() }; }
   inline const nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
 
   //implements QuicConnectionVisitorInterface

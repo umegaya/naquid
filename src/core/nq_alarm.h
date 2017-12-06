@@ -4,10 +4,12 @@
 
 #include "nq.h"
 #include "basis/timespec.h"
+#include "basis/allocator.h"
 #include "core/nq_loop.h"
 #include "core/nq_serial_codec.h"
 
 namespace net {
+class NqBoxer;
 class NqAlarmInterface {
  public:
   virtual ~NqAlarmInterface() {}
@@ -72,17 +74,22 @@ class NqAlarmBase : public NqAlarmInterface {
 };
 class NqAlarm : public NqAlarmBase {
   nq_closure_t cb_;
-  NqAlarmIndex alarm_index_;
+  NqBoxer *boxer_;
+  uint64_t alarm_serial_;
  public:
-  NqAlarm() : NqAlarmBase(), cb_(nq_closure_empty()), alarm_index_(0) {}
+  typedef nq::Allocator<NqAlarm> Allocator;
 
-  inline void set_alarm_index(NqAlarmIndex idx) { alarm_index_ = idx; }
-  inline NqAlarmIndex alarm_index() const { return alarm_index_; }
+  NqAlarm() : NqAlarmBase(), cb_(nq_closure_empty()), alarm_serial_(0) {}
+
   inline void Start(NqLoop *loop, nq_time_t first_invocation_ts, nq_closure_t cb) {
     Stop(loop);
     cb_ = cb;
     NqAlarmBase::Start(loop, first_invocation_ts);
   }
+  inline NqBoxer *GetBoxer() { return boxer_; }
+  NqAlarmIndex alarm_index() const;
+  uint64_t alarm_serial() { return alarm_serial_; }
+  void InitSerial(uint64_t serial) { alarm_serial_ = serial; }
 
   // implements NqAlarmInterface
   void OnFire(NqLoop *loop) override {
@@ -97,5 +104,11 @@ class NqAlarm : public NqAlarmBase {
       delete this;
     }
   }
+
+  //implement custom allocator
+  void* operator new(std::size_t sz);
+  void* operator new(std::size_t sz, NqBoxer* l);
+  void operator delete(void *p) noexcept;
+  void operator delete(void *p, NqBoxer *l) noexcept;
 };
 }
