@@ -9,7 +9,7 @@ using namespace nqtest;
 struct conn_context {
   int count;
 };
-void on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void **ppctx) {
+void on_conn_open(void *, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
   TRACE("on_conn_open event:%d\n", hsev);
   if (hsev != NQ_HS_DONE) {
     return;
@@ -17,6 +17,7 @@ void on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void **ppctx) {
   auto ctx = (conn_context *)malloc(sizeof(conn_context));
   ctx->count = 3;
   *ppctx = ctx;
+  TRACE("set context for %p, %p", c.p, ctx);
 }
 int g_reject = 2;
 void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
@@ -59,16 +60,36 @@ void on_alarm(void *p, nq_time_t *pnext) {
 
 
 /* rpc callbacks */
-bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
+bool on_rpc_open(void *p, nq_rpc_t rpc, void **ppctx) {
+  TRACE("on_rpc_open");
+  bool valid;
+  if (nq_rpc_outgoing(rpc, &valid)) {
+    TRACE("outgoing");
+    //outgoing stream need to send rpc to peer
+    auto msg = (std::string *)(*ppctx);
+    RPC(rpc, RpcType::ServerRequest, msg->c_str(), msg->length(), ([rpc, msg](
+      nq_rpc_t rpc2, nq_result_t r, const void *data, nq_size_t dlen) {
+      TRACE("receive ServerRequest reply");
+      ASSERT(r >= 0 && nq_rpc_equal(rpc, rpc2) && MakeString(data, dlen) == ("from client:" + (*msg)));
+      delete msg;
+    }));
+  } else if (valid) {
+    //incoming do nothing now
+    TRACE("incoming");
+  } else {
+    ASSERT(false);
+  }
   return true;
 }
 bool on_rpc_open_reject(void *p, nq_rpc_t rpc, void **ppctx) {
+  TRACE("on_rpc_open_reject");
   auto c = nq_rpc_conn(rpc);
   conn_context *ctx = reinterpret_cast<conn_context *>(nq_conn_ctx(c));
   if (ctx == nullptr) {
     ASSERT(false);
     return false;
   }
+  TRACE("on_rpc_open_reject %d", ctx->count);
   ctx->count--;
   if (ctx->count <= 0) {
     return on_rpc_open(p, rpc, ppctx);
@@ -78,7 +99,7 @@ bool on_rpc_open_reject(void *p, nq_rpc_t rpc, void **ppctx) {
 void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
-  //TRACE("rpc req: %u", type);
+  TRACE("rpc req: %u", type);
   switch (type) {
     case RpcType::Ping: {
       ASSERT(len == sizeof(nq_time_t));
@@ -104,17 +125,9 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
           return;
         }
         auto name = s.substr(0, idx);
-        auto msg = "from server:" + s.substr(idx + 1);
+        auto msg = new std::string("from server:" + s.substr(idx + 1));
         auto c = nq_rpc_conn(rpc);
-        auto rpc2 = nq_conn_rpc(c, name.c_str());
-        if (!nq_rpc_is_valid(rpc2)) {
-          nq_rpc_reply(rpc, RpcError::NoSuchStream, msgid, s.c_str(), s.length());
-          return;          
-        }
-        RPC(rpc2, RpcType::ServerRequest, msg.c_str(), msg.length(), ([rpc2, msg](
-          nq_rpc_t rpc3, nq_result_t r, const void *data, nq_size_t dlen) {
-          ASSERT(r >= 0 && nq_rpc_sid(rpc2) == nq_rpc_sid(rpc3) && MakeString(data, dlen) == ("from client:" + msg));
-        }));
+        nq_conn_rpc(c, name.c_str(), msg);
         nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
       }
       break;
@@ -171,6 +184,7 @@ bool on_stream_open(void *p, nq_stream_t s, void **ppctx) {
     free(sc);
     return false; 
   }
+  TRACE("on_stream_open set context: %p %u", sc, nq_stream_sid(s));
   *ppctx = sc;
   return true;
 }
@@ -306,7 +320,7 @@ int main(int argc, char *argv[]){
     1, 2, 1, 1,
   };
   nq_closure_init(scf.on_server_conn_open, on_server_conn_open, on_conn_open_reject, reject_counter + 0);
-  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open, reject_counter + 1);
+  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open_reject, reject_counter + 1);
   nq_closure_init(scf.on_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 2);
   nq_closure_init(scf.on_raw_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 3);
   setup_server(sv, 18443, &scf);

@@ -7,26 +7,19 @@
 #include "core/nq_server_session.h"
 #include "core/nq_client_loop.h"
 #include "core/nq_dispatcher.h"
+#include "core/nq_unwrapper.h"
 
 namespace net {
 
 NqStream::NqStream(QuicStreamId id, NqSession* nq_session, 
                    bool establish_side, SpdyPriority priority) : 
   QuicStream(id, nq_session), 
+  buffer_(),
   handler_(nullptr), 
   priority_(priority), 
-  establish_side_(establish_side) {
+  establish_side_(establish_side),
+  established_(false), proto_sent_(false) {
   nq_session->RegisterStreamPriority(id, priority);
-}
-NqLoop *NqStream::GetLoop() { 
-  return nq_session()->delegate()->GetLoop(); 
-}
-nq_alarm_t NqStream::NewAlarm() {
-  auto a = GetBoxer()->NewAlarm();
-  return {
-    .p = a,
-    .s = a->alarm_serial(),
-  };
 }
 NqSession *NqStream::nq_session() { 
   return static_cast<NqSession *>(session()); 
@@ -42,14 +35,33 @@ NqSessionIndex NqStream::session_index() const {
 nq_conn_t NqStream::conn() { 
   return nq_session()->conn(); 
 }
-bool NqStream::set_protocol(const std::string &name) {
-  if (!establish_side()) {
-    ASSERT(false); //should be establish side
-    return false; 
+bool NqStream::OpenHandler(const std::string &name) {
+  if (handler_ != nullptr) {
+    return establish_side(); //because non establish side never call this twice.
+  }
+  handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name));
+  if (handler_ == nullptr) {
+    ASSERT(false);
+    return false;
   }
   buffer_ = name;
-  handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name));
-  return handler_ != nullptr;
+  buffer_.append(1, '\0');
+  if (!handler_->OnOpen()) {
+    buffer_ = "";
+    return false;
+  }
+  return true;
+}
+NqLoop *NqStream::GetLoop() { 
+  return nq_session()->delegate()->GetLoop(); 
+}
+nq_alarm_t NqStream::NewAlarm() {
+  NqAlarm *a = GetBoxer()->NewAlarm();
+  TRACE("NqStream::NewAlram %p", a);
+  return {
+    .p = a,
+    .s = a->alarm_serial(),
+  };
 }
 NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
   auto he = nq_session()->handler_map()->Find(name);
@@ -86,11 +98,14 @@ NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
   return s;
 }
 void NqStream::Disconnect() {
-  WriteOrBufferData(QuicStringPiece(), true, nullptr);
+  //WriteOrBufferData(QuicStringPiece(), true, nullptr);
+  //CloseReadSide(); //prevent further receiving packet
+  nq_session()->CloseStream(id());
 }
 void NqStream::OnClose() {
+  TRACE("NqStream::OnClose %p, %llx(%lu)", this, stream_serial_.load(), id());
   handler_->OnClose();
-  InvalidateSerial();
+  QuicStream::OnClose();
 }
 void NqStream::OnDataAvailable() {
   QuicConnection::ScopedPacketBundler bundler(
@@ -99,34 +114,34 @@ void NqStream::OnDataAvailable() {
   struct iovec v[256];
   int n_blocks = sequencer()->GetReadableRegions(v, 256);
   int i = 0;
-  if (handler_ == nullptr && !establish_side()) {
+  if (!established_) {
     //establishment
-    for (;i < n_blocks;) {
-      buffer_.append(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
-      sequencer()->MarkConsumed(v[i].iov_len);
-      i++;
-      size_t idx = buffer_.find('\0');
-      if (idx == std::string::npos) {
-        continue; //not yet established
+    if (establish_side()) {
+      established_ = true;
+    } else {
+      for (;i < n_blocks;) {
+        buffer_.append(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
+        sequencer()->MarkConsumed(v[i].iov_len);
+        i++;
+        size_t idx = buffer_.find('\0');
+        if (idx == std::string::npos) {
+          continue; //not yet established
+        }
+        //prevent send handshake message to client
+        set_proto_sent();
+        //create handler by initial establish string
+        auto name = buffer_.substr(0, idx);
+        if (!OpenHandler(name)) {
+          Disconnect();
+          return;
+        }
+        if (buffer_.length() > (idx + 1)) {
+          //parse_buffer may contains over-received payload
+          handler_->OnRecv(buffer_.c_str() + idx + 1, buffer_.length() - idx - 1);
+        }
+        established_ = true;
+        break;
       }
-      //create handler by initial establish string
-      auto name = buffer_.substr(0, idx);
-      handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name));
-      if (handler_ == nullptr) { //server side OnOpen
-        Disconnect();
-        return; //broken payload. stream handler does not exists / stream handler reject to processs
-      }
-      handler_->ProtoSent();
-      if (!handler_->OnOpen()) {
-        Disconnect();
-        return; //broken payload. stream handler does not exists / stream handler reject to processs        
-      }
-      if (buffer_.length() > (idx + 1)) {
-        //parse_buffer may contains over-received payload
-        handler_->OnRecv(buffer_.c_str() + idx + 1, buffer_.length() - idx - 1);
-      }
-      buffer_ = std::move(name);
-      break;
     }
   }
   size_t consumed = 0;
@@ -151,13 +166,15 @@ void NqClientStream::InitSerial() {
       NqConnSerialCodec::ClientSessionIndex(session_serial), 
       stream_index_ //need to give stable stream index instead of stream_id, which will change on reconnection.
     ); 
+  TRACE("NqClientStream: serial = %llx", stream_serial_.load());
 }
 void NqClientStream::OnClose() {
-  //it's generally unsafe. delegate is not assured to be NqClient*
   ASSERT(nq_session()->delegate()->IsClient());
-  NqStream::OnClose();
+  //to initiate new stream creation by sending packet, remove session pointer first
   auto c = static_cast<NqClient *>(nq_session()->delegate());
   c->stream_manager().OnClose(this);
+  NqStream::OnClose();
+  InvalidateSerial();
 }
 void **NqClientStream::ContextBuffer() {
   ASSERT(nq_session()->delegate()->IsClient());
@@ -166,38 +183,40 @@ void **NqClientStream::ContextBuffer() {
   return c->stream_manager().FindContextBuffer(
     NqStreamSerialCodec::ClientStreamIndex(serial));
 }
+const std::string &NqClientStream::Protocol() const {
+  auto c = static_cast<const NqClient *>(nq_session()->delegate());  
+  return c->stream_manager().FindStreamName(
+    NqStreamSerialCodec::ClientStreamIndex(stream_serial()));
+}
+
 
 
 
 NqBoxer *NqServerStream::GetBoxer() {
   return static_cast<NqBoxer *>(static_cast<NqDispatcher *>(stream_allocator()));
 }
-void NqServerStream::InitSerial() {
+void NqServerStream::InitSerial(NqStreamIndex idx) {
   stream_ptr_ = nq_session()->delegate();
   auto session_serial = nq_session()->delegate()->SessionSerial();
   ASSERT(!NqConnSerialCodec::IsClient(session_serial));
   stream_serial_ = NqStreamSerialCodec::ServerEncode(
     NqConnSerialCodec::ServerSessionIndex(session_serial), 
-    id(), 
+    idx, 
     NqConnSerialCodec::ServerWorkerIndex(session_serial)
   );   
+  TRACE("NqServerStream: serial = %llx", stream_serial_.load());
 }
 void NqServerStream::OnClose() {
   ASSERT(!nq_session()->delegate()->IsClient());
   NqStream::OnClose();
+  InvalidateSerial();
 }
 
 
 
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
-  if (!proto_sent_) { //TODO(iyatomi): use unlikely
-    const auto& name = stream_->protocol();
-    char zero_byte = 0;
-    stream_->WriteOrBufferData(QuicStringPiece(name.c_str(), name.length()), false, nullptr);
-    stream_->WriteOrBufferData(QuicStringPiece(&zero_byte, 1), false, nullptr);
-    OnOpen(); //client stream side OnOpen
-    proto_sent_ = true;
-  }
+  stream_->SendHandshake();
+  TRACE("WriteBytes %p", stream_);
   stream_->WriteOrBufferData(QuicStringPiece(p, len), false, nullptr);
 }
 
@@ -316,14 +335,14 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
   memcpy(buffer + ofs, p, len);
   WriteBytes(buffer, ofs + len);  
 }
-void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
+void NqSimpleRPCStreamHandler::Call(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
   //QuicConnection::ScopedPacketBundler bundler(
     //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   nq_msgid_t msgid = msgid_factory_.New();
   SendCommon(type, msgid, p, len);
   EntryRequest(msgid, cb, default_timeout_ts_);
 }
-void NqSimpleRPCStreamHandler::Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) {
+void NqSimpleRPCStreamHandler::CallEx(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) {
   //QuicConnection::ScopedPacketBundler bundler(
     //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   nq_msgid_t msgid = msgid_factory_.New();

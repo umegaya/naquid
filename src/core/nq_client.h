@@ -29,17 +29,15 @@ class NqClient : public QuicClientBase,
  public:
   enum ConnectState : uint8_t {
     DISCONNECT,
-    CONNECT,
+    CONNECTING,
+    CONNECTED,
     FINALIZED,
     RECONNECTING,
   };
   class ReconnectAlarm : public QuicAlarm::Delegate {
    public:
     ReconnectAlarm(NqClient *client) : client_(client) {}
-    void OnAlarm() { 
-      client_->Initialize();
-      client_->StartConnect(); 
-    }
+    void OnAlarm();
    private:
     NqClient *client_;
   };
@@ -64,12 +62,13 @@ class NqClient : public QuicClientBase,
     using StreamMap = QuicSmallMap<NqStreamIndex, Entry, 10>;
 
     StreamMap stream_map_;
-    std::stack<NqStreamIndex> in_empty_indexes_;
-    std::mutex map_mutex_;
+    nq::IdFactoryNoAtomic<NqStreamIndex> index_seed_;
    public:
-    StreamManager() : stream_map_(), in_empty_indexes_(), map_mutex_() {}
+    StreamManager() : stream_map_(), index_seed_() {}
     
-    bool OnOpen(const std::string &name, NqClientStream *s);
+    bool OnOutgoingOpen(NqClientSession *session, bool connected, 
+                        const std::string &name, void *ctx);
+    bool OnIncomingOpen(NqClientStream *s);
     void OnClose(NqClientStream *s);
 
     NqClientStream *FindOrCreateStream(
@@ -89,11 +88,14 @@ class NqClient : public QuicClientBase,
       auto *e = FindEntry(index);
       return e == nullptr ? nullptr : e->ContextBuffer();
     }
+    inline const std::string &FindStreamName(NqStreamIndex index) const {
+      static std::string empty_;
+      auto *e = FindEntry(index);
+      return e == nullptr ? empty_ : e->Name();
+    }
    protected:
     Entry *FindEntry(NqStreamIndex index) const;
-    bool OnOutgoingOpen(const std::string &name, NqClientStream *s);
     void OnOutgoingClose(NqClientStream *s);
-    bool OnIncomingOpen(NqClientStream *s);
     void OnIncomingClose(NqClientStream *s);    
   };
  public:
@@ -156,12 +158,13 @@ class NqClient : public QuicClientBase,
                ConnectionCloseSource close_by_peer_or_self) override;
   void OnOpen(nq_handshake_event_t hsev) override;
   bool IsClient() const override { return true; }
+  bool IsConnected() const override { return connect_state_ == CONNECTED; }
   void Disconnect() override;
   bool Reconnect() override;
   uint64_t ReconnectDurationUS() const override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
-  QuicStream* NewStream(const std::string &name) override;
+  bool NewStream(const std::string &name, void *ctx) override;
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
   NqLoop *GetLoop() override;
   QuicConnection *Connection() override { return session()->connection(); }

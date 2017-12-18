@@ -9,7 +9,7 @@ namespace net {
 QuicStream* NqClientSession::CreateIncomingDynamicStream(QuicStreamId id) {
   auto c = static_cast<NqClient *>(delegate());
   auto s = new(c->client_loop()) NqClientStream(id, this, false);
-  c->stream_manager().OnOpen("", s);
+  c->stream_manager().OnIncomingOpen(s);
   s->InitSerial();
   ActivateStream(QuicWrapUnique(s));
   return s;

@@ -31,12 +31,38 @@ using namespace net;
 // helper
 //
 // --------------------------
+enum InvalidHandleReason {
+  IHR_CONN_CREATE_FAIL = 1,
+  IHR_INVALID_CONN = 2,
+  IHR_CONN_NOT_FOUND = 3,
+  IHR_INVALID_STREAM = 4,
+};
 template <class H> 
-H INVALID_HANDLE(const char *msg) {
+H INVALID_HANDLE(InvalidHandleReason ihr) {
   H h;
-  h.p = const_cast<char *>(msg);
+  h.p = reinterpret_cast<void *>(ihr);
   h.s = 0;
   return h;
+}
+template <class H>
+const char *INVALID_REASON(const H &h) {
+  switch (reinterpret_cast<uintptr_t>(h.p)) {
+    case IHR_CONN_CREATE_FAIL:
+      return "conn create fail";
+    case IHR_INVALID_CONN:
+      return "invalid conn";
+    case IHR_CONN_NOT_FOUND:
+      return "conn not found";
+    case IHR_INVALID_STREAM:    
+      return "invalid stream";
+    default:
+      if (h.s == 0) {
+        return "deallocated handle";
+      } else {
+        ASSERT(false);
+        return "outdated handle";
+      }
+  }
 }
 
 static nq_closure_t g_empty_closure {
@@ -49,17 +75,14 @@ NQAPI_THREADSAFE nq_closure_t nq_closure_empty() {
 NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr) {
   return clsr.ptr == nullptr;
 }
-static inline NqStream *ToStream(nq_rpc_t rpc) { 
-  return reinterpret_cast<NqStream *>(rpc.p); 
-}
-static inline NqStream *ToStream(nq_stream_t s) { 
-  return reinterpret_cast<NqStream *>(s.p); 
-}
 static inline NqSession::Delegate *ToConn(nq_conn_t c) { 
   return reinterpret_cast<NqSession::Delegate *>(c.p); 
 }
 static inline NqAlarm *ToAlarm(nq_alarm_t a) { 
   return reinterpret_cast<NqAlarm *>(a.p); 
+}
+static inline bool IsOutgoing(bool is_client, nq_sid_t stream_id) {
+  return is_client ? ((stream_id % 2) != 0) : ((stream_id % 2) == 0);
 }
 
 
@@ -88,7 +111,7 @@ NQAPI_BOOTSTRAP nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *add
   auto cf = NqClientConfig(*conf);
 	auto c = loop->Create(addr->host, addr->port, cf);
   if (c == nullptr) {
-    return INVALID_HANDLE<nq_conn_t>("fail to create client");
+    return INVALID_HANDLE<nq_conn_t>(IHR_CONN_CREATE_FAIL);
   }
   return c->ToHandle();
 }
@@ -163,36 +186,35 @@ NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
     return d->IsClient();
-  });
+  }, "nq_conn_is_client");
   return false;
 }
 NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn) {
-  if (conn.s == 0) { TRACE("invalid handle: %s", conn.p); return false; }
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
     return true;
-  });
+  }, "nq_conn_is_valid");
   return false;
 }
 NQAPI_THREADSAFE nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
     return d->ResetHandlerMap()->ToHandle();
-  });
+  }, "nq_conn_hdmap");
   return nullptr;
 }
 NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
     return nq_time_usec(d->ReconnectDurationUS());
-  });
+  }, "nq_conn_reconnect_wait");
   return 0;
 }
 NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
     return d->Context();
-  });
+  }, "nq_conn_ctx");
   return nullptr;
 }
 //these are hidden API for test, because returned value is unstable
@@ -201,7 +223,7 @@ NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
     return d->Connection()->connection_id();
-  });
+  }, "nq_conn_cid");
   return 0;
 }
 
@@ -211,63 +233,72 @@ NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
 // stream API
 //
 // --------------------------
-NQAPI_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name) {
-  NqSession::Delegate *d;
-  UNWRAP_CONN(conn, d, {
-    return d->NewStreamCast<NqStream>(name)->ToHandle<nq_stream_t>();
-  });
-  return INVALID_HANDLE<nq_stream_t>("invalid conn"); 
+NQAPI_THREADSAFE void nq_conn_stream(nq_conn_t conn, const char *name, void *ctx) {
+  NqUnwrapper::UnwrapBoxer(conn)->InvokeConn(conn.s, NqBoxer::OpCode::CreateStream, ToConn(conn), name, ctx);
 }
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
   NqSession::Delegate *d;
   UNWRAP_CONN(s, d, ({
     return {.p = d, .s = NqStreamSerialCodec::ToConnSerial(s.s)};
-  }));
-  return INVALID_HANDLE<nq_conn_t>("fail to find conn");
+  }), "nq_stream_conn");
+  return INVALID_HANDLE<nq_conn_t>(IHR_CONN_NOT_FOUND);
 }
 NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s) {
   NqStream *st;
   UNWRAP_STREAM(s, st, {
     return st->NewAlarm();
-  });
-  return INVALID_HANDLE<nq_alarm_t>("invalid stream");
+  }, "nq_stream_alarm");
+  return INVALID_HANDLE<nq_alarm_t>(IHR_INVALID_STREAM);
 }
 NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s) {
   NqStream *st;
   UNWRAP_STREAM(s, st, {
     return true;
-  });
+  }, "nq_stream_is_valid");
+  return false;
+}
+NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid) {
+  NqStream *st;
+  UNWRAP_STREAM(s, st, {
+    *p_valid = true;
+    return IsOutgoing(NqStreamSerialCodec::IsClient(s.s), st->id());
+  }, "nq_stream_close");
+  *p_valid = false;
   return false;
 }
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s) {
-  ASSERT(nq_stream_is_valid(s));
-	NqUnwrapper::UnwrapBoxer(s)->InvokeStream(s.s, NqBoxer::OpCode::Disconnect, ToStream(s));
+  NqStream *st;
+  UNWRAP_STREAM(s, st, {
+    st->Disconnect();
+  }, "nq_stream_close");
 }
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
-  ASSERT(nq_conn_is_valid(nq_stream_conn(s)));
-  NqUnwrapper::UnwrapBoxer(s)->InvokeStream(s.s, NqBoxer::OpCode::Send, data, datalen, ToStream(s));
+  NqStream *st;
+  UNWRAP_STREAM(s, st, {
+    st->Handler<NqStreamHandler>()->Send(data, datalen);
+  }, "nq_stream_send");
 }
+//these are hidden API for test, because returned value is unstable
+//when used with client connection (under reconnection)
 NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s) {
   NqSession::Delegate *d;
   UNWRAP_CONN(s, d, {
     return d->StreamContext(s.s);
-  });
+  }, "nq_stream_ctx");
   return nullptr;
 }
-//these are hidden API for test, because returned value is unstable
-//when used with client connection (under reconnection)
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s) {
   NqStream *st;
   UNWRAP_STREAM(s, st, {
     return st->id();
-  });
+  }, "nq_stream_sid");
   return 0;
 }
 NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s) {
   NqStream *st;
   UNWRAP_STREAM(s, st, {
-    return st->protocol().c_str();
-  });
+    return st->Protocol().c_str();
+  }, "nq_stream_name");
   return nullptr;
 }
 
@@ -278,79 +309,94 @@ NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s) {
 // rpc API
 //
 // --------------------------
-NQAPI_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name) {
-  NqSession::Delegate *d;
-  UNWRAP_CONN(conn, d, {
-    return d->NewStreamCast<NqStream>(name)->ToHandle<nq_rpc_t>();
-  });
-  return INVALID_HANDLE<nq_rpc_t>("invalid conn"); 
+NQAPI_THREADSAFE void nq_conn_rpc(nq_conn_t conn, const char *name, void *ctx) {
+  NqUnwrapper::UnwrapBoxer(conn)->InvokeConn(conn.s, NqBoxer::OpCode::CreateRpc, ToConn(conn), name, ctx);
 }
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   NqSession::Delegate *d;
   UNWRAP_CONN(rpc, d, ({
     return {.p = d, .s = NqStreamSerialCodec::ToConnSerial(rpc.s)};
-  }));
-  return INVALID_HANDLE<nq_conn_t>("fail to find conn");
+  }), "nq_rpc_conn");
+  return INVALID_HANDLE<nq_conn_t>(IHR_CONN_NOT_FOUND);
 }
 NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc) {
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
     return st->NewAlarm();
-  });
-  return INVALID_HANDLE<nq_alarm_t>("invalid stream");
+  }, "nq_rpc_alarm");
+  return INVALID_HANDLE<nq_alarm_t>(IHR_INVALID_STREAM);
 }
 NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc) {
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
     return true;
-  });
+  }, "nq_rpc_is_valid");
+  return false;
+}
+NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t rpc, bool *p_valid) {
+  NqStream *st;
+  UNWRAP_STREAM(rpc, st, {
+    *p_valid = true;
+    return IsOutgoing(NqStreamSerialCodec::IsClient(rpc.s), st->id());
+  }, "nq_stream_close");
+  *p_valid = false;
   return false;
 }
 NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc) {
-  ASSERT(nq_rpc_is_valid(rpc));
-  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Disconnect, ToStream(rpc));
+  NqStream *st;
+  UNWRAP_STREAM(rpc, st, {
+    st->Disconnect();
+  }, "nq_rpc_close");
 }
 NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
-  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(type > 0);
-  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Call, type, data, datalen, on_reply, ToStream(rpc));
+  NqStream *st;
+  UNWRAP_STREAM(rpc, st, {
+    st->Handler<NqSimpleRPCStreamHandler>()->Call(type, data, datalen, on_reply);
+  }, "nq_rpc_call");
 }
 NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_rpc_opt_t *opts) {
-  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(type > 0);
-  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::CallEx, type, data, datalen, *opts, ToStream(rpc));
+  NqStream *st;
+  UNWRAP_STREAM(rpc, st, {
+    st->Handler<NqSimpleRPCStreamHandler>()->CallEx(type, data, datalen, *opts);
+  }, "nq_rpc_call_ex");
 }
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen) {
-  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(type > 0);
-  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Notify, type, data, datalen, ToStream(rpc));
+  NqStream *st;
+  UNWRAP_STREAM(rpc, st, {
+    st->Handler<NqSimpleRPCStreamHandler>()->Notify(type, data, datalen);
+  }, "nq_rpc_notify");
 }
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
-  ASSERT(nq_conn_is_valid(nq_rpc_conn(rpc)));
   ASSERT(result <= 0);
-  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen, ToStream(rpc));
+  NqStream *st;
+  UNWRAP_STREAM(rpc, st, {
+    st->Handler<NqSimpleRPCStreamHandler>()->Reply(result, msgid, data, datalen);
+  }, "nq_rpc_reply");
 }
+//these are hidden API for test, because returned value is unstable
+//when used with client connection (under reconnection)
 NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t rpc) {
   NqSession::Delegate *d;
   UNWRAP_CONN(rpc, d, {
     return d->StreamContext(rpc.s);
-  });
+  }, "nq_rpc_ctx");
   return nullptr;
 }
-//these are hidden API for test, because returned value is unstable
-//when used with client connection (under reconnection)
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc) {
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
     return st->id();
-  });
+  }, "nq_rpc_sid");
   return 0;
 }
 NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t rpc) {
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
-    return st->protocol().c_str();
-  });
+    return st->Protocol().c_str();
+  }, "nq_rpc_name");
   return nullptr;
 }
 

@@ -16,8 +16,12 @@ static void test_io(nq_stream_t s, Test::Conn &tc) {
 }
 
 void test_stream(Test::Conn &conn) {
-	auto simple = conn.NewStream("sst");
-	auto raw = conn.NewStream("rst");
-	test_io(simple, conn);
-	test_io(raw, conn);
+	conn.OpenStream("sst", [&conn](nq_stream_t simple, void **ppctx) {
+		test_io(simple, conn);
+		return true;
+	});
+	conn.OpenStream("rst", [&conn](nq_stream_t raw, void **ppctx) {
+		test_io(raw, conn);
+		return true;
+	});
 }

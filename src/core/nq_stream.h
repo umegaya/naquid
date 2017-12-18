@@ -25,11 +25,11 @@ class NqStream : public QuicStream {
  protected:
   void *stream_ptr_;
   nq::atomic<uint64_t> stream_serial_;
+  std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name
  private:
   std::unique_ptr<NqStreamHandler> handler_;
-  std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name
   SpdyPriority priority_;
-  bool establish_side_;
+  bool establish_side_, established_, proto_sent_;
  public:
   NqStream(QuicStreamId id, 
            NqSession* nq_session, 
@@ -39,19 +39,28 @@ class NqStream : public QuicStream {
 
   NqLoop *GetLoop();
 
-  void OnDataAvailable() override;
-  void OnClose() override;
+  inline void SendHandshake() {
+    if (!proto_sent_) {
+      TRACE("SendHandshake %p", this);
+      WriteOrBufferData(QuicStringPiece(buffer_.c_str(), buffer_.length()), false, nullptr);
+      proto_sent_ = true;
+    }
+  }
+  bool OpenHandler(const std::string &name);
 
   void Disconnect();
   nq_alarm_t NewAlarm();
 
+  void OnDataAvailable() override;
+  void OnClose() override;
   virtual void **ContextBuffer() = 0;
-  virtual void InitSerial() = 0;
   virtual NqBoxer *GetBoxer() = 0;
+  virtual const std::string &Protocol() const = 0;
   inline void InvalidateSerial() { stream_serial_ = 0; }
 
-  inline const std::string &protocol() const { return buffer_; }
   inline bool establish_side() const { return establish_side_; }
+  inline bool proto_sent() const { return proto_sent_; }
+  inline void set_proto_sent() { proto_sent_ = true; }
   inline uint64_t stream_serial() const { return stream_serial_; }
   NqSessionIndex session_index() const;
 
@@ -81,10 +90,12 @@ class NqClientStream : public NqStream {
   inline void set_stream_index(NqStreamIndex idx) { stream_index_ = idx; }
   inline NqStreamIndex stream_index() const { return stream_index_; }
 
+  void InitSerial();
+
   NqBoxer *GetBoxer() override;
-  void InitSerial() override;
   void OnClose() override;
   void **ContextBuffer() override;
+  const std::string &Protocol() const override;
 };
 class NqServerStream : public NqStream {
   void *context_;
@@ -97,10 +108,12 @@ class NqServerStream : public NqStream {
 
   inline void *context() { return context_; }
 
+  void InitSerial(NqStreamIndex idx);
+
   NqBoxer *GetBoxer() override;
-  void InitSerial() override;
   void OnClose() override;
   void **ContextBuffer() override { return &context_; }
+  const std::string &Protocol() const override { return buffer_; }
 };
 
 
@@ -109,16 +122,13 @@ class NqStreamHandler {
 protected:
   NqStream *stream_;
   nq_closure_t on_open_, on_close_;
-  bool proto_sent_;
 public:
-  NqStreamHandler(NqStream *stream) : stream_(stream), proto_sent_(false) {}
+  NqStreamHandler(NqStream *stream) : stream_(stream) {}
   virtual ~NqStreamHandler() {}
   
   //interface
   virtual void OnRecv(const void *p, nq_size_t len) = 0;
   virtual void Send(const void *p, nq_size_t len) = 0;  
-  virtual void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) = 0;
-  virtual void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) = 0;
 
   //operation
   //following code assumes nq_stream_t and nq_rpc_t just has same way to create, 
@@ -128,14 +138,16 @@ public:
   STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 0, "offset of p differ");
   STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 8, "offset of s differ");
   //FYI(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
-  inline bool OnOpen() { return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), stream_->ContextBuffer()); }
+  inline bool OnOpen() { 
+    TRACE("NqSreamHandler::OnOpen");
+    return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), stream_->ContextBuffer());
+  }
   inline void OnClose() { nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); }
   inline void SetLifeCycleCallback(nq_closure_t on_open, nq_closure_t on_close) {
     on_open_ = on_open;
     on_close_ = on_close;
   }
   inline void Disconnect() { stream_->Disconnect(); }
-  inline void ProtoSent() { proto_sent_ = true; }
   inline NqStream *stream() { return stream_; }
   void WriteBytes(const char *p, nq_size_t len);
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
@@ -158,8 +170,6 @@ class NqSimpleStreamHandler : public NqStreamHandler {
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override;
-  void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
-  void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) override { ASSERT(false); }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqSimpleStreamHandler);
@@ -182,8 +192,6 @@ class NqRawStreamHandler : public NqStreamHandler {
       WriteBytes(static_cast<char *>(buf), size);
     }
   }
-  void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override { ASSERT(false); }
-  void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) override { ASSERT(false); }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqRawStreamHandler);
@@ -246,8 +254,8 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override { ASSERT(false); }
-  void Send(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) override;
-  void Send(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) override;
+  virtual void Call(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb);
+  virtual void CallEx(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt);
   void Notify(uint16_t type, const void *p, nq_size_t len);
   void Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len);
 

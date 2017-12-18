@@ -58,6 +58,9 @@ class NqConnSerialCodec {
   static inline bool IsClient(uint64_t serial) {
     return ((serial & CLIENT_BIT) != 0);
   }
+  static inline NqSessionIndex SessionIndex(uint64_t serial) {
+    return IsClient(serial) ? ClientSessionIndex(serial) : ServerSessionIndex(serial);
+  }
 };
 class NqStreamSerialCodec {
   constexpr static uint64_t CLIENT_BIT = 0x0000000080000000;
@@ -96,16 +99,14 @@ class NqStreamSerialCodec {
 template <class S, typename INDEX>
 class NqSessiontMap : protected std::map<INDEX, S*> {
   nq::IdFactory<INDEX> idgen_;
-  std::mutex mtx_;
  public:
   typedef std::map<INDEX, S*> container;
-  NqSessiontMap() : container(), idgen_(), mtx_() {}
+  NqSessiontMap() : container(), idgen_() {}
   ~NqSessiontMap() { Clear(); }
   inline INDEX NewId() { 
     return idgen_.New(); 
   }
   inline void Clear() {
-    std::unique_lock<std::mutex> lock(mtx_);
     for (auto &kv : *this) {
       delete kv.second;
     }
@@ -113,19 +114,16 @@ class NqSessiontMap : protected std::map<INDEX, S*> {
   }
   inline INDEX Add(S *s) { 
     auto idx = NewId();
-    std::unique_lock<std::mutex> lock(mtx_);
     (*this)[idx] = s; 
     return idx;
   }
   inline void Remove(INDEX idx) {
-    std::unique_lock<std::mutex> lock(mtx_);
     auto it = container::find(idx);
     if (it != container::end()) {
       container::erase(it);
     }
   }
   inline S *Find(INDEX idx) {
-    std::unique_lock<std::mutex> lock(mtx_);
     auto it = container::find(idx);
     return it != container::end() ? it->second : nullptr;
   }

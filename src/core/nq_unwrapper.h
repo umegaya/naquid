@@ -27,8 +27,29 @@ namespace net {
 //     already invalid and do nothing 
 class NqUnwrapper {
  protected:
-  static inline NqBoxer *UnwrapBoxer(uint64_t stream_serial, void *p) { 
-    if (NqStreamSerialCodec::IsClient(stream_serial)) {
+  static inline std::mutex *UnwrapMutex(uint64_t stream_serial, void *p) {
+    auto b = UnwrapBoxer(NqStreamSerialCodec::IsClient(stream_serial), p);
+    if (b->MainThread() &&
+        b->IsSessionLocked(NqStreamSerialCodec::ClientSessionIndex(stream_serial))) {
+      return nullptr; //avoid deadlock
+    }
+    return UnsafeUnwrapMutex(NqStreamSerialCodec::IsClient(stream_serial), p);
+  }
+  static inline NqSession::Delegate *UnwrapConn(uint64_t stream_serial, void *p) { 
+    if (stream_serial != 0) {
+      auto s = UnwrapStoredSerialFromStream(stream_serial, p);
+      if (s == NqStreamSerialCodec::ToConnSerial(stream_serial)) {
+        return reinterpret_cast<NqSession::Delegate *>(p);
+      }
+    }
+    return nullptr;
+  }
+
+
+ public:
+  //unwrap boxer
+  static inline NqBoxer *UnwrapBoxer(bool is_client, void *p) { 
+    if (is_client) {
       auto cli = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(p));
       return cli->boxer();
     } else {
@@ -36,47 +57,41 @@ class NqUnwrapper {
       return sv->boxer();
     }
   }
-  static inline std::mutex *UnwrapMutex(uint64_t stream_serial, void *p) {
-    auto b = UnwrapBoxer(stream_serial, p);
-    if (b->MainThread() &&
-        b->IsSessionLocked(NqStreamSerialCodec::ClientSessionIndex(stream_serial))) {
-      return nullptr; //avoid deadlock
-    }
-    if (NqStreamSerialCodec::IsClient(stream_serial)) {
-      auto cli = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(p));
-      return &(cli->static_mutex());
-    } else {
-      auto sv = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(p));
-      return &(sv->static_mutex());
-    }
-  }
 
- public:
   //unwrap stored serial
-  static inline uint64_t UnwrapStoredSerial(uint64_t conn_serial, void *p) {
-    if (NqConnSerialCodec::IsClient(conn_serial)) {
-      auto cli = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(p));
+  static inline uint64_t UnwrapStoredSerialCommon(bool is_client, void *delegate_ptr) {
+    if (is_client) {
+      auto cli = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(delegate_ptr));
       return cli->session_serial();
     } else {
-      auto sv = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(p));
+      auto sv = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(delegate_ptr));
       return sv->session_serial();
-    }
+    }    
+  }
+  static inline uint64_t UnwrapStoredSerial(uint64_t conn_serial, void *p) {
+    return UnwrapStoredSerialCommon(NqConnSerialCodec::IsClient(conn_serial), p);
+  }
+  static inline uint64_t UnwrapStoredSerialFromStream(uint64_t stream_serial, void *p) {
+    return UnwrapStoredSerialCommon(NqStreamSerialCodec::IsClient(stream_serial), p);
   }
   
   //unwrap mutex
+  static inline std::mutex *UnsafeUnwrapMutex(bool is_client, void *delegate_ptr) {
+    if (is_client) {
+      auto cli = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(delegate_ptr));
+      return &(cli->static_mutex());
+    } else {
+      auto sv = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(delegate_ptr));
+      return &(sv->static_mutex());
+    }
+  }
   static inline std::mutex *UnwrapMutex(nq_conn_t conn) {
     auto b = UnwrapBoxer(conn);
     if (b->MainThread() &&  
         b->IsSessionLocked(NqStreamSerialCodec::ClientSessionIndex(conn.s))) {
       return nullptr; //avoid deadlock
     }
-    if (NqConnSerialCodec::IsClient(conn.s)) {
-      auto cli = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(conn.p));
-      return &(cli->static_mutex());
-    } else {
-      auto sv = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(conn.p));
-      return &(sv->static_mutex());
-    }
+    return UnsafeUnwrapMutex(NqConnSerialCodec::IsClient(conn.s), conn.p);
   }
   static inline std::mutex *UnwrapMutex(nq_stream_t s) {
     return UnwrapMutex(s.s, s.p);
@@ -101,30 +116,22 @@ class NqUnwrapper {
     return nullptr;
   }
   static inline NqSession::Delegate *UnwrapConn(nq_stream_t s) { 
-    NqStream *st = UnwrapStream(s);
-    return st != nullptr ? st->nq_session()->delegate() : nullptr; 
+    return UnwrapConn(s.s, s.p); 
   }
   static inline NqSession::Delegate *UnwrapConn(nq_rpc_t rpc) { 
-    NqStream *st = UnwrapStream(rpc);
-    return st != nullptr ? st->nq_session()->delegate() : nullptr; 
+    return UnwrapConn(rpc.s, rpc.p); 
   }
 
 
   //unwrap boxer
   static inline NqBoxer *UnwrapBoxer(nq_conn_t conn) {
-    if (NqConnSerialCodec::IsClient(conn.s)) {
-      auto cli = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(conn.p));
-      return cli->boxer();
-    } else {
-      auto sv = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(conn.p));
-      return sv->boxer();
-    }    
+    return UnwrapBoxer(NqConnSerialCodec::IsClient(conn.s), conn.p);   
   }
   static inline NqBoxer *UnwrapBoxer(nq_stream_t s) { 
-    return UnwrapBoxer(s.s, s.p); 
+    return UnwrapBoxer(NqStreamSerialCodec::IsClient(s.s), s.p); 
   }
   static inline NqBoxer *UnwrapBoxer(nq_rpc_t rpc) { 
-    return UnwrapBoxer(rpc.s, rpc.p); 
+    return UnwrapBoxer(NqStreamSerialCodec::IsClient(rpc.s), rpc.p); 
   }
   static inline NqBoxer *UnwrapBoxer(nq_alarm_t a) { 
     return reinterpret_cast<NqAlarm *>(a.p)->GetBoxer();
@@ -133,10 +140,10 @@ class NqUnwrapper {
 
   //unwrap stream
   static inline NqStream *UnwrapStream(nq_stream_t s) { 
-    return UnwrapBoxer(s.s, s.p)->FindStream(s.s, s.p); 
+    return UnwrapBoxer(NqStreamSerialCodec::IsClient(s.s), s.p)->FindStream(s.s, s.p); 
   }
   static inline NqStream *UnwrapStream(nq_rpc_t rpc) { 
-    return UnwrapBoxer(rpc.s, rpc.p)->FindStream(rpc.s, rpc.p); 
+    return UnwrapBoxer(NqStreamSerialCodec::IsClient(rpc.s), rpc.p)->FindStream(rpc.s, rpc.p); 
   }
 
 
@@ -155,38 +162,50 @@ class NqUnwrapper {
 
 //note that following macro and function executed even if pointer already freed. 
 //so cannot call virtual function correctly inside of this func.
-#define UNWRAP_CONN(__handle, __d, __code) { \
-  if (__handle.s == 0) { TRACE("invalid handle %s", __handle.p); } \
-  else { \
+#define UNWRAP_CONN(__handle, __d, __code, __purpose) { \
+  if (__handle.s == 0) { \
+    TRACE("UNWRAP_CONN(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
+  } else { \
     auto m = NqUnwrapper::UnwrapMutex(__handle); \
     if (m != nullptr) { \
       std::unique_lock<std::mutex> lock(*m); \
       __d = NqUnwrapper::UnwrapConn(__handle); \
       if (__d != nullptr) { \
         __code; \
+      } else { \
+        TRACE("UNWRAP_CONN(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
       } \
     } else { \
       __d = NqUnwrapper::UnwrapConn(__handle); \
       if (__d != nullptr) { \
         __code; \
+      } else { \
+        TRACE("UNWRAP_CONN(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
       } \
     } \
   } \
 }
-#define UNWRAP_STREAM(__handle, __s, __code) { \
-  if (__handle.s == 0) { TRACE("invalid handle %s", __handle.p); } \
-  else { \
+#define UNWRAP_STREAM(__handle, __s, __code, __purpose) { \
+  if (__handle.s == 0) { \
+    TRACE("UNWRAP_STREAM(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
+  } else { \
     auto m = NqUnwrapper::UnwrapMutex(__handle); \
     if (m != nullptr) { \
+      /*TRACE("UNWRAP_STREAM(%s): try lock %p", __purpose, m);//*/ \
       std::unique_lock<std::mutex> lock(*m); \
+      /*TRACE("UNWRAP_STREAM(%s): try lock success %p", __purpose, m);//*/ \
       __s = NqUnwrapper::UnwrapStream(__handle); \
       if (__s != nullptr) { \
         __code; \
+      } else { \
+        TRACE("UNWRAP_STREAM(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
       } \
     } else { \
       __s = NqUnwrapper::UnwrapStream(__handle); \
       if (__s != nullptr) { \
         __code; \
+      } else { \
+        TRACE("UNWRAP_STREAM(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
       } \
     } \
   } \

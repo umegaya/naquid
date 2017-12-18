@@ -30,4 +30,7 @@ class IdFactory {
     return 0;		
   }
 };
+//TODO(iyatomi): provide true NoAtomic version
+template <class T>
+using IdFactoryNoAtomic = IdFactory<T>;
 }

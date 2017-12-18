@@ -28,7 +28,7 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
   thread_id_(worker.thread_id()), server_map_(), alarm_map_(), 
   session_allocator_(config.server().max_session_hint), stream_allocator_(config.server().max_stream_hint),
-  alarm_allocator_() {
+  alarm_allocator_(config.server().max_session_hint) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
   SetFromConfig(config);

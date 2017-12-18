@@ -18,15 +18,19 @@ class NqServerSession : public NqSession,
 
   nq_conn_t ToHandle();
   NqStream *FindStream(QuicStreamId id);
-  NqStream *FindStreamBySerial(uint64_t s);
+  //if you set included closed to true, be careful to use returned value, 
+  //this pointer soon will be invalid.
+  NqStream *FindStreamBySerial(uint64_t s, bool include_closed = false);
   void InitSerial();
   inline void InvalidateSerial() { session_serial_ = 0; }  
 
   std::mutex &static_mutex();
   NqBoxer *boxer();
+  NqDispatcher *dispatcher();
   inline uint64_t session_serial() const { return session_serial_; }
   inline NqSessionIndex session_index() const { 
     return NqConnSerialCodec::ServerSessionIndex(session_serial_); }
+  inline nq::IdFactory<NqStreamIndex> &index_factory() { return index_factory_; }
 
 
   //implements QuicSession
@@ -44,7 +48,8 @@ class NqServerSession : public NqSession,
   void Disconnect() override;
   bool Reconnect() override; //only supported for client 
   bool IsClient() const override;
-  QuicStream *NewStream(const std::string &name) override;
+  bool IsConnected() const override { return true; }
+  bool NewStream(const std::string &name, void *ctx) override;
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
@@ -53,17 +58,10 @@ class NqServerSession : public NqSession,
   QuicConnection *Connection() override { return connection(); }
   uint64_t SessionSerial() const override { return session_serial(); }
 
-
-  //implement custom allocator
-  void* operator new(std::size_t sz);
-  void* operator new(std::size_t sz, NqDispatcher* d);
-  void operator delete(void *p) noexcept;
-  void operator delete(void *p, NqDispatcher *d) noexcept;
-
  private:
-  NqDispatcher *dispatcher_;
   const NqServer::PortConfig &port_config_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
+  nq::IdFactory<NqStreamIndex> index_factory_;
   uint64_t session_serial_;
   void *context_;
 };

@@ -80,6 +80,7 @@ class NqAlarm : public NqAlarmBase {
   typedef nq::Allocator<NqAlarm> Allocator;
 
   NqAlarm() : NqAlarmBase(), cb_(nq_closure_empty()), alarm_serial_(0) {}
+  ~NqAlarm() override {}
 
   inline void Start(NqLoop *loop, nq_time_t first_invocation_ts, nq_closure_t cb) {
     Stop(loop);
@@ -93,6 +94,7 @@ class NqAlarm : public NqAlarmBase {
 
   // implements NqAlarmInterface
   void OnFire(NqLoop *loop) override {
+    TRACE("OnFire %p", this);
     nq_time_t next = invocation_ts_;
     nq_closure_call(cb_, on_alarm, &next);
     if (next > invocation_ts_) {

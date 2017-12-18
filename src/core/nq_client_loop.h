@@ -21,7 +21,7 @@ class NqClientLoop : public NqLoop,
                      public QuicStreamAllocator {
   typedef NqSessiontMap<NqClient, NqSessionIndex> ClientMap;
   typedef NqSessiontMap<NqAlarm, NqAlarmIndex> AlarmMap;
-  typedef nq::AllocatorWithBSS<NqClient, NqStaticSection> ClientAllocator;
+  typedef nq::Allocator<NqClient, NqStaticSection> ClientAllocator;
   typedef nq::Allocator<NqClientStream> StreamAllocator;
   typedef NqAlarm::Allocator AlarmAllocator;
   nq::HandlerMap handler_map_;
@@ -37,7 +37,7 @@ class NqClientLoop : public NqLoop,
  public:
   NqClientLoop(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
     processor_(), versions_(net::AllSupportedVersions()),
-    client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_() {
+    client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint) {
     set_main_thread();
   }
   ~NqClientLoop() { Close(); }
@@ -78,6 +78,8 @@ class NqClientLoop : public NqLoop,
   AlarmAllocator *GetAlarmAllocator() override { return &alarm_allocator_; }
   bool IsClient() const override { return true; }
   bool IsSessionLocked(NqSessionIndex idx) const override { return NqLoop::IsSessionLocked(idx); };
+  void LockSession(NqSessionIndex idx) override { NqLoop::LockSession(idx); }
+  void UnlockSession() override { NqLoop::UnlockSession(); }
   NqSession::Delegate *FindConn(uint64_t serial, NqBoxer::OpTarget target) override;
   NqStream *FindStream(uint64_t serial, void *p) override;
   void RemoveAlarm(NqAlarmIndex index) override;

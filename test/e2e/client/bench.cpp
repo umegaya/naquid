@@ -11,8 +11,8 @@
 struct closure_ctx {
   uint64_t seed;
   uint64_t last_recv;
+  uint32_t index;
 };
-std::map<uint64_t, bool> g_connected;
 nq_conn_t g_cs[N_CLIENT];
 nq_rpc_t g_rpcs[N_CLIENT];
 closure_ctx g_ctxs[N_CLIENT];
@@ -35,26 +35,22 @@ static void send_rpc(nq_rpc_t rpc, nq_closure_t reply_cb) {
 void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
   intptr_t idx = (intptr_t)arg;
   TRACE("on_conn_open event:%ld %d\n", idx, hsev);
-  if (hsev == NQ_HS_DONE) {
-    g_connected[c.s] = true;
-    auto rpc = g_rpcs[idx];
-    auto rep = g_reps[idx];
-    for (int j = 0; j < N_SEND; j++) {
-      send_rpc(rpc, rep);
-    }
-  }
 }
 nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_result_t, const char *detail, bool) {
   intptr_t idx = (intptr_t)arg;
   TRACE("on_conn_close: reason:%ld %s\n", idx, detail);
-  g_connected[c.s] = false;
   return nq_time_sec(2);
 }
 
 
 
 /* rpc stream callback */
-bool on_rpc_open(void *p, nq_rpc_t s, void **) {
+bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
+  auto v = (closure_ctx *)nq_rpc_ctx(rpc);
+  auto rep = g_reps[v->index];
+  for (int i = 0; i < N_SEND; i++) {
+    send_rpc(rpc, rep);
+  }
   return true;
 }
 void on_rpc_close(void *p, nq_rpc_t s) {
@@ -120,9 +116,10 @@ int main(int argc, char *argv[]){
       printf("fail to create connection\n");
       return -1;
     }
-    g_rpcs[i] = nq_conn_rpc(g_cs[i], "rpc");
     g_ctxs[i].seed = 0;
     g_ctxs[i].last_recv = 0;
+    g_ctxs[i].index = i;
+    nq_conn_rpc(g_cs[i], "rpc", g_ctxs + i);
     nq_closure_init(g_reps[i], on_rpc_reply, on_rpc_reply, g_ctxs + i);
   }
 

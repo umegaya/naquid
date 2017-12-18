@@ -37,6 +37,12 @@ namespace test {
 class QuicSessionPeer;
 }  // namespace test
 
+class QuicSessionAllocator {
+ public:
+  virtual void *AllocSession(std::size_t sz) = 0;
+  virtual void FreeSession(void *) = 0;
+};
+
 class QUIC_EXPORT_PRIVATE QuicSession : public QuicConnectionVisitorInterface,
                                         public StreamNotifierInterface,
                                         public QuicStreamFrameDataProducer {
@@ -499,6 +505,33 @@ class QUIC_EXPORT_PRIVATE QuicSession : public QuicConnectionVisitorInterface,
   const bool can_use_slices_;
 
   DISALLOW_COPY_AND_ASSIGN(QuicSession);
+
+  //if not nullptr, assure this stream to be allocated with it.
+  QuicSessionAllocator* allocator_;
+
+ public:
+  inline QuicSessionAllocator *session_allocator() { return allocator_; }
+  inline void* operator new(std::size_t sz) {
+    auto r = reinterpret_cast<QuicSession *>(std::malloc(sz));
+    r->allocator_ = nullptr;
+    return r;
+  }
+  inline void* operator new(std::size_t sz, QuicSessionAllocator* a) {
+    auto r = reinterpret_cast<QuicSession *>(a->AllocSession(sz));
+    r->allocator_ = a;
+    return r;
+  }
+  inline void operator delete(void *p) noexcept {
+    auto r = reinterpret_cast<QuicSession *>(p);
+    if (r->allocator_ == nullptr) {
+      std::free(r);
+    } else {
+      r->allocator_->FreeSession(r);
+    }
+  }
+  inline void operator delete(void *p, QuicSessionAllocator *a) noexcept {
+    a->FreeSession(p);
+  }
 };
 
 }  // namespace net

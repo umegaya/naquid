@@ -73,12 +73,12 @@ void NqClient::InitSerial() {
 }
 nq_conn_t NqClient::ToHandle() { 
   return {
-    .p = this,
+    .p = static_cast<NqSession::Delegate *>(this),
     .s = session_serial_,
   };
 }
 std::mutex &NqClient::static_mutex() {
-  return loop_->client_allocator().BSS(this)->mutex();
+  return loop_->client_allocator().Bss(this)->mutex();
 }
 NqBoxer *NqClient::boxer() { 
   return static_cast<NqBoxer *>(loop_); 
@@ -95,7 +95,7 @@ std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* c
 void NqClient::InitializeSession() {
   QuicClientBase::InitializeSession();
   nq_session()->GetClientCryptoStream()->CryptoConnect();
-  connect_state_ = CONNECT;
+  connect_state_ = CONNECTING;
   alarm_.reset(); //free existing reconnection alarm
 }
 
@@ -126,10 +126,12 @@ NqLoop *NqClient::GetLoop() {
   return loop_; 
 }
 void NqClient::OnOpen(nq_handshake_event_t hsev) { 
-  if (hsev == NQ_HS_DONE) {
+  nq_closure_call(on_open_, on_client_conn_open, ToHandle(), hsev, &context_); 
+  //order is important because connect_state_ may change in above callback.
+  if (hsev == NQ_HS_DONE && connect_state_ == CONNECTING) {
+    connect_state_ = CONNECTED;
     stream_manager_.RecoverOutgoingStreams(nq_session());
   }
-  nq_closure_call(on_open_, on_client_conn_open, ToHandle(), hsev, &context_); 
 }
 void NqClient::OnClose(QuicErrorCode error,
              const std::string& error_details,
@@ -162,7 +164,7 @@ void NqClient::Disconnect() {
     alarm_->Cancel();
     alarm_.reset();
   }
-  if (connect_state_ == CONNECT) {
+  if (connect_state_ == CONNECTING || connect_state_ == CONNECTED) {
     connect_state_ = FINALIZED;
     QuicClientBase::Disconnect(); 
   } else if (connect_state_ == DISCONNECT || connect_state_ == RECONNECTING) {
@@ -170,12 +172,12 @@ void NqClient::Disconnect() {
     alarm_.reset(alarm_factory()->CreateAlarm(this));
     alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
   } else {
-    //finalize/reconnecting do nothing, because this client already scheduled to destroy.
+    //finalize do nothing, because this client already scheduled to destroy.
     ASSERT(alarm_ != nullptr);
   }
 }
 bool NqClient::Reconnect() {
-  if (connect_state_ == CONNECT) {
+  if (connect_state_ == CONNECTED || connect_state_ == CONNECTING) {
     connect_state_ = RECONNECTING;
     QuicClientBase::Disconnect(); 
   } else if (connect_state_ == DISCONNECT) {
@@ -200,17 +202,11 @@ nq::HandlerMap* NqClient::ResetHandlerMap() {
 }
 //TODO(iyatomi): concurrency limitation with NewStream
 NqClientStream *NqClient::FindOrCreateStream(NqStreamIndex index) {
-  return stream_manager_.FindOrCreateStream(nq_session(), index, connect_state_ == CONNECT);
+  return stream_manager_.FindOrCreateStream(nq_session(), index, connect_state_ == CONNECTED);
 }
 //TODO(iyatomi): concurrency limitation with FindOrCreateStream
-QuicStream *NqClient::NewStream(const std::string &name) {
-  auto s = static_cast<NqClientStream *>(nq_session()->CreateOutgoingDynamicStream());
-  if (!stream_manager_.OnOpen(name, s)) {
-    delete s;
-    return nullptr;
-  }
-  s->InitSerial();
-  return s;
+bool NqClient::NewStream(const std::string &name, void *ctx) {
+  return stream_manager_.OnOutgoingOpen(nq_session(), connect_state_ == CONNECTED, name, ctx);
 }
 QuicCryptoStream *NqClient::NewCryptoStream(NqSession* session) {
   return new QuicCryptoClientStream(server_id(), session,  new ProofVerifyContext(), crypto_config(), this);
@@ -218,106 +214,99 @@ QuicCryptoStream *NqClient::NewCryptoStream(NqSession* session) {
 
 
 
+//ReconnectAlarm
+void NqClient::ReconnectAlarm::OnAlarm() { 
+  auto loop = client_->loop_;
+  loop->LockSession(client_->session_index());
+  auto m = &(client_->static_mutex());
+  std::unique_lock<std::mutex> session_lock(*m);
+
+  client_->Initialize();
+  client_->StartConnect(); 
+  //here, this already become invalid. but loop can be used
+
+  loop->UnlockSession();  
+}
+
+
+
 //StreamManager
 NqClient::StreamManager::Entry *
 NqClient::StreamManager::FindEntry(NqStreamIndex index) const {
-  std::unique_lock<std::mutex> lock(const_cast<StreamManager *>(this)->map_mutex_);
   auto it = stream_map_.find(index);
   return it != stream_map_.end() ? const_cast<Entry *>(&(it->second)) : nullptr;
 }
 void NqClient::StreamManager::RecoverOutgoingStreams(NqClientSession *session) {
-  std::unique_lock<std::mutex> lock(map_mutex_);
   for (auto &kv : stream_map_) {
     auto &e = kv.second;
+    TRACE("RecoverOutgoingStreams: %u %s %p", kv.first, e.name_.c_str(), e.handle_);
     if (e.name_.length() > 0) {
       auto s = e.Stream();
       if (s == nullptr) {
         s = static_cast<NqClientStream *>(session->CreateOutgoingDynamicStream());
-        s->set_protocol(e.name_);
         s->set_stream_index(kv.first);
         s->InitSerial();
-        //this may race with NqClientStream *Find call
-        e.SetStream(s);
-      } else {
-        TRACE("RecoverOutgoingStreams: create for %d: already exists %p", kv.first, s);
+        TRACE("RecoverOutgoingStreams: serial %llx", s->stream_serial());
+      }
+      e.SetStream(s);
+      if (!s->OpenHandler(e.name_)) {
+        e.ClearStream();
+        delete s;
       }
     }
   }
 }
 bool NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
-  std::unique_lock<std::mutex> lock(map_mutex_);
   ASSERT((s->id() % 2) == 0); //must be incoming stream from server (server outgoing stream)
-  NqStreamIndex idx;
-  if (in_empty_indexes_.size() > 0) {
-    idx = in_empty_indexes_.top();
-    in_empty_indexes_.pop();
-    auto it = stream_map_.find(idx);
-    if (it != stream_map_.end()) {
-      it->second.SetStream(s);    
-    } else {
-      ASSERT(false);
-    }
-  } else if (stream_map_.size() >= 65536) {
-    ASSERT(false);
-    return false;
-  } else {
-    idx = stream_map_.size();
-    stream_map_.emplace(idx, Entry(s));
-  }
+  auto idx = index_seed_.New();
+  stream_map_.emplace(idx, Entry(s));
   s->set_stream_index(idx);
   return true;
 }
 void NqClient::StreamManager::OnIncomingClose(NqClientStream *s) {
-  std::unique_lock<std::mutex> lock(map_mutex_);
-  ASSERT(s->stream_index() < stream_map_.size());
   stream_map_.erase(s->stream_index());
-  //pool empty index for incoming slots
-  in_empty_indexes_.push(s->stream_index());
 }
 
-bool NqClient::StreamManager::OnOutgoingOpen(const std::string &name, NqClientStream *s) {
-  std::unique_lock<std::mutex> lock(map_mutex_);
-  ASSERT((s->id() % 2) != 0); //must be outgoing stream to server (server incoming stream)
-  s->set_protocol(name);
-  auto idx = stream_map_.size();
-  stream_map_.emplace(idx, Entry(s, name));
-  s->set_stream_index(idx);
-  return true;
+bool NqClient::StreamManager::OnOutgoingOpen(NqClientSession *session, bool connected, 
+                                            const std::string &name, void *ctx) {
+  auto idx = index_seed_.New();
+  auto r = stream_map_.emplace(idx, Entry(nullptr, name));
+  if (!r.second) {
+    return false;
+  } else {
+    r.first->second.context_ = ctx;
+    if (connected) {
+      //when connected means RecoverOutgoingStreams is not called automatically in NqClient::OnOpen.
+      RecoverOutgoingStreams(session);
+    }
+    return true;
+  }
 }
 void NqClient::StreamManager::OnOutgoingClose(NqClientStream *s) {
-  std::unique_lock<std::mutex> lock(map_mutex_);
-  ASSERT(s->stream_index() < stream_map_.size());
-  auto it = stream_map_.find(s->stream_index());
-  if (it != stream_map_.end()) {
-    it->second.ClearStream();    
-  }
+  stream_map_.erase(s->stream_index());
 }
 NqClientStream *NqClient::StreamManager::FindOrCreateStream(
       NqClientSession *session, 
       NqStreamIndex stream_index, 
       bool connected) {
-  std::unique_lock<std::mutex> lock(const_cast<StreamManager *>(this)->map_mutex_);
   auto it = stream_map_.find(stream_index);
   if (it != stream_map_.end()) {
     auto &e = it->second;
-    if (e.name_.length() > 0) {
+    //TODO(iyatomi): somehow enable this code to allow user to create 
+    /*if (e.name_.length() > 0) {
       auto s = e.Stream();
       if (s == nullptr && connected) {
         s = static_cast<NqClientStream *>(session->CreateOutgoingDynamicStream());
-        s->set_protocol(e.name_);
         s->set_stream_index(stream_index);
         s->InitSerial();
-        e.SetStream(s);
+        if (s->OpenHandler(e.name_)) {
+          e.SetStream(s);
+        }
       }
-    }
+    }*/
     return e.Stream();
   }
   return nullptr;
-}
-bool NqClient::StreamManager::OnOpen(const std::string &name, NqClientStream *s) {
-  return ((s->id() % 2) == 0) ? 
-    OnIncomingOpen(s) : 
-    OnOutgoingOpen(name, s);
 }
 void NqClient::StreamManager::OnClose(NqClientStream *s) {
   if ((s->id() % 2) == 0) {

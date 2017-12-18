@@ -9,6 +9,7 @@
 
 #include "basis/defs.h"
 #include "basis/handler_map.h"
+#include "basis/id_factory.h"
 #include "core/nq_serial_codec.h"
 #include "core/nq_static_section.h"
 
@@ -40,19 +41,14 @@ class NqSession : public QuicSession {
     virtual bool Reconnect() = 0; //only supported for client 
     virtual uint64_t ReconnectDurationUS() const = 0;
     virtual bool IsClient() const = 0;
-    virtual QuicStream *NewStream(const std::string &name) = 0;
+    virtual bool IsConnected() const = 0;
+    virtual bool NewStream(const std::string &name, void *ctx) = 0;
     virtual QuicCryptoStream *NewCryptoStream(NqSession *session) = 0;
     virtual const nq::HandlerMap *GetHandlerMap() const = 0;
     virtual nq::HandlerMap *ResetHandlerMap() = 0;
     virtual NqLoop *GetLoop() = 0;
     virtual QuicConnection *Connection() = 0;
     virtual uint64_t SessionSerial() const = 0;
-
-    //this is not thread safe and only guard at nq.cpp nq_conn_rpc, nq_conn_stream.
-    template <class S> S *NewStreamCast(const std::string &name) {
-      return static_cast<S *>(NewStream(name));
-    } 
-    nq_conn_t BoxSelf();
   };
  private:
   std::unique_ptr<QuicCryptoStream> crypto_stream_;

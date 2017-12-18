@@ -24,6 +24,7 @@ void* NqAlarm::operator new(std::size_t sz, NqBoxer* b) {
 void NqAlarm::operator delete(void *p) noexcept {
   auto r = reinterpret_cast<NqAlarm *>(p);
   if (r->boxer_ == nullptr) {
+    ASSERT(false);
     std::free(r);
   } else {
     r->boxer_->GetAlarmAllocator()->Free(p);

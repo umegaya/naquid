@@ -23,13 +23,14 @@ class NqDispatcher : public QuicDispatcher,
                      public QuicCryptoServerStream::Helper,
                      public NqPacketReader::Delegate,
                      public NqBoxer,
-                     public QuicStreamAllocator {
+                     public QuicStreamAllocator, 
+                     public QuicSessionAllocator {
   static const int kNumSessionsToCreatePerSocketEvent = 1024;
   static const int kDefaultCertCacheSize = 16; 
   typedef NqWorker::InvokeQueue InvokeQueue;
   typedef NqSessiontMap<NqServerSession, NqSessionIndex> ServerMap;
   typedef NqSessiontMap<NqAlarm, NqAlarmIndex> AlarmMap;
-  typedef nq::AllocatorWithBSS<NqServerSession, NqStaticSection> SessionAllocator;
+  typedef nq::Allocator<NqServerSession, NqStaticSection> SessionAllocator;
   typedef nq::Allocator<NqServerStream> StreamAllocator;
   typedef NqAlarm::Allocator AlarmAllocator;
   
@@ -78,12 +79,16 @@ class NqDispatcher : public QuicDispatcher,
   inline int worker_num() const { return n_worker_; }
   inline int worker_index() const { return index_; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
-  inline SessionAllocator &session_allocator() { return session_allocator_; }
   inline StreamAllocator &stream_allocator() { return stream_allocator_; }
+  inline SessionAllocator &session_allocator_body() { return session_allocator_; }
 
   //implements QuicStreamAllocator
   void *Alloc(size_t sz) override { return stream_allocator_.Alloc(sz); }
   void Free(void *p) override { return stream_allocator_.Free(p); }
+
+  //implements QuicSessionAllocator
+  void *AllocSession(size_t sz) override { return session_allocator_.Alloc(sz); }
+  void FreeSession(void *p) override { return session_allocator_.Free(p); }  
 
   //implements nq::IoProcessor
   void OnEvent(nq::Fd fd, const Event &e) override;
@@ -113,6 +118,8 @@ class NqDispatcher : public QuicDispatcher,
   AlarmAllocator *GetAlarmAllocator() override { return &alarm_allocator_; }
   bool IsClient() const override { return false; }
   bool IsSessionLocked(NqSessionIndex idx) const override { return loop_.IsSessionLocked(idx); }
+  void LockSession(NqSessionIndex idx) override { loop_.LockSession(idx); }
+  void UnlockSession() override { loop_.UnlockSession(); }
   NqSession::Delegate *FindConn(uint64_t serial, OpTarget target) override;
   NqStream *FindStream(uint64_t serial, void *p) override;
   void RemoveAlarm(NqAlarmIndex index) override;

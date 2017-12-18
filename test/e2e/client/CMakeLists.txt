@@ -11,7 +11,7 @@ else()
 endif()	
 
 file(GLOB_RECURSE src [
-	"./main.cpp" 
+	"./main.cpp"
 	"./specs/*.cpp"
 	"../common.cpp"
 ])

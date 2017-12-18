@@ -33,21 +33,14 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(addr, test_reconnect_client);
     if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_client fails"); }
   }//*/
+  TRACE("==================== test_reconnect_server ====================");
+  {
+    auto tmp = addr;
+    tmp.port = 18443;
+    Test t(tmp, test_reconnect_server);
+    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server fails"); }
+  }//*/
 #endif
-  TRACE("==================== test_reconnect_server_conn ====================");
-  {
-    auto tmp = addr;
-    tmp.port = 18443;
-    Test t(tmp, test_reconnect_server_conn);
-    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server_conn fails"); }
-  }//*/
-  TRACE("==================== test_reconnect_server_stream ====================");
-  {
-    auto tmp = addr;
-    tmp.port = 18443;
-    Test t(tmp, test_reconnect_server_stream);
-    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server_stream fails"); }
-  }//*/
   /*{
     auto tmp = addr;
     tmp.port = 18443;
