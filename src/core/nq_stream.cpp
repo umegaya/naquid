@@ -104,7 +104,9 @@ void NqStream::Disconnect() {
 }
 void NqStream::OnClose() {
   TRACE("NqStream::OnClose %p, %llx(%lu)", this, stream_serial_.load(), id());
-  handler_->OnClose();
+  if (handler_ != nullptr) {
+    handler_->OnClose();
+  }
   QuicStream::OnClose();
 }
 void NqStream::OnDataAvailable() {
@@ -216,7 +218,6 @@ void NqServerStream::OnClose() {
 
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
   stream_->SendHandshake();
-  TRACE("WriteBytes %p", stream_);
   stream_->WriteOrBufferData(QuicStringPiece(p, len), false, nullptr);
 }
 
@@ -267,7 +268,7 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, n
   req->Start(loop_, now + timeout_duration_ts);
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
-  TRACE("stream handler OnRecv %u bytes", len);
+  //fprintf(stderr, "stream %llx handler OnRecv %u bytes\n", stream_->stream_serial(), len);
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
   //prepare tmp variables
@@ -308,7 +309,9 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
         }
       } else {
         //request
-        //TRACE("stream handler request: msgid %u", msgid);
+        fprintf(stderr, "stream handler request: idx %u %llu\n", 
+          nq::Endian::NetbytesToHost<uint32_t>(pstr), 
+          nq::Endian::NetbytesToHost<uint64_t>(pstr + 4));
         nq_closure_call(on_request_, on_rpc_request, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr), reclen);
       }
     } else if (type > 0) {

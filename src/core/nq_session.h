@@ -59,12 +59,7 @@ class NqSession : public QuicSession {
             Visitor* owner,
             Delegate* delegate,
           	const QuicConfig& config);
-  ~NqSession() override {
-    if (connection() != nullptr) {
-      static_cast<NqConnection*>(connection())->Cleanup();
-      delete connection();
-    }
-  }
+  ~NqSession() override;
 
   inline void RegisterStreamPriority(QuicStreamId id, SpdyPriority priority) {
     write_blocked_streams()->RegisterStream(id, priority);

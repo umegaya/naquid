@@ -10,6 +10,9 @@ void NqClientLoop::Poll() {
   NqLoop::Poll();
 }
 void NqClientLoop::Close() {
+  client_map_.Iter([](NqSessionIndex idx, NqClient *cl) {
+    cl->Destroy();
+  });
   client_map_.Clear();
   NqLoop::Close();
 }

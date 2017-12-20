@@ -124,6 +124,7 @@ class NqClient : public QuicClientBase,
   NqClientStream *FindOrCreateStream(NqStreamIndex index);
   void InitSerial();
   inline void InvalidateSerial() { session_serial_ = 0; }
+  inline void Destroy() { OnAlarm(); }
 
 
   // implements QuicClientBase. TODO(umegaya): these are really not needed?

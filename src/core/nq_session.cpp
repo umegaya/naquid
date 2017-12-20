@@ -16,6 +16,18 @@ NqSession::NqSession(QuicConnection* connection,
   auto id = GetNextOutgoingStreamId();
   ASSERT(perspective() == Perspective::IS_SERVER || id == kHeadersStreamId);
 }
+NqSession::~NqSession() {
+  for (auto &kv : dynamic_streams()) {
+    static_cast<NqStream *>(kv.second.get())->InvalidateSerial();
+  }
+  if (connection() != nullptr) {
+    static_cast<NqConnection*>(connection())->Cleanup();
+    delete connection();
+  }
+}
+
+
+
 QuicCryptoStream* NqSession::GetMutableCryptoStream() {
   return crypto_stream_.get();
 }

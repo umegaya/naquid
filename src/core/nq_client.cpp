@@ -103,9 +103,12 @@ void NqClient::InitializeSession() {
 
 // implements QuicAlarm::Delegate
 void NqClient::OnAlarm() { 
-  nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
+  if (!nq_closure_is_empty(on_finalize_)) {
+    nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
+  }
   loop_->RemoveClient(this); 
   alarm_.release(); //release QuicAlarm which should contain *this* pointer, to prevent double free.
+  InvalidateSerial();
   delete this;
 }
 

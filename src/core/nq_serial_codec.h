@@ -112,6 +112,13 @@ class NqSessiontMap : protected std::map<INDEX, S*> {
     }
     container::clear();
   }
+  inline void Iter(std::function<void (INDEX, S*)> cb) {
+    for (auto it = container::begin(); it != container::end(); ) {
+      typename container::iterator kv = it;
+      ++it;
+      cb(kv->first, kv->second);
+    }
+  }
   inline INDEX Add(S *s) { 
     auto idx = NewId();
     (*this)[idx] = s; 
