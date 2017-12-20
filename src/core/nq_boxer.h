@@ -11,6 +11,8 @@
 #include "core/nq_alarm.h"
 #include "core/nq_serial_codec.h"
 
+//#define USE_WRITE_OP (1)
+
 namespace net {
 class NqLoop;
 class NqBoxer {
@@ -29,7 +31,13 @@ class NqBoxer {
     Start,
     CreateStream,
     CreateRpc,
-    StreamOpen,
+#if defined(USE_WRITE_OP)
+    Send,
+    Call,
+    CallEx,
+    Reply,
+    Notify,
+#endif
   };
   enum OpTarget : uint8_t {
     Invalid = 0,
@@ -43,7 +51,39 @@ class NqBoxer {
     OpCode code_;
     OpTarget target_; 
     uint8_t padd_[2];
+    struct Data {
+      const void *p_;
+      nq_size_t len_;
+      Data() { len_ = 0; }
+      Data(const void *p, nq_size_t len) {
+        if (len <= 0) {
+          p_ = p; len_ = len; //if p is not byte array, assume memory is managed by caller
+        } else {
+          ASSERT(len <= 10000);
+          //TODO(iyatomi): allocation from some pool
+          p_ = nq::Syscall::Memdup(p, len); len_ = len;
+        }
+      }
+      ~Data() { if (len_ > 0) { nq::Syscall::MemFree(const_cast<void *>(p_)); } }
+      inline const void *ptr() const { return p_; }
+      inline nq_size_t length() const { return len_; } 
+    } data_;
     union {
+      struct {
+        nq_closure_t on_reply_;
+        uint16_t type_;
+      } call_;
+      struct {
+        nq_rpc_opt_t rpc_opt_;
+        uint16_t type_;
+      } call_ex_;
+      struct {
+        uint16_t type_;
+      } notify_;
+      struct {
+        nq_result_t result_;
+        nq_msgid_t msgid_;
+      } reply_;
       struct {
         nq_time_t invocation_ts_;
         nq_closure_t callback_;
@@ -54,19 +94,50 @@ class NqBoxer {
       } stream_;
     };
     Op(uint64_t serial, void *target_ptr, OpCode code, OpTarget target) : 
-      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target) {}
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {}
     Op(uint64_t serial, void *target_ptr, OpCode code, nq_time_t ts, nq_closure_t cb, 
       OpTarget target) : 
-      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target) {
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       alarm_.invocation_ts_ = ts;
       alarm_.callback_ = cb;
     }
     Op(uint64_t serial, void *target_ptr, OpCode code, const char *name, void *ctx, 
       OpTarget target) : 
-      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target) {
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       stream_.name_ = strdup(name);
       stream_.ctx_ = ctx;
     }
+#if defined(USE_WRITE_OP)
+    Op(uint64_t serial, void *target_ptr, OpCode code, const void *data, nq_size_t datalen, 
+       OpTarget target = OpTarget::Stream) : 
+      serial_(serial), code_(code), target_(target), data_(data, datalen) {}
+    Op(uint64_t serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
+       nq_size_t datalen, nq_closure_t on_reply, 
+       OpTarget target = OpTarget::Stream) :
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
+      call_.type_ = type;
+      call_.on_reply_ = on_reply;
+    }
+    Op(uint64_t serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
+       nq_size_t datalen, nq_rpc_opt_t rpc_opt, 
+       OpTarget target = OpTarget::Stream) :
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
+      call_ex_.type_ = type;
+      call_ex_.rpc_opt_ = rpc_opt;
+    }
+    Op(uint64_t serial, void *target_ptr, OpCode code, uint16_t type, 
+       const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) : 
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
+      notify_.type_ = type;
+    }
+    Op(uint64_t serial, void *target_ptr, OpCode code, 
+       nq_result_t result, nq_msgid_t msgid, 
+       const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) :
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
+      reply_.result_ = result;
+      reply_.msgid_ = msgid;
+    }
+#endif
     ~Op() {}
   };
   class Processor : public moodycamel::ConcurrentQueue<Op*> {
@@ -132,23 +203,6 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, name, ctx, OpTarget::Conn));      
     }
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, NqStream *unboxed, bool from_queue = false) {
-    //UnboxResult r = UnboxResult::Ok;
-    //always enter queue to be safe when this call inside protocol handler
-    if (from_queue) {
-      if (unboxed->stream_serial() == serial) {
-        ASSERT(code == StreamOpen);
-        if (!unboxed->Handler<NqStreamHandler>()->OnOpen()) {
-          unboxed->Disconnect();
-        }
-      } else {
-        //already got invalid
-        TRACE("InvokeStream stream already invalid %llx %llx", unboxed->stream_serial(), serial);
-      }
-    } else {
-      Enqueue(new Op(serial, unboxed, code, OpTarget::Stream));
-    }
-  }
   inline void InvokeAlarm(uint64_t serial, OpCode code, nq_time_t invocation_ts, nq_closure_t cb, NqAlarm *unboxed) {
     if (MainThread()) {
       if (unboxed->alarm_serial() == serial) {
@@ -174,6 +228,80 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, OpTarget::Alarm));
     }    
   }
+  inline void InvokeStream(uint64_t serial, OpCode code, NqStream *unboxed, NqSession::Delegate *d) {
+    //UnboxResult r = UnboxResult::Ok;
+    //always enter queue to be safe when this call inside protocol handler
+    if (unboxed != nullptr) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == Disconnect);
+        unboxed->Disconnect();
+      }
+    } else {
+      ASSERT(d != nullptr);
+      Enqueue(new Op(serial, d, code, OpTarget::Stream));
+    }
+  }
+#if defined(USE_WRITE_OP)
+  inline void InvokeStream(uint64_t serial, OpCode code, 
+                           const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {
+    if (unboxed != nullptr) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == Send);
+        unboxed->Handler<NqStreamHandler>()->Send(data, datalen);
+      }
+    } else {
+      Enqueue(new Op(serial, d, code, data, datalen));
+    }
+  }
+  inline void InvokeStream(uint64_t serial, OpCode code, 
+                           uint16_t type, const void *data, 
+                           nq_size_t datalen, nq_closure_t on_reply, NqStream *unboxed, NqSession::Delegate *d) {
+    if (unboxed != nullptr) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == Call);
+        unboxed->Handler<NqSimpleRPCStreamHandler>()->Call(type, data, datalen, on_reply);
+      }
+    } else {
+      Enqueue(new Op(serial, d, code, type, data, datalen, on_reply));
+    }
+  }
+  inline void InvokeStream(uint64_t serial, OpCode code, 
+                           uint16_t type, const void *data, 
+                           nq_size_t datalen, nq_rpc_opt_t &rpc_opt, NqStream *unboxed, NqSession::Delegate *d) {
+    if (unboxed != nullptr) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == CallEx);
+        unboxed->Handler<NqSimpleRPCStreamHandler>()->CallEx(type, data, datalen, rpc_opt);
+      }
+    } else {
+      Enqueue(new Op(serial, d, code, type, data, datalen, rpc_opt));
+    }
+  }
+  inline void InvokeStream(uint64_t serial, OpCode code, 
+                           uint16_t type, const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {    
+    if (unboxed != nullptr) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == Notify);
+        unboxed->Handler<NqSimpleRPCStreamHandler>()->Notify(type, data, datalen);
+      }
+    } else {
+      Enqueue(new Op(serial, d, code, type, data, datalen));
+    }
+  }
+  inline void InvokeStream(uint64_t serial, OpCode code, 
+                           nq_result_t result, nq_msgid_t msgid, 
+                           const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {
+    if (unboxed != nullptr) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == Reply);
+        unboxed->Handler<NqSimpleRPCStreamHandler>()->Reply(result, msgid, data, datalen);
+      }
+    } else {
+      Enqueue(new Op(serial, d, code, result, msgid, data, datalen));
+    }
+  }
+#endif
+
   
   template <class H>
   struct unbox_result_trait {

@@ -78,6 +78,9 @@ NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr) {
 static inline NqSession::Delegate *ToConn(nq_conn_t c) { 
   return reinterpret_cast<NqSession::Delegate *>(c.p); 
 }
+static inline NqSession::Delegate *ToConn(nq_rpc_t c) { 
+  return reinterpret_cast<NqSession::Delegate *>(c.p); 
+}
 static inline NqAlarm *ToAlarm(nq_alarm_t a) { 
   return reinterpret_cast<NqAlarm *>(a.p); 
 }
@@ -349,11 +352,15 @@ NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc) {
   }, "nq_rpc_close");
 }
 NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
+#if defined(USE_WRITE_OP)
+  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Call, type, data, datalen, on_reply, nullptr, ToConn(rpc));
+#else
   ASSERT(type > 0);
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
     st->Handler<NqSimpleRPCStreamHandler>()->Call(type, data, datalen, on_reply);
   }, "nq_rpc_call");
+#endif
 }
 NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_rpc_opt_t *opts) {
   ASSERT(type > 0);
@@ -370,11 +377,15 @@ NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data
   }, "nq_rpc_notify");
 }
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
+#if defined(USE_WRITE_OP)
+  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen, nullptr, ToConn(rpc));
+#else
   ASSERT(result <= 0);
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
     st->Handler<NqSimpleRPCStreamHandler>()->Reply(result, msgid, data, datalen);
   }, "nq_rpc_reply");
+#endif
 }
 //these are hidden API for test, because returned value is unstable
 //when used with client connection (under reconnection)
