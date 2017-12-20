@@ -49,6 +49,8 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
   // Accessors provided for convenience, not part of any interface.
   NqClient* client() { return client_; }
 
+  Fd fd() { return fd_; }
+
  private:
   // If |fd| is an open UDP socket, unregister and close it. Otherwise, do
   // nothing.

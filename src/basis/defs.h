@@ -6,7 +6,7 @@
 #if !defined(TRACE)
 	#include <string>
 	#include <mutex>
-	#if defined(DEBUG)
+	#if 0//defined(DEBUG)
 		extern std::mutex g_TRACE_mtx;
 		static inline void TRACE(const std::string &fmt) {
 			std::unique_lock<std::mutex> lock(g_TRACE_mtx);

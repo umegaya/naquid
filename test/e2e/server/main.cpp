@@ -1,9 +1,59 @@
 #include "common.h"
 
+#include "basis/header_codec.h"
+
+using namespace nqtest;
+
 static const int kThreads = 1;  //4 thread server
 static const char NotifySuccess[] = "notify success";
 
-using namespace nqtest;
+//#define STORE_DETAIL
+#if defined(STORE_DETAIL)
+nq::atomic<uint32_t> g_recv(0);
+std::map<uint64_t, uint64_t> g_recv_map;
+std::map<uint64_t, bool> g_cid_open_map;
+uint64_t g_index_conn_id_map[100];
+std::mutex g_recv_map_mtx;
+//be sure that calling with locking g_recv_map_mtxs
+void dump_recv() {
+  for (auto &kv : g_recv_map) {
+    fprintf(stderr, "seq for %llx = %llu\n", kv.first, kv.second);
+  }
+}
+extern bool is_conn_opened(uint64_t cid) {
+  auto it = g_cid_open_map.find(cid);
+  return it != g_cid_open_map.end() && it->second;
+}
+extern bool is_packet_received(uint64_t cid) {
+  for (int i = 0; i < 100; i++) {
+    if (g_index_conn_id_map[i] == cid) {
+      return true;
+    }
+  }
+  return false;
+}
+void add_recv(uint64_t serial, uint64_t data) {
+  std::unique_lock<std::mutex> lk(g_recv_map_mtx);
+  auto it = g_recv_map.find(serial);
+  if (it != g_recv_map.end()) {
+    if ((it->second + 1) != data) {
+      fprintf(stderr, "seq leap(%llx): %llu => %llu\n", it->first, it->second, data);
+      dump_recv();
+      exit(1);
+    } else {
+      it->second = data;
+    }
+  } else if (data != 1) {
+    fprintf(stderr, "seq leap(%llx): nil => %llu\n", serial, data);
+    dump_recv();
+    exit(1);
+  } else {
+    g_recv_map[serial] = data;
+  }
+}
+#endif
+
+
 
 /* conn callbacks */
 struct conn_context {
@@ -61,10 +111,9 @@ void on_alarm(void *p, nq_time_t *pnext) {
 
 /* rpc callbacks */
 bool on_rpc_open(void *p, nq_rpc_t rpc, void **ppctx) {
-  TRACE("on_rpc_open");
+  //fprintf(stderr, "on_rpc_open\n");
   bool valid;
   if (nq_rpc_outgoing(rpc, &valid)) {
-    TRACE("outgoing");
     //outgoing stream need to send rpc to peer
     auto msg = (std::string *)(*ppctx);
     RPC(rpc, RpcType::ServerRequest, msg->c_str(), msg->length(), ([rpc, msg](
@@ -74,8 +123,10 @@ bool on_rpc_open(void *p, nq_rpc_t rpc, void **ppctx) {
       delete msg;
     }));
   } else if (valid) {
+#if defined(STORE_DETAIL)
     //incoming do nothing now
-    TRACE("incoming");
+    g_cid_open_map[nq_conn_cid(nq_rpc_conn(rpc))] = true;
+#endif
   } else {
     ASSERT(false);
   }
@@ -98,14 +149,26 @@ bool on_rpc_open_reject(void *p, nq_rpc_t rpc, void **ppctx) {
 }
 void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
+
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
   TRACE("rpc req: %u", type);
   switch (type) {
     case RpcType::Ping: {
-      ASSERT(len == sizeof(nq_time_t));
-      //auto peer_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-      //auto seq = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-      nq_rpc_reply(rpc, RpcError::None, msgid, data, len);
+#if defined(STORE_DETAIL)
+      g_recv++;
+      if ((g_recv % 1000) == 0) {
+        fprintf(stderr, "%d.", (g_recv / 1000));
+      }
+      auto index = nq::Endian::NetbytesToHost<uint32_t>((const char *)data);
+      if (g_index_conn_id_map[index] == 0) {
+        g_index_conn_id_map[index] = nq_conn_cid(nq_rpc_conn(rpc));        
+      }
+      auto seq = nq::Endian::NetbytesToHost<uint64_t>((const char *)data + 4);
+      add_recv(index, seq);
+      nq_rpc_reply(rpc, RpcError::None, msgid, ((const char *)data) + 4, len - 4);
+#else
+      nq_rpc_reply(rpc, RpcError::None, msgid, (const char *)data, len);
+#endif
     } break;
     case RpcType::Raise:
       nq_rpc_reply(rpc, nq::Endian::NetbytesToHost<int32_t>(data), msgid, 
@@ -308,8 +371,12 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
 }
 
 
+
 /* main */
 int main(int argc, char *argv[]){
+#if defined(STORE_DETAIL)
+  memset(g_index_conn_id_map, 0, sizeof(g_index_conn_id_map));
+#endif
   nq_server_t sv = nq_server_create(kThreads);
 
   setup_server(sv, 8443, nullptr);

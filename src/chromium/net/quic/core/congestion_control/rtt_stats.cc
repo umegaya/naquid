@@ -41,10 +41,10 @@ void RttStats::UpdateRtt(QuicTime::Delta send_delta,
                          QuicTime::Delta ack_delay,
                          QuicTime now) {
   if (send_delta.IsInfinite() || send_delta <= QuicTime::Delta::Zero()) {
-    QUIC_LOG_FIRST_N(WARNING, 3)
+    /*QUIC_LOG_FIRST_N(WARNING, 3)
         << "Ignoring measured send_delta, because it's is "
         << "either infinite, zero, or negative.  send_delta = "
-        << send_delta.ToMicroseconds();
+        << send_delta.ToMicroseconds(); */
     return;
   }
 

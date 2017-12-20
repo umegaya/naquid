@@ -25,7 +25,7 @@ class NqStream : public QuicStream {
  protected:
   void *stream_ptr_;
   nq::atomic<uint64_t> stream_serial_;
-  std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name
+  std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name (including ternminate)
  private:
   std::unique_ptr<NqStreamHandler> handler_;
   SpdyPriority priority_;
@@ -41,12 +41,11 @@ class NqStream : public QuicStream {
 
   inline void SendHandshake() {
     if (!proto_sent_) {
-      TRACE("SendHandshake %p", this);
       WriteOrBufferData(QuicStringPiece(buffer_.c_str(), buffer_.length()), false, nullptr);
       proto_sent_ = true;
     }
   }
-  bool OpenHandler(const std::string &name);
+  bool OpenHandler(const std::string &name, bool update_buffer_with_name);
 
   void Disconnect();
   nq_alarm_t NewAlarm();

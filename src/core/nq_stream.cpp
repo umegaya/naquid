@@ -35,17 +35,20 @@ NqSessionIndex NqStream::session_index() const {
 nq_conn_t NqStream::conn() { 
   return nq_session()->conn(); 
 }
-bool NqStream::OpenHandler(const std::string &name) {
+bool NqStream::OpenHandler(const std::string &name, bool update_buffer_with_name) {
   if (handler_ != nullptr) {
     return establish_side(); //because non establish side never call this twice.
   }
-  handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name));
+  //FYI(iyatomi): name.c_str() will create new string without null terminate
+  handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name.c_str()));
   if (handler_ == nullptr) {
     ASSERT(false);
     return false;
   }
-  buffer_ = name;
-  buffer_.append(1, '\0');
+  if (update_buffer_with_name) {
+    buffer_ = name;
+    buffer_.append(1, '\0');
+  }
   if (!handler_->OnOpen()) {
     buffer_ = "";
     return false;
@@ -122,26 +125,36 @@ void NqStream::OnDataAvailable() {
       established_ = true;
     } else {
       for (;i < n_blocks;) {
-        buffer_.append(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
-        sequencer()->MarkConsumed(v[i].iov_len);
-        i++;
-        size_t idx = buffer_.find('\0');
-        if (idx == std::string::npos) {
-          continue; //not yet established
+        const char *vbuf = NqStreamHandler::ToCStr(v[i].iov_base);
+        int idx = 0;
+        for (;idx < v[i].iov_len; idx++) {
+          if (vbuf[idx] == 0) {
+            //FYI(iyatomi): this adds null terminate also.
+            buffer_.append(vbuf, idx + 1); 
+            break;
+          }
+        }
+        if (idx >= v[i].iov_len) {
+          //FYI(iyatomi): entire buffer points part of string.
+          buffer_.append(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
+          sequencer()->MarkConsumed(v[i].iov_len);
+          i++;
+          continue;
         }
         //prevent send handshake message to client
         set_proto_sent();
         //create handler by initial establish string
-        auto name = buffer_.substr(0, idx);
-        if (!OpenHandler(name)) {
+        if (!OpenHandler(buffer_, false)) {
           Disconnect();
           return;
         }
-        if (buffer_.length() > (idx + 1)) {
-          //parse_buffer may contains over-received payload
-          handler_->OnRecv(buffer_.c_str() + idx + 1, buffer_.length() - idx - 1);
+        if (v[i].iov_len > (idx + 1)) {
+          //v[i] may contains over-received payload
+          handler_->OnRecv(vbuf + idx + 1, v[i].iov_len - idx - 1);
         }
         established_ = true;
+        sequencer()->MarkConsumed(v[i].iov_len);
+        i++;
         break;
       }
     }
@@ -283,7 +296,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
     if (tmp_ofs == 0) { break; }
     read_ofs += tmp_ofs;
     if ((read_ofs + reclen) > plen) {
-      //TRACE("short of buffer %u %u %u", reclen, read_ofs, plen);
+      //fprintf(stderr, "short of buffer %u %zu %zu\n", reclen, read_ofs, plen);
       break;
     }
     //TRACE("msgid, type = %u %d", msgid, type);
@@ -309,9 +322,9 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
         }
       } else {
         //request
-        fprintf(stderr, "stream handler request: idx %u %llu\n", 
-          nq::Endian::NetbytesToHost<uint32_t>(pstr), 
-          nq::Endian::NetbytesToHost<uint64_t>(pstr + 4));
+        //fprintf(stderr, "stream handler request: idx %u %llu\n", 
+          //nq::Endian::NetbytesToHost<uint32_t>(pstr), 
+          //nq::Endian::NetbytesToHost<uint64_t>(pstr + 4));
         nq_closure_call(on_request_, on_rpc_request, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr), reclen);
       }
     } else if (type > 0) {

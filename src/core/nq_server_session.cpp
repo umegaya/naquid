@@ -123,7 +123,7 @@ bool NqServerSession::NewStream(const std::string &name, void *ctx) {
   auto s = reinterpret_cast<NqStream *>(CreateOutgoingDynamicStream());
   auto ppctx = s->ContextBuffer();
   *ppctx = ctx;
-  if (!s->OpenHandler(name)) {
+  if (!s->OpenHandler(name, true)) {
     CloseStream(s->id());
     return false;
   }

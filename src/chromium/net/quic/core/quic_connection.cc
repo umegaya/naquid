@@ -1756,6 +1756,7 @@ void QuicConnection::SendOrQueuePacket(SerializedPacket* packet) {
   // If there are already queued packets, queue this one immediately to ensure
   // it's written in sequence number order.
   if (!queued_packets_.empty() || !WritePacket(packet)) {
+    fprintf(stderr, "packet will queued %s\n", queued_packets_.empty() ? "qempty" : "qnotempty");
     // Take ownership of the underlying encrypted packet.
     packet->encrypted_buffer = CopyBuffer(*packet);
     queued_packets_.push_back(*packet);

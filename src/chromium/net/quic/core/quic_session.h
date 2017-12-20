@@ -287,6 +287,8 @@ class QUIC_EXPORT_PRIVATE QuicSession : public QuicConnectionVisitorInterface,
 
   bool can_use_slices() const { return can_use_slices_; }
 
+  void DumpWriteBlockedStatus();
+
  protected:
   using StaticStreamMap = QuicSmallMap<QuicStreamId, QuicStream*, 2>;
 

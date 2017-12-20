@@ -6,6 +6,17 @@
 
 using namespace nqtest;
 
+#if defined(STORE_DETAIL)
+extern bool is_conn_opened(uint64_t cid) {
+  return true;
+}
+extern bool is_packet_received(uint64_t cid) {
+  return true;
+}
+#endif
+
+
+
 void test_suites(const nq_addr_t &addr, bool skip = true) {
 #if 1
   TRACE("==================== test_rpc ====================");

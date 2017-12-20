@@ -252,7 +252,7 @@ void NqClient::StreamManager::RecoverOutgoingStreams(NqClientSession *session) {
         TRACE("RecoverOutgoingStreams: serial %llx", s->stream_serial());
       }
       e.SetStream(s);
-      if (!s->OpenHandler(e.name_)) {
+      if (!s->OpenHandler(e.name_, true)) {
         e.ClearStream();
         delete s;
       }
@@ -302,7 +302,7 @@ NqClientStream *NqClient::StreamManager::FindOrCreateStream(
         s = static_cast<NqClientStream *>(session->CreateOutgoingDynamicStream());
         s->set_stream_index(stream_index);
         s->InitSerial();
-        if (s->OpenHandler(e.name_)) {
+        if (s->OpenHandler(e.name_, true)) {
           e.SetStream(s);
         }
       }

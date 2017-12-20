@@ -221,7 +221,7 @@ class Test {
     RunOptions() {
       idle_timeout = nq_time_sec(60);
       handshake_timeout = nq_time_sec(60);
-      rpc_timeout = nq_time_sec(30);
+      rpc_timeout = nq_time_sec(60);
       execute_duration = 0;
     }
   };

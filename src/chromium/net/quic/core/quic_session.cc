@@ -336,6 +336,10 @@ QuicConsumedData QuicSession::WritevData(
   return data;
 }
 
+void QuicSession::DumpWriteBlockedStatus() {
+  
+}
+
 void QuicSession::SendRstStream(QuicStreamId id,
                                 QuicRstStreamErrorCode error,
                                 QuicStreamOffset bytes_written) {

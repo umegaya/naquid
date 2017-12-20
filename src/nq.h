@@ -320,7 +320,9 @@ NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t
 static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
-
+//will deprecate
+NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t c);
+NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t c);
 
 
 // --------------------------
