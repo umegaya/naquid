@@ -56,6 +56,9 @@ class NqDispatcher : public QuicDispatcher,
   inline void Process(NqPacket *p) {
     {
       //get NqServerSession's mutex, which is corresponding to this packet's connection id
+#if defined(USE_WRITE_OP)
+      ProcessPacket(p->server_address(), p->client_address(), *p);        
+#else
       auto cid = p->ConnectionId();
       auto s = FindByConnectionId(cid);
       if (s != nullptr) {
@@ -66,6 +69,7 @@ class NqDispatcher : public QuicDispatcher,
       } else {
         ProcessPacket(p->server_address(), p->client_address(), *p);        
       }
+#endif
     }
     reader_.Pool(const_cast<char *>(p->data()), p);
   }

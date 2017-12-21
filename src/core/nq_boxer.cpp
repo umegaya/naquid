@@ -8,9 +8,11 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
     switch (op->target_) {
     case Conn: {
       auto c = reinterpret_cast<NqSession::Delegate *>(op->target_ptr_);
+#if !defined(USE_WRITE_OP)
       auto m = NqUnwrapper::UnsafeUnwrapMutex(NqConnSerialCodec::IsClient(op->serial_), c);
       std::unique_lock<std::mutex> lock(*m);
       p->LockSession(NqConnSerialCodec::SessionIndex(op->serial_));
+#endif
       switch (op->code_) {
       case CreateStream:
       case CreateRpc:
@@ -20,13 +22,17 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
         p->InvokeConn(op->serial_, op->code_, c, true);
         break;
       }
+#if !defined(USE_WRITE_OP)
       p->UnlockSession();
+#endif
     } break;
     case Stream: {
+#if !defined(USE_WRITE_OP)
       auto c = reinterpret_cast<NqSession::Delegate *>(op->target_ptr_);
       auto m = NqUnwrapper::UnsafeUnwrapMutex(NqStreamSerialCodec::IsClient(op->serial_), c);
       std::unique_lock<std::mutex> lock(*m);
       p->LockSession(NqConnSerialCodec::SessionIndex(op->serial_));
+#endif
       auto s = p->FindStream(op->serial_, op->target_ptr_);
       switch (op->code_) {
       case Disconnect:
@@ -58,7 +64,9 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
         ASSERT(false);
         break;
       }
+#if !defined(USE_WRITE_OP)
       p->UnlockSession();
+#endif
     } break;
     case Alarm: {
       auto a = reinterpret_cast<NqAlarm *>(op->target_ptr_);
