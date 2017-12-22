@@ -14,11 +14,17 @@ file(GLOB_RECURSE src [
 	"./main.cpp" 
 ])
 
-find_library(core_foundation CoreFoundation)
-find_library(cocoa Cocoa)
-find_library(iokit IOKit)
-find_library(security Security)
+set(platform_libs "")
+if (${TEST_OS} STREQUAL "osx")
+	find_library(core_foundation CoreFoundation)
+	find_library(cocoa Cocoa)
+	find_library(iokit IOKit)
+	find_library(security Security)
+	set(platform_libs ${core_foundation} ${cocoa} ${iokit} ${security})
+endif()
+set(platform_lib_paths "../../../build/t/${TEST_OS}")
 
-link_directories(../../../build/t)
+link_directories(${platform_lib_paths})
+
 add_executable(server ${src})
-target_link_libraries(server nq ${core_foundation} ${cocoa} ${iokit} ${security})
+target_link_libraries(server nq ${platform_libs})

@@ -1,3 +1,4 @@
 test/lab/*
+test/e2e/build/*
 build/*
 tools/builder/finish
