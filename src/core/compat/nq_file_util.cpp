@@ -7,6 +7,8 @@
 
 #include <stddef.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 namespace base {	
@@ -20,6 +22,39 @@ bool ReadFromFD(int fd, char* buffer, size_t bytes) {
     total_read += bytes_read;
   }
   return total_read == bytes;
+}
+
+bool WriteFileDescriptor(const int fd, const char* data, int size) {
+  // Allow for partial writes.
+  ssize_t bytes_written_total = 0;
+  for (ssize_t bytes_written_partial = 0; bytes_written_total < size;
+       bytes_written_total += bytes_written_partial) {
+    bytes_written_partial =
+        HANDLE_EINTR(write(fd, data + bytes_written_total,
+                           size - bytes_written_total));
+    if (bytes_written_partial < 0)
+      return false;
+  }
+
+  return true;
+}
+
+int WriteFile(const FilePath& filename, const char* data, int size) {
+  int fd = HANDLE_EINTR(creat(filename.value().c_str(), 0666));
+  if (fd < 0)
+    return -1;
+
+  int bytes_written = WriteFileDescriptor(fd, data, size) ? size : -1;
+  if (IGNORE_EINTR(close(fd)) < 0)
+    return -1;
+  return bytes_written;
+}
+
+bool DirectoryExists(const FilePath& path) {
+  struct stat file_info;
+  if (stat(path.value().c_str(), &file_info) != 0)
+    return false;
+  return S_ISDIR(file_info.st_mode);
 }
 
 //minimum file IO
@@ -38,6 +73,23 @@ FilePath::FilePath(StringPieceType path) {
     path_.erase(nul_pos, StringType::npos);
 }
 FilePath::~FilePath() {
+}
+
+//FYI(iyatomi): this is simplified from original implementation, 
+//to only meet requirement of platform_thread_linux.cc. 
+FilePath FilePath::Append(StringPieceType component) const {
+  StringPieceType appended = component;
+  StringType without_nuls;
+
+  StringType::size_type nul_pos = component.find(kStringTerminator);
+  if (nul_pos != StringPieceType::npos) {
+    component.substr(0, nul_pos).CopyToString(&without_nuls);
+    appended = StringPieceType(without_nuls);
+  }
+
+  FilePath new_path(path_);
+  appended.AppendToString(&new_path.path_);
+  return new_path;
 }
 
 //TODO(iyatomi): if necessary, port OpenFile/CloseFile, instead of fopen/fclose

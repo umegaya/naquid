@@ -65,10 +65,9 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
 }
 
 int main(int argc, char *argv[]){
-  nq_addr_t a1 = {
-    .host = "127.0.0.1",
-    .port = 8443,
-  };
+  nq_addr_t a1;
+  a1.host = "127.0.0.1";
+  a1.port = 8443;
   test_suites(a1);
 
   return 0;

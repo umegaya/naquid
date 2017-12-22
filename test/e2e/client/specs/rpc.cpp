@@ -1,5 +1,7 @@
 #include "rpc.h"
 
+#include <memory.h>
+
 using namespace nqtest;
 
 static void test_ping(nq_rpc_t rpc, Test::Conn &tc) {

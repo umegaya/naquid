@@ -1,6 +1,7 @@
 #include "common.h"
 
 #include <cstdlib>
+#include <memory.h>
 
 namespace nqtest {
 nq_stream_t Test::Conn::invalid_stream = { const_cast<char *>("invalid"), 0 };
@@ -229,11 +230,12 @@ bool Test::Run(const RunOptions *opt) {
   static RunOptions fallback;
   RunOptions options = (opt != nullptr) ? *opt : fallback;
   nq_client_t cl = nq_client_create(256, 256 * 4);
-  nq_clconf_t conf = {
-    .insecure = false,
-    .handshake_timeout = options.handshake_timeout,
-    .idle_timeout = options.idle_timeout,
-  };
+
+  nq_clconf_t conf;
+  conf.insecure = false;
+  conf.handshake_timeout = options.handshake_timeout;
+  conf.idle_timeout = options.idle_timeout;
+
   Conn *conns = new Conn[concurrency_];
   for (int i = 0; i < concurrency_; i++) {
     nq_closure_init(conf.on_open, on_client_conn_open, &Test::OnConnOpen, conns + i);

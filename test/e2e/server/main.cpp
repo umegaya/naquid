@@ -1,6 +1,7 @@
 #include "common.h"
 
 #include "basis/header_codec.h"
+#include <memory.h>
 
 using namespace nqtest;
 

@@ -14,13 +14,16 @@ file(GLOB_RECURSE src [
 	"./main.cpp" 
 ])
 
-set(platform_libs "")
 if (${TEST_OS} STREQUAL "osx")
 	find_library(core_foundation CoreFoundation)
 	find_library(cocoa Cocoa)
 	find_library(iokit IOKit)
 	find_library(security Security)
 	set(platform_libs ${core_foundation} ${cocoa} ${iokit} ${security})
+elseif(${TEST_OS} STREQUAL "linux")
+	set(platform_libs pthread)
+else()
+	set(platform_libs "")
 endif()
 set(platform_lib_paths "../../../build/t/${TEST_OS}")
 
