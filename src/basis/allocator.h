@@ -53,7 +53,7 @@ class Allocator {
   ~Allocator() {
     for (auto &c : chunks_) {
       auto pb = c.get();
-      for (int i = 0; i < chunk_size_; i++) {
+      for (size_t i = 0; i < chunk_size_; i++) {
         pb[i].Destroy();
       }
     }
@@ -79,7 +79,7 @@ class Allocator {
   inline void GrowChunk() {
     chunks_.emplace(chunks_.end(), new Block[chunk_size_]);
     auto pb = chunks_[chunks_.size() - 1].get();
-    for (int i = 0; i < chunk_size_; i++) {
+    for (size_t i = 0; i < chunk_size_; i++) {
       auto ptr = pb + i;
       ptr->Init();
       pool_.push(ptr);

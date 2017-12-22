@@ -324,8 +324,8 @@ struct server_config {
 void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   nq_addr_t addr = {
     "0.0.0.0", 
-    "./test/e2e/server/certs/leaf_cert.pem", 
-    "./test/e2e/server/certs/leaf_cert.pkcs8", 
+    "./server/certs/leaf_cert.pem", 
+    "./server/certs/leaf_cert.pkcs8", 
     nullptr,
     port
   };

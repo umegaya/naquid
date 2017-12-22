@@ -58,10 +58,6 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(addr, test_reconnect_stress, 64);
     if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_stress fails"); }
   }//*/
-  /*if (skip) {
-    Test t(addr, test_bench, 256);
-    if (!t.Run()) { ALERT_AND_EXIT("test_bench fails"); }
-  }//*/
 }
 
 int main(int argc, char *argv[]){

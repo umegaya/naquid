@@ -66,7 +66,7 @@ const char *INVALID_REASON(const H &h) {
   }
 }
 
-static nq_closure_t g_empty_closure = { nullptr, nullptr };
+static nq_closure_t g_empty_closure = { nullptr, { nullptr } };
 NQAPI_THREADSAFE nq_closure_t nq_closure_empty() {
   return g_empty_closure;
 }
@@ -76,9 +76,11 @@ NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr) {
 static inline NqSession::Delegate *ToConn(nq_conn_t c) { 
   return reinterpret_cast<NqSession::Delegate *>(c.p); 
 }
+#if defined(USE_WRITE_OP)
 static inline NqSession::Delegate *ToConn(nq_rpc_t c) { 
   return reinterpret_cast<NqSession::Delegate *>(c.p); 
 }
+#endif
 static inline NqAlarm *ToAlarm(nq_alarm_t a) { 
   return reinterpret_cast<NqAlarm *>(a.p); 
 }

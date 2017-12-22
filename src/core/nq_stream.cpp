@@ -126,7 +126,7 @@ void NqStream::OnDataAvailable() {
     } else {
       for (;i < n_blocks;) {
         const char *vbuf = NqStreamHandler::ToCStr(v[i].iov_base);
-        int idx = 0;
+        size_t idx = 0;
         for (;idx < v[i].iov_len; idx++) {
           if (vbuf[idx] == 0) {
             //FYI(iyatomi): this adds null terminate also.

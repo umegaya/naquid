@@ -10,6 +10,7 @@ set(linux_src
 	./src/chromium/base/threading/platform_thread_internal_posix.cc
 	./src/chromium/base/threading/platform_thread_linux.cc
 	./src/chromium/base/threading/platform_thread_posix.cc
+	./src/chromium/base/threading/thread_local_storage_posix.cc
 	./src/chromium/base/time/time_exploded_posix.cc
 	./src/chromium/base/time/time_now_posix.cc
 )

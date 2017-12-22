@@ -35,8 +35,6 @@ else()
 endif()
 set(platform_lib_paths "../../../build/t/${TEST_OS}")
 
-message("plibpath: ${platform_lib_paths}")
-
 link_directories(${platform_lib_paths})
 
 add_executable(client ${src})

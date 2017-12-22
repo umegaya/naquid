@@ -1,6 +1,7 @@
 #include <nq.h>
 
 #include <map>
+#include <inttypes.h>
 
 #include "basis/endian.h"
 
@@ -94,8 +95,8 @@ static uint64_t g_idx = 0;
 static bool g_alive = true;
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
   ASSERT(result >= 0);
-  auto v = (closure_ctx *)p;
 #if defined(STORE_DETAIL)
+  auto v = (closure_ctx *)p;
   auto recv_seq = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
   if (recv_seq != (v->last_recv + 1)) {
     fprintf(stderr, "rpc %llx, seq leaps: %llu => %llu\n", rpc.s, v->last_recv, recv_seq);
@@ -169,7 +170,7 @@ int main(int argc, char *argv[]){
     nq_client_poll(cl);
   }
 
-  printf("process %llu requests in %lf sec\n", 
+  printf("process %" PRId64 " requests in %lf sec\n", 
     g_idx, ((double)(nq_time_now() - start)) / (1000 * 1000 * 1000));
 
   nq_client_destroy(cl);
