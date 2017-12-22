@@ -66,10 +66,7 @@ const char *INVALID_REASON(const H &h) {
   }
 }
 
-static nq_closure_t g_empty_closure {
-  .arg = nullptr,
-  .ptr = nullptr,
-};
+static nq_closure_t g_empty_closure = { nullptr, nullptr };
 NQAPI_THREADSAFE nq_closure_t nq_closure_empty() {
   return g_empty_closure;
 }

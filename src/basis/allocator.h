@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stack>
+#include <vector>
+#include <memory>
 
 #include "base/memory/manual_constructor.h"
 

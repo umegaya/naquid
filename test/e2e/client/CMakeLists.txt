@@ -31,5 +31,5 @@ link_directories(../../../build/t)
 add_executable(client ${src})
 target_link_libraries(client nq ${core_foundation} ${cocoa} ${iokit} ${security})
 
-	add_executable(bench ${bench_src})
-	target_link_libraries(bench nq ${core_foundation} ${cocoa} ${iokit} ${security})
+add_executable(bench ${bench_src})
+target_link_libraries(bench nq ${core_foundation} ${cocoa} ${iokit} ${security})

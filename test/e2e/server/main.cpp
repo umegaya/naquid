@@ -61,13 +61,6 @@ struct conn_context {
 };
 void on_conn_open(void *, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
   TRACE("on_conn_open event:%d\n", hsev);
-  if (hsev != NQ_HS_DONE) {
-    return;
-  }
-  auto ctx = (conn_context *)malloc(sizeof(conn_context));
-  ctx->count = 3;
-  *ppctx = ctx;
-  TRACE("set context for %p, %p", c.p, ctx);
 }
 int g_reject = 2;
 void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
@@ -81,6 +74,10 @@ void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void
     nq_conn_close(c);
     return;
   }
+  auto ctx = (conn_context *)malloc(sizeof(conn_context));
+  ctx->count = 3;
+  *ppctx = ctx;
+  TRACE("set context for %p, %p", c.p, ctx);
   on_conn_open(arg, c, hsev, ppctx);
 }
 void on_conn_close(void *, nq_conn_t c, nq_result_t, const char *detail, bool) {

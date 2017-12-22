@@ -5,7 +5,7 @@
 #include "basis/endian.h"
 
 #define N_CLIENT (100)
-#define N_SEND (1500)
+#define N_SEND (5000)
 
 //#define STORE_DETAIL
 #if defined(STORE_DETAIL)

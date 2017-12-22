@@ -14,7 +14,8 @@
 - [ ] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
 - [ ] conn: handle connectivity change (if not handled)
 - [ ] conn: try to use let's encrypt cert (with corresponding host name) by default
-- [ ] stream: consider the way that can access sid/ctx/name of client stream (now cannot during reconnection wait)
+- [ ] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
+  - but ```nq_[stream|rpc]_[name|ctx]``` remained as hidden API (its only safe at single thread processing, and may useful for that case)
 - [ ] API: use direct pointer to access conn/stream
 - [ ] API: consider the good way to integrate nq_error_t and user defined error code, as the value of nq_result_t of nq_rpc_reply.
 - [ ] API: more API to thread safe 
@@ -25,6 +26,8 @@
   - giving special option to nq_client_connect's nq_clconf_t or nq_svconf_t
 - [x] server: QuicAlarm should be more efficient
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
+- [ ] server: graceful shutdown
+  - stop accepting connection and wait until all request in the worker queue consumed
 - [ ] client: remove stub alarm and connection helper interface
   - override NqLoop operator new/delete to avoid freeing with unique_ptr of QuicClientBase
 - [ ] test: high frequent reconnection test
@@ -37,7 +40,7 @@
 - [ ] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread
 - [x] bench: latency, throughput, compare with mrs, which is ENet based, gaming specific udp network library
-  - 20~30% slower than mrs, but it may not big difference for naquid main use case (send/recv small packet very frequently)
+  - ~10% faster than mrs, with 100ccu/5000 request (roughly 350k req/sec) almost batched (mrs does not allow 100+ ccu, so more comparision is not possible)
 
 
 #### remain tasks for 1.0.0
