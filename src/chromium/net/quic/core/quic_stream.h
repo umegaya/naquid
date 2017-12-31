@@ -410,12 +410,12 @@ class QUIC_EXPORT_PRIVATE QuicStream : public StreamNotifierInterface {
  public:
   inline QuicStreamAllocator *stream_allocator() { return allocator_; }
   inline void* operator new(std::size_t sz) {
-    auto r = reinterpret_cast<QuicStream *>(std::malloc(sz));
+    volatile auto r = reinterpret_cast<QuicStream *>(std::malloc(sz));
     r->allocator_ = nullptr;
     return r;
   }
   inline void* operator new(std::size_t sz, QuicStreamAllocator* a) {
-    auto r = reinterpret_cast<QuicStream *>(a->Alloc(sz));
+    volatile auto r = reinterpret_cast<QuicStream *>(a->Alloc(sz));
     r->allocator_ = a;
     return r;
   }

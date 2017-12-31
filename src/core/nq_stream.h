@@ -35,7 +35,9 @@ class NqStream : public QuicStream {
            NqSession* nq_session, 
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority);
-  ~NqStream() override { ASSERT(stream_serial_ == 0); }
+  ~NqStream() override {
+    ASSERT(stream_serial_ == 0); 
+  }
 
   NqLoop *GetLoop();
 

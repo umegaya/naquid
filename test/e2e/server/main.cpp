@@ -5,7 +5,7 @@
 
 using namespace nqtest;
 
-static const int kThreads = 1;  //4 thread server
+static const int kThreads = 1;  //1 thread server
 static const char NotifySuccess[] = "notify success";
 
 //#define STORE_DETAIL
