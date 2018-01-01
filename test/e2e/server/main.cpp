@@ -1,6 +1,7 @@
 #include "common.h"
 
 #include "basis/header_codec.h"
+#include "basis/convert.h"
 #include <memory.h>
 
 using namespace nqtest;
@@ -375,7 +376,12 @@ int main(int argc, char *argv[]){
 #if defined(STORE_DETAIL)
   memset(g_index_conn_id_map, 0, sizeof(g_index_conn_id_map));
 #endif
-  nq_server_t sv = nq_server_create(kThreads);
+  int n_threads = kThreads;
+  if (argc > 1) {
+    n_threads = nq::convert::Do(argv[1], kThreads);
+  }
+  fprintf(stderr, "n_threads %d\n", n_threads);
+  nq_server_t sv = nq_server_create(n_threads);
 
   setup_server(sv, 8443, nullptr);
   server_config scf = {
