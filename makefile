@@ -36,6 +36,9 @@ linux_internal:
 linux:
 	$(call ct_run,make linux_internal)
 
+linux_sh: 
+	docker run --name nqsh --rm -ti --privileged -v `pwd`:/naquid naquid/meta-builder bash || docker exec -ti nqsh bash
+
 ios:
 	-@mkdir -p build/ios.v7
 	-@mkdir -p build/ios.64
