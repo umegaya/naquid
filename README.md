@@ -10,7 +10,6 @@
   - seems cannot, we stick to send stream kind over stream for a while.
 - [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
 - [x] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
-- [ ] conn: more cert check
 - [ ] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
 - [ ] conn: handle connectivity change (if not handled)
 - [ ] conn: try to use let's encrypt cert (with corresponding host name) by default
@@ -50,7 +49,7 @@
 
 
 #### YAGNI
-- [ ] conn: optinally enable certificate transparency verification 
+- [ ] conn: more cert check. eg. optinally enable certificate transparency verification
   - maybe better just expose certificate data to user
 
 

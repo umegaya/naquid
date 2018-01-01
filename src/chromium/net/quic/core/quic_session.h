@@ -514,12 +514,12 @@ class QUIC_EXPORT_PRIVATE QuicSession : public QuicConnectionVisitorInterface,
  public:
   inline QuicSessionAllocator *session_allocator() { return allocator_; }
   inline void* operator new(std::size_t sz) {
-    auto r = reinterpret_cast<QuicSession *>(std::malloc(sz));
+    volatile auto r = reinterpret_cast<QuicSession *>(std::malloc(sz));
     r->allocator_ = nullptr;
     return r;
   }
   inline void* operator new(std::size_t sz, QuicSessionAllocator* a) {
-    auto r = reinterpret_cast<QuicSession *>(a->AllocSession(sz));
+    volatile auto r = reinterpret_cast<QuicSession *>(a->AllocSession(sz));
     r->allocator_ = a;
     return r;
   }
