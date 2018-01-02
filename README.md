@@ -10,19 +10,19 @@
   - seems cannot, we stick to send stream kind over stream for a while.
 - [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
 - [x] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
-- [ ] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
+- [x] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
 - [ ] conn: handle connectivity change (if not handled)
-- [ ] conn: try to use let's encrypt cert (with corresponding host name) by default
 - [ ] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
   - but ```nq_[stream|rpc]_[name|ctx]``` remained as hidden API (its only safe at single thread processing, and may useful for that case)
 - [x] API: use direct pointer to access conn/stream
 - [ ] API: consider the good way to integrate nq_error_t and user defined error code, as the value of nq_result_t of nq_rpc_reply.
-- [ ] API: more API to thread safe 
+- [x] API: more API to thread safe 
 - [ ] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
-- [ ] API: more detail control of rpc timeout
-- [ ] API: raw connection (do not use stream name to select used stream)
+- [x] API: more detail control of rpc timeout (we providing nq_rpc_call_ex)
+- [ ] API: raw connection (do not use stream name to select stream protocol to be used)
 - [ ] API: ```nq_(conn|rpc|stream)_is_valid``` returns optional error detail msg 
   - giving special option to nq_client_connect's nq_clconf_t or nq_svconf_t
+- [ ] API: actually obsolute APIs which are decided to obsolute (hide header declaration)
 - [x] server: QuicAlarm should be more efficient
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
 - [ ] server: graceful shutdown
@@ -51,6 +51,7 @@
 #### YAGNI
 - [ ] conn: more cert check. eg. optinally enable certificate transparency verification
   - maybe better just expose certificate data to user
+- [ ] conn: try to use let's encrypt cert (with corresponding host name) by default
 
 
 #### WIP: docs

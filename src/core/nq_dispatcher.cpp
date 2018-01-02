@@ -98,21 +98,21 @@ bool NqDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& message,
 QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
                                              const QuicSocketAddress& client_address,
                                              QuicStringPiece alpn) {
-    auto it = server_.port_configs().find(port_);
-    if (it == server_.port_configs().end()) {
-    	return nullptr;
-    }
+  auto it = server_.port_configs().find(port_);
+  if (it == server_.port_configs().end()) {
+  	return nullptr;
+  }
 
-    QuicConnection* connection = new QuicConnection(
-      connection_id, client_address, &loop_, &loop_,
-      CreatePerConnectionWriter(),
-      /* owns_writer= */ true, Perspective::IS_SERVER, GetSupportedVersions());
+  QuicConnection* connection = new QuicConnection(
+    connection_id, client_address, &loop_, &loop_,
+    CreatePerConnectionWriter(),
+    /* owns_writer= */ true, Perspective::IS_SERVER, GetSupportedVersions());
 
-    auto s = new(this) NqServerSession(connection, it->second);
-    s->Initialize();
-    s->InitSerial();
-    s->OnOpen(NQ_HS_START);
-    return s;
+  auto s = new(this) NqServerSession(connection, it->second);
+  s->Initialize();
+  s->InitSerial();
+  s->OnOpen(NQ_HS_START);
+  return s;
 }
 
 //implements NqBoxer
