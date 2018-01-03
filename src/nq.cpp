@@ -1,14 +1,15 @@
 #include "nq.h"
 
+#include "base/at_exit.h"
+#include "base/logging.h"
+
+#include "basis/defs.h"
 #include "basis/timespec.h"
 
 #include "core/nq_client_loop.h"
 #include "core/nq_server.h"
 #include "core/nq_unwrapper.h"
 #include "core/nq_network_helper.h"
-
-#include "base/at_exit.h"
-#include "base/logging.h"
 
 //at exit manager seems optimized out and causes linkder error without following anchor
 extern base::AtExitManager *nq_at_exit_manager();
@@ -89,16 +90,29 @@ static inline bool IsOutgoing(bool is_client, nq_sid_t stream_id) {
   return is_client ? ((stream_id % 2) != 0) : ((stream_id % 2) == 0);
 }
 
-
+static nq::logger::level::def cr_severity_to_nq_map[] = {
+  nq::logger::level::debug, //const LogSeverity LOG_VERBOSE = -1;  // This is level 1 verbosity
+  nq::logger::level::info, //const LogSeverity LOG_INFO = 0;
+  nq::logger::level::warn, //const LogSeverity LOG_WARNING = 1;
+  nq::logger::level::error, //const LogSeverity LOG_ERROR = 2;
+  nq::logger::level::fatal, //const LogSeverity LOG_FATAL = 3;
+};
 static bool nq_chromium_logger(int severity,
-    const char* file, int line, size_t message_start, const std::string& str) {
-
+  const char* file, int line, size_t message_start, const std::string& str) {
+  auto lv = cr_severity_to_nq_map[severity + 1];
+  nq::logger::log(lv, {
+    {"tag", "crlog"},
+    {"file", file},
+    {"line", line},
+    {"msg", str.c_str() + message_start},
+  });
+  return true;
 }
 
 static void lib_init() {
   g_at_exit_manager = nq_at_exit_manager(); //anchor
   //set loghandoer for chromium codebase
-  SetLogMessageHandler(nq_chromium_logger);
+  logging::SetLogMessageHandler(nq_chromium_logger);
 }
 
 
@@ -451,9 +465,54 @@ NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d) {
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d) {
 	return nq::clock::pause(d);
 }
+
+
+
+// --------------------------
+//
+// alarm API
+//
+// --------------------------
 NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t invocation_ts, nq_closure_t cb) {
   NqUnwrapper::UnwrapBoxer(a)->InvokeAlarm(a.s, NqBoxer::OpCode::Start, invocation_ts, cb, ToAlarm(a));
 }
 NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a) {
   NqUnwrapper::UnwrapBoxer(a)->InvokeAlarm(a.s, NqBoxer::OpCode::Finalize, ToAlarm(a));
+}
+
+
+
+// --------------------------
+//
+// log API
+//
+// --------------------------
+NQAPI_BOOTSTRAP void nq_log_config(const nq_logconf_t *conf) {
+  nq::logger::configure(conf->callback, conf->id, conf->manual_flush);
+}
+NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *params, int n_params) {
+  nq::json j = {
+    {"msg", msg}
+  };
+  for (int i = 0; i < n_params; i++) {
+    auto p = params[i];
+    switch (p.type) {
+    case NQ_LOG_INTEGER:
+      j[p.key] = p.value.n;
+      break;
+    case NQ_LOG_STRING:
+      j[p.key] = p.value.s;
+      break;
+    case NQ_LOG_FLOAT:
+      j[p.key] = p.value.f;
+      break;
+    case NQ_LOG_BOOLEAN:
+      j[p.key] = p.value.b;
+      break;
+    }
+  }
+  nq::logger::log((nq::logger::level::def)(int)lv, j);
+}
+NQAPI_THREADSAFE void nq_log_flush() {
+  nq::logger::flush();
 }

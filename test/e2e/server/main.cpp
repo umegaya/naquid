@@ -380,7 +380,10 @@ int main(int argc, char *argv[]){
   if (argc > 1) {
     n_threads = nq::convert::Do(argv[1], kThreads);
   }
-  fprintf(stderr, "n_threads %d\n", n_threads);
+  nq::logger::info({
+    {"msg", "launch server"},
+    {"n_threads", n_threads},
+  });
   nq_server_t sv = nq_server_create(n_threads);
 
   setup_server(sv, 8443, nullptr);

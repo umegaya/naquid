@@ -9,6 +9,15 @@
 #include "basis/defs.h"
 
 namespace nq {
+
+#if defined(__ENABLE_EPOLL__) || defined(__ENABLE_KQUEUE__)
+typedef int Fd;
+constexpr Fd INVALID_FD = -1; 
+#elif defined(__ENABLE_IOCP__)
+//TODO(iyatomi): windows definition
+#else
+#endif
+
 class Syscall {
 public:
 	static inline int Close(Fd fd) { return ::close(fd); }

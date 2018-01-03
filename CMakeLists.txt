@@ -24,7 +24,6 @@ endif()
 set(lib_src
 	./src/nq.cpp
 
-	./src/basis/defs.cpp
 	./src/basis/endian.cpp
 	./src/basis/logger.cpp
 	./src/basis/timespec.cpp

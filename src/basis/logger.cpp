@@ -1,7 +1,9 @@
 #include "logger.h"
 #include <mutex>
 #include <MoodyCamel/concurrentqueue.h>
-
+#if defined(NO_LOG_WRITE_CALLBACK)
+#include <iostream>
+#endif
 
 namespace nq {
 namespace logger {
@@ -14,8 +16,9 @@ namespace logger {
       "F",
       "R",
   };
-  static void default_writer(const char *buf, size_t len, bool) {
+  static inline void default_writer(const char *buf, size_t len) {
     fwrite(buf, 1, len, stderr);
+    fputc('\n', stderr);
   }
   static writer_cb_t writer_ = default_writer;
   static std::string id_ = "nq";
@@ -39,7 +42,7 @@ namespace logger {
     if (manual_flush_) {
       std::string str;
       while (s_logs.try_dequeue(str)) {
-        writer_(str.c_str(), str.length(), true);
+        writer_(str.c_str(), str.length());
       }
     }
   }
@@ -48,32 +51,16 @@ namespace logger {
   }
 #endif
 
-  void write(const std::string &body, const std::string &footer) {
+  void write(const json &j) {
     mtx_.lock();
 #if defined(NO_LOG_WRITE_CALLBACK)
-    fwrite(body.c_str(), 1, body.length(), stdout);
-    fwrite(footer.c_str(), 1, footer.length(), stdout);
+    std::err << j << std::endl;
 #else
-    if (manual_flush_) {
-      s_logs.enqueue(body + footer);
-    } else {
-      writer_(body.c_str(), body.length(), false);
-      writer_(footer.c_str(), footer.length(), true);
-    }
-#endif
-    mtx_.unlock();
-  }
-
-
-  void write(const std::string &body) {
-    mtx_.lock();
-#if defined(NO_LOG_WRITE_CALLBACK)
-    fwrite(body.c_str(), 1, body.length(), stdout);
-#else
+    auto body = j.dump();
     if (manual_flush_) {
       s_logs.enqueue(body);
     } else {
-      writer_(body.c_str(), body.length(), true);     
+      writer_(body.c_str(), body.length());     
     }
 #endif
     mtx_.unlock();

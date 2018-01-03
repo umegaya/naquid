@@ -437,9 +437,8 @@ NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a);
 // log API
 //
 // --------------------------
-//log handler. note that this called multiple times for a single log line. 
-//last boolean indicates log output finished(true) or not(false). 
-typedef void (*nq_logger_t)(const char *, size_t, bool);
+//log handler. 
+typedef void (*nq_logger_t)(const char *, size_t);
 //log configuration
 typedef struct {
   //(possibly) unique identifier of log stream which is created by single process
@@ -469,7 +468,6 @@ typedef enum {
   NQ_LOG_INTEGER,
   NQ_LOG_STRING,
   NQ_LOG_FLOAT,
-  NQ_LOG_DOUBLE,
   NQ_LOG_BOOLEAN,
 } nq_logparam_type_t;
 typedef struct {
@@ -489,7 +487,8 @@ NQAPI_BOOTSTRAP void nq_log_config(const nq_logconf_t *conf);
 NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *params, int n_params);
 
 static inline void nq_msg(nq_loglv_t lv, const char *msg) { nq_log(lv, msg, NULL, 0); }
-//only enable if you configure manual_flush to true
+//flush cached log. only enable if you configure manual_flush to true. 
+//recommend to call from only one thread. otherwise log output order may change from actual order.
 NQAPI_THREADSAFE void nq_log_flush(); 
 
 
