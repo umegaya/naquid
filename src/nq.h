@@ -79,6 +79,7 @@ typedef enum {
   NQ_EALLOC = -3,
   NQ_ENOTSUPPORT = -4,
   NQ_EGOAWAY = -5,
+  NQ_EUSER = -6, //for rpc, user calls raise to reply
 } nq_error_t;
 
 typedef enum {
@@ -91,7 +92,6 @@ typedef struct {
   int port;
 } nq_addr_t;
 
-typedef void (*nq_logger_t)(const char *, size_t, bool);
 
 //closure
 
@@ -412,6 +412,13 @@ NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
 
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
 
+
+
+// --------------------------
+//
+// alarm API
+//
+// --------------------------
 #define STOP_INVOKE_NQ_TIME (0)
 //configure alarm to invoke cb after current time exceeds first, 
 //at thread which handle receive callback of nq_rpc/stream_t that creates this alarm.
@@ -422,6 +429,70 @@ NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
 NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t first, nq_closure_t cb);
 //destroy alarm. if you call nq_alarm_set after the alarm already called nq_alarm_destroy, it will possibly crash
 NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a);
+
+
+
+// --------------------------
+//
+// log API
+//
+// --------------------------
+//log handler. note that this called multiple times for a single log line. 
+//last boolean indicates log output finished(true) or not(false). 
+typedef void (*nq_logger_t)(const char *, size_t, bool);
+//log configuration
+typedef struct {
+  //(possibly) unique identifier of log stream which is created by single process
+  const char *id;
+
+  //if set to true, you need to call nq_log_flush() periodically to actually output logs.
+  //also useful for some environement like Unity Editor, which cannot call logging API from non-main thread.
+  //https://fogbugz.unity3d.com/default.asp?949512_dab6v5ranqbebqr5
+  bool manual_flush;
+
+  //log handler
+  nq_logger_t callback;
+} nq_logconf_t;
+//log severity
+typedef enum {
+  NQ_LOGLV_TRACE,
+  NQ_LOGLV_DEBUG,
+  NQ_LOGLV_INFO,
+  NQ_LOGLV_WARN,
+  NQ_LOGLV_ERROR,
+  NQ_LOGLV_FATAL,            
+  NQ_LOGLV_REPORT,
+  NQ_LOGLV_MAX,
+} nq_loglv_t;
+//structured log param
+typedef enum {
+  NQ_LOG_INTEGER,
+  NQ_LOG_STRING,
+  NQ_LOG_FLOAT,
+  NQ_LOG_DOUBLE,
+  NQ_LOG_BOOLEAN,
+} nq_logparam_type_t;
+typedef struct {
+  const char *key;
+  nq_logparam_type_t type;
+  union {
+    float f;
+    double d;
+    uint64_t n;
+    const char *s;
+    bool b;
+  } value;
+} nq_logparam_t;
+
+NQAPI_BOOTSTRAP void nq_log_config(const nq_logconf_t *conf);
+
+NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *params, int n_params);
+
+static inline void nq_msg(nq_loglv_t lv, const char *msg) { nq_log(lv, msg, NULL, 0); }
+//only enable if you configure manual_flush to true
+NQAPI_THREADSAFE void nq_log_flush(); 
+
+
 
 #if defined(__cplusplus)
 }

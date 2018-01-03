@@ -26,6 +26,7 @@ set(lib_src
 
 	./src/basis/defs.cpp
 	./src/basis/endian.cpp
+	./src/basis/logger.cpp
 	./src/basis/timespec.cpp
 
 	./src/core/nq_alarm.cpp
@@ -104,7 +105,7 @@ elseif (ANDROID)
 	add_library(nq SHARED ${nqsrc})
 	target_link_libraries(nq "-lc++_static -llog")
 elseif (WINDOWS)
-	# TODO(iyatomi): add windows build instruction
+	messsage(FATAL_ERROR, "TODO(iyatomi): add windows build instruction")
 elseif (NQ_LINUX)
 	set(nqsrc ${src} ${linux_src})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_EPOLL__")

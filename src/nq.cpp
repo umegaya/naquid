@@ -8,6 +8,7 @@
 #include "core/nq_network_helper.h"
 
 #include "base/at_exit.h"
+#include "base/logging.h"
 
 //at exit manager seems optimized out and causes linkder error without following anchor
 extern base::AtExitManager *nq_at_exit_manager();
@@ -89,6 +90,17 @@ static inline bool IsOutgoing(bool is_client, nq_sid_t stream_id) {
 }
 
 
+static bool nq_chromium_logger(int severity,
+    const char* file, int line, size_t message_start, const std::string& str) {
+
+}
+
+static void lib_init() {
+  g_at_exit_manager = nq_at_exit_manager(); //anchor
+  //set loghandoer for chromium codebase
+  SetLogMessageHandler(nq_chromium_logger);
+}
+
 
 // --------------------------
 //
@@ -96,7 +108,7 @@ static inline bool IsOutgoing(bool is_client, nq_sid_t stream_id) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint) {
-  g_at_exit_manager = nq_at_exit_manager(); //anchor
+  lib_init(); //anchor
 	auto l = new NqClientLoop(max_nfd, max_stream_hint);
 	if (l->Open(max_nfd) < 0) {
 		return nullptr;
@@ -134,7 +146,7 @@ NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_server_t nq_server_create(int n_worker) {
-	g_at_exit_manager = nq_at_exit_manager(); //anchor
+	lib_init(); //anchor
   auto sv = new NqServer(n_worker);
 	return sv->ToHandle();
 }

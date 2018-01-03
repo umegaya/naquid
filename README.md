@@ -21,7 +21,6 @@
 - [x] API: more detail control of rpc timeout (we providing nq_rpc_call_ex)
 - [ ] API: raw connection (do not use stream name to select stream protocol to be used)
 - [ ] API: ```nq_(conn|rpc|stream)_is_valid``` returns optional error detail msg 
-  - giving special option to nq_client_connect's nq_clconf_t or nq_svconf_t
 - [ ] API: actually obsolute APIs which are decided to obsolute (hide header declaration)
 - [x] server: QuicAlarm should be more efficient
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
@@ -60,9 +59,7 @@
     - mainly because of the nature of mobile connection, that is, greedy reconnection is required to keep MMO-ish connectivity to the server.
   - connection object life cycle
     - client: active
-      - client connection object retained over reconnection. so its possible client connection object alive but connection is not active (eg. on reconnection wait)
-      - no need to recreate nq_conn_t or nq_stream/rpc_t on reconnection. its automatically rebound to new session delegate or stream, after establishment.
-        - note that stream rebind only occurs on writing stream (lazy rebind). 
+      - client connection object retained over reconnection. so its possible client connection object alive but connection is not active (eg. during reconnection wait)
     - server: passive
       - server connection object is the exactly same life cycle with connection itself
       - disconnect == every resouce related with the connection is deleted. 
