@@ -12,10 +12,22 @@ NqSession::NqSession(QuicConnection* connection,
                      Delegate* delegate,
                      const QuicConfig& config) : 
   QuicSession(connection, owner, config), delegate_(delegate) {
-  //chromium implementation treat initial value (3) as special stream (header stream for QPDY)
+  //chromium implementation treat initial value (3) as special stream (header stream for SPDY)
   auto id = GetNextOutgoingStreamId();
   ASSERT(perspective() == Perspective::IS_SERVER || id == kHeadersStreamId);
 }
+NqSession::~NqSession() {
+  for (auto &kv : dynamic_streams()) {
+    static_cast<NqStream *>(kv.second.get())->InvalidateSerial();
+  }
+  if (connection() != nullptr) {
+    static_cast<NqConnection*>(connection())->Cleanup();
+    delete connection();
+  }
+}
+
+
+
 QuicCryptoStream* NqSession::GetMutableCryptoStream() {
   return crypto_stream_.get();
 }
@@ -23,8 +35,7 @@ const QuicCryptoStream* NqSession::GetCryptoStream() const {
   return crypto_stream_.get();
 }
 
-//NqSession::Delegate
-nq_conn_t NqSession::Delegate::BoxSelf() { return GetBoxer()->Box(this); }
+
 
 //implements QuicConnectionVisitorInterface
 void NqSession::OnConnectionClosed(QuicErrorCode error,

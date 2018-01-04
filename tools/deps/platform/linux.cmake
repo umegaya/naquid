@@ -1,13 +1,16 @@
 set(linux_src
-	./src/chromium/base/debug/proc_maps_linux.cc
+	./src/chromium/base/debug/debugger_posix.cc
+	./src/chromium/base/debug/stack_trace_posix.cc
 	./src/chromium/base/files/file_util_linux.cc
-	./src/chromium/base/process/internal_linux.cc
-	./src/chromium/base/process/memory_linux.cc
-	./src/chromium/base/process/process_handle_linux.cc
-	./src/chromium/base/process/process_info_linux.cc
-	./src/chromium/base/process/process_iterator_linux.cc
-	./src/chromium/base/process/process_linux.cc
-	./src/chromium/base/process/process_metrics_linux.cc
-	./src/chromium/base/sys_info_linux.cc
+	./src/chromium/base/json/json_writer.cc
+	./src/chromium/base/posix/safe_strerror.cc
+	./src/chromium/base/process/process_handle_posix.cc
+	./src/chromium/base/rand_util_posix.cc
+	./src/chromium/base/synchronization/lock_impl_posix.cc
+	./src/chromium/base/threading/platform_thread_internal_posix.cc
 	./src/chromium/base/threading/platform_thread_linux.cc
+	./src/chromium/base/threading/platform_thread_posix.cc
+	./src/chromium/base/threading/thread_local_storage_posix.cc
+	./src/chromium/base/time/time_exploded_posix.cc
+	./src/chromium/base/time/time_now_posix.cc
 )

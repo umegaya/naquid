@@ -111,7 +111,7 @@ set(net_src
 	./src/chromium/net/quic/core/frames/quic_stream_frame.cc
 	./src/chromium/net/quic/core/frames/quic_window_update_frame.cc
 	./src/chromium/net/quic/chromium/crypto/proof_source_chromium.cc
-	./src/chromium/net/quic/chromium/crypto/proof_verifier_chromium.cc
+	#./src/chromium/net/quic/chromium/crypto/proof_verifier_chromium.cc
 	./src/chromium/net/quic/core/proto/cached_network_parameters.pb.cc
 	./src/chromium/net/quic/core/proto/source_address_token.pb.cc
 	./src/chromium/net/quic/core/quic_ack_listener_interface.cc

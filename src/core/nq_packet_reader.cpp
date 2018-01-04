@@ -130,7 +130,7 @@ bool NqPacketReader::ReadPacketsMulti(
     // timestamping.
     if (packet_walltimestamp.IsZero()) {
       if (fallback_walltimestamp.IsZero()) {
-        fallback_walltimestamp = clock.WallNow();
+        fallback_walltimestamp = QuicWallTime::FromUNIXMicroseconds((clock.Now() - QuicTime::Zero()).ToMicroseconds());
       }
       packet_walltimestamp = fallback_walltimestamp;
     }
@@ -185,7 +185,7 @@ bool NqPacketReader::ReadPackets(
   // This isn't particularly desirable, but not all platforms support socket
   // timestamping.
   if (walltimestamp.IsZero()) {
-    walltimestamp = clock.WallNow();
+    walltimestamp = QuicWallTime::FromUNIXMicroseconds((clock.Now() - QuicTime::Zero()).ToMicroseconds());
   }
   QuicTime timestamp = clock.ConvertWallTimeToQuicTime(walltimestamp);
   auto packet = NewPacket(buf, bytes_read, timestamp, 0, false,

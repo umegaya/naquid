@@ -3,7 +3,7 @@ BUILD_SETTING_PATH=$(RELATIVE_PROJECT_ROOT)/tools/cmake
 CHROMIUM_ROOT=../chromium
 BUILDER_IMAGE=naquid/meta-builder
 LIB=nq
-# osx/linux
+# osx/linux/windows
 TEST_OS=osx
 DEBUG=False
 TEST_DEBUG=True
@@ -26,8 +26,8 @@ bundle:
 	cd build/osx && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/bundle.cmake $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
 
 testlib:
-	-@mkdir -p build/t
-	cd build/t && cmake -DDEBUG:BOOL=$(TEST_DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/testlib.cmake $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	-@mkdir -p build/t/$(TEST_OS)
+	cd build/t/$(TEST_OS) && cmake -DDEBUG:BOOLEAN=$(TEST_DEBUG) -DCMAKE_TOOLCHAIN_FILE=../$(BUILD_SETTING_PATH)/$(TEST_OS).cmake $(RELATIVE_PROJECT_ROOT)/.. && make -j$(JOB)
 
 linux_internal: 
 	-@mkdir -p build/linux
@@ -35,6 +35,9 @@ linux_internal:
 
 linux:
 	$(call ct_run,make linux_internal)
+
+linux_sh: 
+	docker run --name nqsh --rm -ti --privileged -v `pwd`:/naquid naquid/meta-builder bash || docker exec -ti nqsh bash
 
 ios:
 	-@mkdir -p build/ios.v7
@@ -70,11 +73,11 @@ patch:
 sync: inject patch
 
 testsv:
-	make -C test/e2e server DEBUG=$(TEST_DEBUG)
+	make -C test/e2e server TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
 
 testcl:
-	make -C test/e2e client DEBUG=$(TEST_DEBUG)
+	make -C test/e2e client TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
 
 testclean:
-	-@rm -r build/t
-	make -C test/e2e clean DEBUG=$(TEST_DEBUG)
+	-@rm -r build/t/$(TEST_OS)
+	make -C test/e2e clean TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)

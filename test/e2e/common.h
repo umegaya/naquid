@@ -89,34 +89,58 @@ class StreamRecordClosureCaller : public ClosureCallerBase {
 };
 class ConnOpenStreamClosureCaller : public ClosureCallerBase {
  public:
+  bool is_stream_;
   std::function<bool (nq_rpc_t, void **)> cb_;
+  std::function<bool (nq_stream_t, void **)> stream_cb_;
  public:
-  ConnOpenStreamClosureCaller() : cb_() {}
+  ConnOpenStreamClosureCaller() : is_stream_(false), cb_() {}
+  ConnOpenStreamClosureCaller(std::function<bool (nq_rpc_t, void **)> cb) : is_stream_(false), cb_(cb) {}
+  ConnOpenStreamClosureCaller(std::function<bool (nq_stream_t, void **)> cb) : is_stream_(true), stream_cb_(cb) {}
   ~ConnOpenStreamClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_rpc_open, &ConnOpenStreamClosureCaller::Call, this);
+    if (is_stream_) {
+      nq_closure_init(clsr, on_stream_open, &ConnOpenStreamClosureCaller::CallStream, this);
+    } else {
+      nq_closure_init(clsr, on_rpc_open, &ConnOpenStreamClosureCaller::Call, this);
+    }
     return clsr;
   }
   static bool Call(void *arg, nq_rpc_t rpc, void **ppctx) { 
     auto pcc = (ConnOpenStreamClosureCaller *)arg;
     return pcc->cb_(rpc, ppctx);
   }
+  static bool CallStream(void *arg, nq_stream_t st, void **ppctx) { 
+    auto pcc = (ConnOpenStreamClosureCaller *)arg;
+    return pcc->stream_cb_(st, ppctx);
+  }
 };
 class ConnCloseStreamClosureCaller : public ClosureCallerBase {
  public:
+  bool is_stream_;
   std::function<void (nq_rpc_t)> cb_;
+  std::function<bool (nq_stream_t)> stream_cb_;
  public:
-  ConnCloseStreamClosureCaller() : cb_() {}
+  ConnCloseStreamClosureCaller() : is_stream_(false), cb_() {}
+  ConnCloseStreamClosureCaller(std::function<bool (nq_rpc_t)> cb) : is_stream_(false), cb_(cb) {}
+  ConnCloseStreamClosureCaller(std::function<bool (nq_stream_t)> cb) : is_stream_(true), stream_cb_(cb) {}
   ~ConnCloseStreamClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_rpc_close, &ConnCloseStreamClosureCaller::Call, this);
+    if (is_stream_) {
+      nq_closure_init(clsr, on_stream_close, &ConnCloseStreamClosureCaller::CallStream, this);
+    } else {
+      nq_closure_init(clsr, on_rpc_close, &ConnCloseStreamClosureCaller::Call, this);
+    }
     return clsr;
   }
   static void Call(void *arg, nq_rpc_t rpc) { 
     auto pcc = (ConnCloseStreamClosureCaller *)arg;
-    return pcc->cb_(rpc);
+    pcc->cb_(rpc);
+  }
+  static void CallStream(void *arg, nq_stream_t st) { 
+    auto pcc = (ConnCloseStreamClosureCaller *)arg;
+    pcc->stream_cb_(st);
   }
 };
 class ConnOpenClosureCaller : public ClosureCallerBase {
@@ -197,7 +221,7 @@ class Test {
     RunOptions() {
       idle_timeout = nq_time_sec(60);
       handshake_timeout = nq_time_sec(60);
-      rpc_timeout = nq_time_sec(30);
+      rpc_timeout = nq_time_sec(60);
       execute_duration = 0;
     }
   };
@@ -241,6 +265,7 @@ class Test {
         rpc = r;
       }
     };
+    typedef uint64_t SessionSerialType;
    public:
     int index, disconnect;
     std::thread th;
@@ -249,7 +274,7 @@ class Test {
 
     nq_conn_t c;
 
-    std::map<nq_sid_t, Stream> streams;
+    std::map<SessionSerialType, Stream> streams;
     std::map<CallbackType, std::unique_ptr<ClosureCallerBase>> conn_notifiers;
 
     char *send_buf;
@@ -271,36 +296,31 @@ class Test {
       std::unique_lock<std::mutex> lock(mtx);
       cond.notify_one();
     }
-    nq_stream_t NewStream(const std::string &name) {
-      for (auto &st : streams) {
-        if (name == std::string(nq_stream_name(st.second.st))) {
-          return st.second.st;
-        }
-      }
-      return invalid_stream;
+    void OpenStream(const std::string &name, std::function<bool (nq_stream_t, void **)> cb) {
+      auto cc = new ConnOpenStreamClosureCaller(cb);
+      nq_conn_stream(c, name.c_str(), cc);
     }
-    nq_rpc_t NewRpc(const std::string &name) {
-      for (auto &st : streams) {
-        if (name == std::string(nq_rpc_name(st.second.rpc))) {
-          return st.second.rpc;
-        }
-      }
-      return invalid_rpc;
+    void OpenRpc(const std::string &name, std::function<bool (nq_rpc_t, void **)> cb) {
+      auto cc = new ConnOpenStreamClosureCaller(cb);
+      nq_conn_rpc(c, name.c_str(), cc);
     }
+    static inline SessionSerialType SessionSerial(nq_stream_t &s) { return s.s; }
+    static inline SessionSerialType SessionSerial(nq_rpc_t &rpc) { return rpc.s; }
     void AddStream(nq_stream_t s) {
-      auto sid = nq_stream_sid(s);
+      auto sid = SessionSerial(s);
       if (streams.find(sid) == streams.end()) {
         streams.emplace(sid, Stream(s));
       }
     } 
     void AddStream(nq_rpc_t rpc) {
-      auto sid = nq_rpc_sid(rpc);
+      auto sid = SessionSerial(rpc);
       if (streams.find(sid) == streams.end()) {
+        TRACE("AddStream add rpc %llx", sid);
         streams.emplace(sid, Stream(rpc));
       }
     }
     bool RemoveStream(nq_stream_t s) {
-      auto it = streams.find(nq_stream_sid(s));
+      auto it = streams.find(SessionSerial(s));
       if (it != streams.end()) {
         streams.erase(it);
         return true;
@@ -308,8 +328,9 @@ class Test {
       return false;
     }
     bool RemoveStream(nq_rpc_t rpc) {
-      auto it = streams.find(nq_rpc_sid(rpc));
+      auto it = streams.find(SessionSerial(rpc));
       if (it != streams.end()) {
+        TRACE("AddStream remove rpc %llx", SessionSerial(rpc));
         streams.erase(it);
         return true;
       }
@@ -327,7 +348,7 @@ class Test {
       conn_notifiers[type] = std::unique_ptr<ClosureCallerBase>(clsr);
     }
     bool FindClosure(CallbackType type, nq_stream_t s, nq_closure_t &clsr) {
-      auto it = streams.find(nq_stream_sid(s));
+      auto it = streams.find(SessionSerial(s));
       if (it != streams.end()) {
         auto it2 = it->second.notifiers.find(type);
         if (it2 != it->second.notifiers.end()) {
@@ -338,13 +359,16 @@ class Test {
       return false;
     }
     void SetClosure(CallbackType type, nq_stream_t s, ClosureCallerBase *clsr) {
-      auto it = streams.find(nq_stream_sid(s));
+      TRACE("SetClosure: sid = %llx", SessionSerial(s));
+      auto it = streams.find(SessionSerial(s));
       if (it != streams.end()) {
         it->second.notifiers[type] = std::unique_ptr<ClosureCallerBase>(clsr);
+      } else {
+        ASSERT(false);
       }
     }
     bool FindClosure(CallbackType type, nq_rpc_t rpc, nq_closure_t &clsr) {
-      auto it = streams.find(nq_rpc_sid(rpc));
+      auto it = streams.find(SessionSerial(rpc));
       if (it != streams.end()) {
         auto it2 = it->second.notifiers.find(type);
         if (it2 != it->second.notifiers.end()) {
@@ -355,9 +379,12 @@ class Test {
       return false;
     }
     void SetClosure(CallbackType type, nq_rpc_t rpc, ClosureCallerBase *clsr) {
-      auto it = streams.find(nq_rpc_sid(rpc));
+      TRACE("SetClosure: sid = %llx", SessionSerial(rpc));
+      auto it = streams.find(SessionSerial(rpc));
       if (it != streams.end()) {
         it->second.notifiers[type] = std::unique_ptr<ClosureCallerBase>(clsr);
+      } else {
+        ASSERT(false);
       }
     }
     Latch NewLatch() {
@@ -376,11 +403,11 @@ class Test {
     }
   };
  protected:
-  nq::atm_int_t running_;
-  nq::atm_int_t result_;
-  nq::atm_int_t test_start_;
-  nq::atm_int_t thread_start_;
-  nq::atm_int_t closed_conn_;
+  nq::atomic<int> running_;
+  nq::atomic<int> result_;
+  nq::atomic<int> test_start_;
+  nq::atomic<int> thread_start_;
+  nq::atomic<int> closed_conn_;
   TestProc testproc_;
   TestInitProc init_;
   nq_addr_t addr_;
@@ -471,6 +498,7 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
 }
 
 #define WATCH_STREAM(conn, stream, type, callback) { \
+  TRACE("WATCH_STREAM: at %p %u %s(%u)", &conn, nqtest::Test::CallbackType::type, __FILE__, __LINE__); \
   auto *pcc = new nqtest::type##ClosureCaller(); \
   pcc->cb_ = callback; \
   conn.SetClosure(nqtest::Test::CallbackType::type, stream, pcc); \

@@ -11,14 +11,15 @@
 
 #include "net/tools/quic/quic_client_base.h"
 
+#include "basis/allocator.h"
 #include "basis/closure.h"
-#include "core/nq_client_loop.h"
 #include "core/nq_client_session.h"
 #include "core/nq_config.h"
 
 namespace net {
 
 class QuicServerId;
+class NqClientLoop;
 class NqClientStream;
 
 class NqClient : public QuicClientBase, 
@@ -28,93 +29,73 @@ class NqClient : public QuicClientBase,
  public:
   enum ConnectState : uint8_t {
     DISCONNECT,
-    CONNECT,
+    CONNECTING,
+    CONNECTED,
     FINALIZED,
     RECONNECTING,
   };
   class ReconnectAlarm : public QuicAlarm::Delegate {
    public:
     ReconnectAlarm(NqClient *client) : client_(client) {}
-    void OnAlarm() { 
-      client_->Initialize();
-      client_->StartConnect(); 
-    }
+    void OnAlarm();
    private:
     NqClient *client_;
   };
   class StreamManager {
     struct Entry {
       NqClientStream *handle_;
+      std::string name_;
       void *context_;
-      Entry(NqClientStream *h) : handle_(h), context_(nullptr) {}
+      Entry(NqClientStream *h) : 
+        handle_(h), name_(), context_(nullptr) {}
+      Entry(NqClientStream *h, const std::string &name) : 
+        handle_(h), name_(name), context_(nullptr) {}
       inline void SetStream(NqClientStream *s) { handle_ = s; }
       inline void ClearStream() { handle_ = nullptr; }
       inline NqClientStream *Stream() { return handle_; }
       inline void *Context() { return context_; }
-      inline void **ContextBuffer() { return &context_; }
+      inline void **ContextBuffer() { return &context_; }      
+      inline void SetName(const std::string &name) { name_ = name; }
+      inline const std::string &Name() { return name_; }
     };
-    struct EntryGroup {
-      std::vector<Entry> streams_;
-      std::string name_;
-      inline void SetStream(NqClientStream *s) {
-        streams_[s->index_per_name_id()].SetStream(s);
-      }
-      inline void ClearStream(NqClientStream *s) {
-        streams_[s->index_per_name_id()].ClearStream();
-      }
-      inline NqClientStream *Stream(NqStreamIndexPerNameId idx) {
-        return streams_[idx].Stream();
-      }
-    };
-    std::vector<EntryGroup> out_entries_;
-    std::vector<Entry> in_entries_;
-    std::stack<NqStreamIndexPerNameId> in_empty_indexes_;
-    std::mutex entries_mutex_;
+
+    using StreamMap = QuicSmallMap<NqStreamIndex, Entry, 10>;
+
+    StreamMap stream_map_;
+    nq::IdFactoryNoAtomic<NqStreamIndex> index_seed_;
    public:
-    StreamManager() : out_entries_(), in_entries_(), in_empty_indexes_(), entries_mutex_() {}
+    StreamManager() : stream_map_(), index_seed_() {}
     
-    inline bool OnOpen(const std::string &name, NqClientStream *s) {
-      return ((s->id() % 2) == 0) ? OnIncomingOpen(s) : OnOutgoingOpen(name, s);
-    }
-    inline void OnClose(NqClientStream *s) {
-      if ((s->id() % 2) == 0) {
-        OnIncomingClose(s);
-      } else {
-        OnOutgoingClose(s);
-      }
-    }
+    bool OnOutgoingOpen(NqClientSession *session, bool connected, 
+                        const std::string &name, void *ctx);
+    bool OnIncomingOpen(NqClientStream *s);
+    void OnClose(NqClientStream *s);
+
     NqClientStream *FindOrCreateStream(
       NqClientSession *session, 
-      NqStreamNameId name_id, 
-      NqStreamIndexPerNameId index_per_name_id, 
+      NqStreamIndex stream_index, 
       bool connected);
 
     //recover all created outgoing streams on reconnection done
     void RecoverOutgoingStreams(NqClientSession *session);
     
     //it should be used by non-owner thread of this client. 
-    inline const NqClientStream *Find(NqStreamNameId id, NqStreamIndexPerNameId index) const {
-      auto *e = FindEntry(id, index);
-      return e == nullptr ? nullptr : e->Stream();
-    }
-    inline void *FindContext(NqStreamNameId id, NqStreamIndexPerNameId index) const {
-      auto *e = FindEntry(id, index);
+    inline void *FindContext(NqStreamIndex index) const {
+      auto *e = FindEntry(index);
       return e == nullptr ? nullptr : e->Context();
     }
-    inline void **FindContextBuffer(NqStreamNameId id, NqStreamIndexPerNameId index) {
-      auto *e = FindEntry(id, index);
+    inline void **FindContextBuffer(NqStreamIndex index) {
+      auto *e = FindEntry(index);
       return e == nullptr ? nullptr : e->ContextBuffer();
     }
-    inline const std::string &Find(NqStreamNameId id) const {
+    inline const std::string &FindStreamName(NqStreamIndex index) const {
       static std::string empty_;
-      return id <= out_entries_.size() ? out_entries_[id - 1].name_ : empty_;
+      auto *e = FindEntry(index);
+      return e == nullptr ? empty_ : e->Name();
     }
    protected:
-    Entry *FindEntry(NqStreamNameId id, NqStreamIndexPerNameId index) const;
-    NqStreamNameId Add(const std::string &name);
-    bool OnOutgoingOpen(const std::string &name, NqClientStream *s);
+    Entry *FindEntry(NqStreamIndex index) const;
     void OnOutgoingClose(NqClientStream *s);
-    bool OnIncomingOpen(NqClientStream *s);
     void OnIncomingClose(NqClientStream *s);    
   };
  public:
@@ -123,21 +104,27 @@ class NqClient : public QuicClientBase,
            const QuicServerId& server_id,
            const QuicVersionVector& supported_versions,
            const NqClientConfig &config,
-           NqClientLoop* loop,
            std::unique_ptr<ProofVerifier> proof_verifier);
   ~NqClient() override;
 
   // operation
-  NqClientSession *nq_session() { return static_cast<NqClientSession *>(session()); }
-  const NqClientSession *nq_session() const { 
-    return static_cast<const NqClientSession *>(const_cast<NqClient *>(this)->session()); 
-  }
+  inline NqClientSession *nq_session() { return static_cast<NqClientSession *>(session()); }
+  inline const NqClientSession *nq_session() const { return const_cast<NqClient *>(this)->nq_session(); }
   inline bool destroyed() const { return connect_state_ == FINALIZED; }
-  inline NqSessionIndex session_index() const { return session_index_; }
   inline StreamManager &stream_manager() { return stream_manager_; }
   inline const StreamManager &stream_manager() const { return stream_manager_; }
-  inline nq_conn_t ToHandle() { return loop_->Box(this); }
-  NqClientStream *FindOrCreateStream(NqStreamNameId name_id, NqStreamIndexPerNameId index_per_name_id);
+  inline NqClientLoop *client_loop() { return loop_; }
+  inline uint64_t session_serial() const { return session_serial_; }
+  inline NqSessionIndex session_index() const { 
+    return NqConnSerialCodec::ClientSessionIndex(session_serial_); }
+
+  std::mutex &static_mutex();
+  NqBoxer *boxer();
+  nq_conn_t ToHandle();
+  NqClientStream *FindOrCreateStream(NqStreamIndex index);
+  void InitSerial();
+  inline void InvalidateSerial() { session_serial_ = 0; }
+  inline void Destroy() { OnAlarm(); }
 
 
   // implements QuicClientBase. TODO(umegaya): these are really not needed?
@@ -151,13 +138,11 @@ class NqClient : public QuicClientBase,
 
   // implements QuicAlarm::Delegate
   void OnAlarm() override;
-
   // implements QuicCryptoClientStream::ProofHandler
   // Called when the proof in |cached| is marked valid.  If this is a secure
   // QUIC session, then this will happen only after the proof verifier
   // completes.
   void OnProofValid(const QuicCryptoClientConfig::CachedState& cached) override;
-
   // Called when proof verification details become available, either because
   // proof verification is complete, or when cached details are used. This
   // will only be called for secure QUIC connections.
@@ -165,39 +150,43 @@ class NqClient : public QuicClientBase,
 
 
   // implements NqSession::Delegate
-  uint64_t Id() const override { return connect_state_ == CONNECT ? nq_session()->connection_id() : 0; }
   void *Context() const override { return context_; }
   void *StreamContext(uint64_t stream_serial) const override {
-    return stream_manager_.FindContext(NqStreamSerialCodec::ClientStreamNameId(stream_serial), 
-                                       NqStreamSerialCodec::ClientStreamIndexPerName(stream_serial));
+    return stream_manager_.FindContext(NqStreamSerialCodec::ClientStreamIndex(stream_serial));
   }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
   void OnOpen(nq_handshake_event_t hsev) override;
   bool IsClient() const override { return true; }
+  bool IsConnected() const override { return connect_state_ == CONNECTED; }
   void Disconnect() override;
   bool Reconnect() override;
   uint64_t ReconnectDurationUS() const override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
-  QuicStream* NewStream(const std::string &name) override;
+  bool NewStream(const std::string &name, void *ctx) override;
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
-  NqLoop *GetLoop() override { return loop_; }
-  NqBoxer *GetBoxer() override { return static_cast<NqBoxer *>(loop_); }
-  NqSessionIndex SessionIndex() const override { return session_index_; }
+  NqLoop *GetLoop() override;
   QuicConnection *Connection() override { return session()->connection(); }
+  uint64_t SessionSerial() const override { return session_serial(); }
 
+
+  //implement custom allocator
+  void* operator new(std::size_t sz);
+  void* operator new(std::size_t sz, NqClientLoop* l);
+  void operator delete(void *p) noexcept;
+  void operator delete(void *p, NqClientLoop *l) noexcept;
 
  private:
   NqClientLoop* loop_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
   std::unique_ptr<QuicAlarm> alarm_;
   nq_closure_t on_close_, on_open_, on_finalize_;
-  NqSessionIndex session_index_;
+  uint64_t session_serial_;
   StreamManager stream_manager_;
   uint64_t next_reconnect_us_ts_;
-  ConnectState connect_state_;
+  nq::atomic<ConnectState> connect_state_;
   void *context_;
 
   DISALLOW_COPY_AND_ASSIGN(NqClient);

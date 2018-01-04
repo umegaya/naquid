@@ -1,5 +1,7 @@
 #include "rpc.h"
 
+#include <memory.h>
+
 using namespace nqtest;
 
 static void test_ping(nq_rpc_t rpc, Test::Conn &tc) {
@@ -113,10 +115,14 @@ static void test_server_stream(nq_rpc_t rpc, const std::string &stream_name, Tes
 }
 
 void test_rpc(Test::Conn &conn) {
-	auto rpc = conn.NewRpc("rpc");
-	auto rpc2 = conn.NewRpc("rpc");
-	test_ping(rpc, conn);
-	test_raise(rpc, conn);
-	test_notify(rpc2, conn);
-	test_server_stream(rpc2, "rpc", conn);
+	conn.OpenRpc("rpc", [&conn](nq_rpc_t rpc, void **ppctx) {
+		test_ping(rpc, conn);
+		test_raise(rpc, conn);
+		return true;
+	});
+	conn.OpenRpc("rpc", [&conn](nq_rpc_t rpc, void **ppctx) {
+		test_notify(rpc, conn);
+		test_server_stream(rpc, "rpc", conn);
+		return true;
+	});
 }

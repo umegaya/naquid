@@ -27,7 +27,7 @@ namespace nq {
       nq_size_t idx = 0;
       *psz_decoded = 0;
       while (bufsz > idx) {
-        *psz_decoded += ((buf[idx] & 0x7f) << (idx * 8));
+        *psz_decoded += ((buf[idx] & 0x7f) << (idx * 7));
         if ((buf[idx] & 0x80) == 0) {
           idx++;
         } else {

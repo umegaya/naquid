@@ -5,28 +5,14 @@
 #include <algorithm>
 
 #include "nq.h"
+#include "basis/id_factory.h"
 
 namespace net {
-typedef uint16_t NqSessionIndex;
-typedef uint16_t NqStreamNameId;
-typedef uint16_t NqStreamIndexPerNameId;
+typedef uint32_t NqSessionIndex;
+typedef uint16_t NqStreamIndex;
 typedef uint32_t NqAlarmIndex;
-static const NqStreamNameId CLIENT_INCOMING_STREAM_NAME_ID = static_cast<NqStreamNameId>(0);
-template <class TYPE>
-class NqIndexFactory {
- public:
-  static constexpr TYPE kLimit = 
-    (((TYPE)0x80) << (8 * (sizeof(TYPE) - 1))) + 
-    ((((TYPE)0x80) << (8 * (sizeof(TYPE) - 1))) - 100);
-  static inline TYPE Create(TYPE &seed) {
-    auto id = ++seed;
-    if (seed >= kLimit) {
-      seed = 1;
-    }
-    return id;
-  }
-};
 class NqAlarmSerialCodec {
+  constexpr static uint64_t CLIENT_BIT = 0x0000000080000000;
  public:
   static inline uint64_t ServerEncode(NqAlarmIndex alarm_index, int worker_index) {
     return ((uint64_t)alarm_index << 0) | ((uint64_t)worker_index << 32);
@@ -38,126 +24,115 @@ class NqAlarmSerialCodec {
     return (NqAlarmIndex)((serial & 0x00000000FFFFFFFF));
   } 
   static inline uint64_t ClientEncode(NqAlarmIndex alarm_index) {
-    return alarm_index;
+    return ((uint64_t)alarm_index) | CLIENT_BIT;
   }
   static inline NqAlarmIndex ClientAlarmIndex(uint64_t serial) {
     return (NqAlarmIndex)((serial & 0x00000000FFFFFFFF));
   } 
-};
-class NqStreamSerialCodec {
- public:
-  static inline uint64_t ServerEncode(NqSessionIndex session_index, 
-                                      QuicConnectionId conn_id, 
-                                      QuicStreamId stream_id, int n_worker) {
-    ASSERT(n_worker <= 0x0000FFFF);
-    return (((uint64_t)session_index) << 48) | 
-            ((conn_id % n_worker) << 32) | (stream_id);
+  static inline bool IsClient(uint64_t serial) {
+    return ((serial & CLIENT_BIT) != 0);
   }
-  static inline NqSessionIndex ServerSessionIndex(uint64_t serial) {
-    return (NqSessionIndex)((serial & 0xFFFF000000000000) >> 48);
-  }
-  static inline int ServerWorkerIndex(uint64_t serial) {
-    return (int)((serial & 0x0000FFFF00000000) >> 32);
-  }
-  static inline QuicStreamId ServerStreamId(uint64_t serial) {
-    return (QuicStreamId)((serial & 0x00000000FFFFFFFF));
-  } 
-
-  static inline uint64_t ClientEncode(NqSessionIndex session_index, 
-                                      NqStreamNameId name_id,
-                                      NqStreamIndexPerNameId name_index_per_name) {
-    return (((uint64_t)session_index) << 32) | (name_id << 16) | (name_index_per_name);
-  }
-  static inline int ClientSessionIndex(uint64_t serial) {
-    return (int)((serial & 0x0000FFFF00000000) >> 32);
-  }
-  static inline NqStreamNameId ClientStreamNameId(uint64_t serial) {
-    return (NqStreamNameId)((serial & 0x00000000FFFF0000) >> 16);
-  }
-  static inline NqStreamIndexPerNameId ClientStreamIndexPerName(uint64_t serial) {
-    return (NqStreamIndexPerNameId)((serial & 0x000000000000FFFF) >> 0);
-  } 
 };
 class NqConnSerialCodec {
+  constexpr static uint64_t CLIENT_BIT = 0x0000000080000000;
  public:
-  static inline uint64_t ServerEncode(NqSessionIndex session_index, 
-                                      QuicConnectionId conn_id, int n_worker) {
-    ASSERT(n_worker <= 0x0000FFFF);
-    return (((uint64_t)session_index) << 16) | ((conn_id % n_worker) << 0);
+  static inline uint64_t ServerEncode(NqSessionIndex session_index, QuicConnectionId cid, int n_worker) {
+    ASSERT(session_index <= 0x7FFFFFFF);
+    return ((uint64_t)session_index & 0x000000007FFFFFFF) | ((cid % n_worker) << 48);
   }
   static inline NqSessionIndex ServerSessionIndex(uint64_t serial) {
-    return (NqSessionIndex)((serial & 0x00000000FFFF0000) >> 16);
+    return (NqSessionIndex)(serial & 0x000000007FFFFFFF);
   }
   static inline int ServerWorkerIndex(uint64_t serial) {
-    return (int)(serial & 0x000000000000FFFF);
-  }
-  static inline uint64_t FromServerStreamSerial(uint64_t serial) {
-    auto session_index = NqStreamSerialCodec::ServerSessionIndex(serial);
-    auto worker_index = NqStreamSerialCodec::ServerWorkerIndex(serial);
-    return (((uint64_t)session_index) << 16) | (worker_index);
+    return (int)((serial & 0xFFFF000000000000) >> 48);
   }
 
   static inline uint64_t ClientEncode(NqSessionIndex session_index) {
-    return session_index;
+    ASSERT(session_index <= 0x7FFFFFFF);
+    return ((uint64_t)session_index & 0x000000007FFFFFFF) | CLIENT_BIT;
   }
-  static inline int ClientSessionIndex(uint64_t serial) {
-    return (int)serial;
+  static inline NqSessionIndex ClientSessionIndex(uint64_t serial) {
+    return ServerSessionIndex(serial);
   }
-  static inline uint64_t FromClientStreamSerial(uint64_t serial) {
-    auto session_index = NqStreamSerialCodec::ClientSessionIndex(serial);
-    return session_index;
+
+  static inline bool IsClient(uint64_t serial) {
+    return ((serial & CLIENT_BIT) != 0);
+  }
+  static inline NqSessionIndex SessionIndex(uint64_t serial) {
+    return IsClient(serial) ? ClientSessionIndex(serial) : ServerSessionIndex(serial);
+  }
+};
+class NqStreamSerialCodec {
+  constexpr static uint64_t CLIENT_BIT = 0x0000000080000000;
+ public:
+  static inline uint64_t ServerEncode(NqSessionIndex session_index, NqStreamIndex stream_index, int worker_index) {
+    ASSERT(session_index <= 0x7FFFFFFF);
+    return (((uint64_t)session_index) & 0x000000007FFFFFFF) | ((uint64_t)stream_index << 32) | ((uint64_t)worker_index << 48);
+  }
+  static inline NqSessionIndex ServerSessionIndex(uint64_t serial) {
+    return (NqSessionIndex)(serial & 0x000000007FFFFFFF);
+  }
+  static inline NqStreamIndex ServerStreamIndex(uint64_t serial) {
+    return (int)((serial & 0x0000FFFF00000000) >> 32);
+  }
+  static inline int ServerWorkerIndex(uint64_t serial) {
+    return (int)((serial & 0xFFFF000000000000) >> 48);
+  }
+
+  static inline uint64_t ClientEncode(NqSessionIndex session_index, NqStreamIndex stream_index) {
+    return (((uint64_t)session_index) & 0x000000007FFFFFFF) | ((uint64_t)stream_index << 32) | CLIENT_BIT;
+  }
+  static inline NqSessionIndex ClientSessionIndex(uint64_t serial) {
+    return ServerSessionIndex(serial);
+  }
+  static inline NqStreamIndex ClientStreamIndex(uint64_t serial) {
+    return ServerStreamIndex(serial);
+  }
+
+  static inline bool IsClient(uint64_t serial) {
+    return ((serial & CLIENT_BIT) != 0);
+  }
+  static inline uint64_t ToConnSerial(uint64_t stream_serial) {
+    return (stream_serial & 0xFFFF0000FFFFFFFF);
   }
 };
 template <class S, typename INDEX>
-class NqObjectExistenceMap : public std::map<INDEX, S*> {
-  INDEX index_seed_;
+class NqSessiontMap : protected std::map<INDEX, S*> {
+  nq::IdFactory<INDEX> idgen_;
  public:
   typedef std::map<INDEX, S*> container;
-  NqObjectExistenceMap() : container(), index_seed_(0) {}
-  inline INDEX NewIndex() { 
-    return NqIndexFactory<INDEX>::Create(index_seed_); 
+  NqSessiontMap() : container(), idgen_() {}
+  ~NqSessiontMap() { Clear(); }
+  inline INDEX NewId() { 
+    return idgen_.New(); 
   }
   inline void Clear() {
     for (auto &kv : *this) {
       delete kv.second;
     }
-    container::clear();    
+    container::clear();
   }
-  inline void Add(INDEX idx, S *s) { (*this)[idx] = s; }
+  inline void Iter(std::function<void (INDEX, S*)> cb) {
+    for (auto it = container::begin(); it != container::end(); ) {
+      typename container::iterator kv = it;
+      ++it;
+      cb(kv->first, kv->second);
+    }
+  }
+  inline INDEX Add(S *s) { 
+    auto idx = NewId();
+    (*this)[idx] = s; 
+    return idx;
+  }
   inline void Remove(INDEX idx) {
     auto it = container::find(idx);
     if (it != container::end()) {
       container::erase(it);
     }
   }
-};
-template <class S, typename INDEX>
-class NqObjectExistenceMapMT : public NqObjectExistenceMap<S, INDEX> {
-  typedef NqObjectExistenceMap<S,INDEX> super;
-  typedef typename super::container container;
-  container read_map_;
-  std::mutex read_map_mutex_;
- public:
-  NqObjectExistenceMapMT() : read_map_(), read_map_mutex_() {}
-  inline void Clear() {
-    super::Clear();
-    {
-        std::unique_lock<std::mutex> lock(read_map_mutex_);
-        read_map_.clear();
-    }
-  }
-  inline void Activate(INDEX idx, S *s) {
-    std::unique_lock<std::mutex> lock(read_map_mutex_);
-    read_map_[idx] = s;
-  }
-  inline void Deactivate(INDEX idx) {
-    std::unique_lock<std::mutex> lock(read_map_mutex_);
-    read_map_.erase(idx);
-  }
-  inline const S *Active(INDEX idx) const {
-      std::unique_lock<std::mutex> lock(const_cast<NqObjectExistenceMapMT<S,INDEX>*>(this)->read_map_mutex_);
-      auto it = read_map_.find(idx);
-      return it != read_map_.end() ? it->second : nullptr;
+  inline S *Find(INDEX idx) {
+    auto it = container::find(idx);
+    return it != container::end() ? it->second : nullptr;
   }
 };
 }

@@ -52,26 +52,26 @@ typedef struct nq_server_tag *nq_server_t; //NqServer
 typedef struct nq_hdmap_tag *nq_hdmap_t; //nq::HandlerMap
 
 typedef struct nq_conn_tag {
-    void *p;    //NqBoxer
-    uint64_t s; 
+    void *p;    //NqSession::Delegate
+    uint64_t s; //session_index (0-30bit) | reserved (31-63bit)
 } nq_conn_t;
 
 typedef struct nq_stream_tag {
-    void *p;    //NqBoxer
-    uint64_t s; 
+    void *p;    //NqSessoin::Delegate(client)/NqServerStream(server)
+    uint64_t s; //session_index (0-30bit) | client_flag (1bit) | stream_index (32-63bit)
 } nq_stream_t; 
 
 typedef struct nq_rpc_tag { //this is essentially same as nq_stream, but would helpful to prevent misuse of rpc/stream
-    void *p;
-    uint64_t s; 
+    void *p;    //NqSessoin::Delegate(client)/NqServerStream(server)
+    uint64_t s; //session_index (0-30bit) | client_flag (1bit) | stream_index (32-63bit)
 } nq_rpc_t; 
 
 typedef struct nq_alarm_tag {
-  void *p;
-  uint64_t s;
+  void *p;      //NqAlarm
+  uint64_t s;   //alarm_index (0-31bit) | reserved (32 - 63bit)
 } nq_alarm_t;
 
-//TODO(iyatomi): reduce error code
+//these values may be provided via nq_result_t
 typedef enum {
   NQ_OK = 0,
   NQ_ESYSCALL = -1,
@@ -79,6 +79,7 @@ typedef enum {
   NQ_EALLOC = -3,
   NQ_ENOTSUPPORT = -4,
   NQ_EGOAWAY = -5,
+  NQ_EUSER = -6, //for rpc, user calls raise to reply
 } nq_error_t;
 
 typedef enum {
@@ -91,7 +92,6 @@ typedef struct {
   int port;
 } nq_addr_t;
 
-typedef void (*nq_logger_t)(const char *, size_t, bool);
 
 //closure
 
@@ -117,7 +117,7 @@ typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_result_t, const 
 
 
 //stream opened. return false to reject stream
-typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void **);
+typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void**);
 //stream closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_stream_close_t)(void *, nq_stream_t);
 
@@ -130,7 +130,7 @@ typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size
 
 
 //rpc opened. return false to reject 
-typedef bool (*nq_on_rpc_open_t)(void *, nq_rpc_t, void **);
+typedef bool (*nq_on_rpc_open_t)(void *, nq_rpc_t, void**);
 //rpc closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_rpc_close_t)(void *, nq_rpc_t);
 
@@ -191,8 +191,8 @@ typedef struct {
   //set true to ignore proof verification
   bool insecure; 
 
-  //set true to use raw connection, which does not send stream name to specify stream type
-  //it just callbacks/sends packet as it is
+  //NYI: set true to use raw connection, which does not send stream name to specify stream type
+  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
   bool raw;
   
   //total handshake time limit / no input limit. default 1000ms/500ms
@@ -206,12 +206,15 @@ typedef struct {
   //quic secret. need to specify arbiter (hopefully unique) string
   const char *quic_secret;
 
-  //set true to use raw connection, which does not accept stream name to specify stream type.
-  //it just callbacks/sends packet as it is
+  //NYI: set true to use raw connection, which does not accept stream name to specify stream type.
+  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
   bool raw;
 
   //cert cache size. default 16 and how meny sessions accepted per loop. default 1024
   int quic_cert_cache_size, accept_per_loop;
+
+  //allocation hint about max sessoin and max stream
+  int max_session_hint, max_stream_hint;
 
   //total handshake time limit / no input limit. default 1000ms/5000ms
   nq_time_t handshake_timeout, idle_timeout; 
@@ -244,7 +247,7 @@ typedef struct {
 //
 // --------------------------
 // create client object which have max_nfd of connection. 
-NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd);
+NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint);
 // do actual network IO. need to call periodically
 NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.
@@ -254,7 +257,7 @@ NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl);
 // TODO(iyatomi): make it NQAPI_THREADSAFE
 NQAPI_BOOTSTRAP nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
 // get handler map of the client. 
-NQAPI_THREADSAFE nq_hdmap_t nq_client_hdmap(nq_client_t cl);
+NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl);
 // set thread id that calls nq_client_poll.
 // call this if thread which polls this nq_client_t is different from creator thread.
 NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl);
@@ -316,8 +319,10 @@ NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get context, which is set at on_conn_open
 NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t
-static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.p == c2.p && c1.s == c2.s; }
-
+static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
+//will deprecate
+NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t c);
+NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t c);
 
 
 // --------------------------
@@ -326,23 +331,25 @@ static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.p == c2
 //
 // --------------------------
 //create single stream from conn, which has type specified by "name". need to use valid conn && call from owner thread of it
-//return invalid stream on error
-NQAPI_THREADSAFE nq_stream_t nq_conn_stream(nq_conn_t conn, const char *name);
+//return invalid stream on error, ctx will be void **ppctx of open callback of this stream handler
+NQAPI_THREADSAFE void nq_conn_stream(nq_conn_t conn, const char *name, void *ctx);
 //get parent conn from rpc
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s);
 //get alarm from stream
 NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s);
 //check stream is valid. sugar for nq_conn_is_valid(nq_stream_conn(s));
 NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s);
+//check stream is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
+//if p_valid returns true, means stream is incoming.
+NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s);
 //send arbiter byte array/arbiter object to stream peer. 
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
-//get context, which is set at on_stream_open
-NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s);
 //check equality of nq_stream_t
-static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.p == c2.p && c1.s == c2.s; }
+static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
 //will deprecate
+NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s);
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
 NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
 
@@ -354,14 +361,17 @@ NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
 //
 // --------------------------
 //create single rpc stream from conn, which has type specified by "name". need to use valid conn && call from owner thread of it
-//return invalid stream on error
-NQAPI_THREADSAFE nq_rpc_t nq_conn_rpc(nq_conn_t conn, const char *name);
+//return invalid stream on error. ctx will be void **ppctx of open callback of this stream handler
+NQAPI_THREADSAFE void nq_conn_rpc(nq_conn_t conn, const char *name, void *ctx);
 //get parent conn from rpc
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc);
 //get alarm from stream or rpc
 NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc);
 //check rpc is valid. sugar for nq_conn_is_valid(nq_rpc_conn(rpc));
 NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc);
+//check rpc is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
+//if p_valid returns true, means stream is incoming.
+NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t s, bool *p_invalid);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
 NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc);
 //send arbiter byte array or object to stream peer. type should be positive
@@ -372,11 +382,10 @@ NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *dat
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen);
 //send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
-//get context, which is set at on_stream_open
-NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t s);
 //check equality of nq_rpc_t
-static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.p == c2.p && c1.s == c2.s; }
+static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
 //will deprecate
+NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t s);
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc);
 NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t rpc);
 
@@ -403,6 +412,13 @@ NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
 
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
 
+
+
+// --------------------------
+//
+// alarm API
+//
+// --------------------------
 #define STOP_INVOKE_NQ_TIME (0)
 //configure alarm to invoke cb after current time exceeds first, 
 //at thread which handle receive callback of nq_rpc/stream_t that creates this alarm.
@@ -413,6 +429,69 @@ NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
 NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t first, nq_closure_t cb);
 //destroy alarm. if you call nq_alarm_set after the alarm already called nq_alarm_destroy, it will possibly crash
 NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a);
+
+
+
+// --------------------------
+//
+// log API
+//
+// --------------------------
+//log handler. 
+typedef void (*nq_logger_t)(const char *, size_t);
+//log configuration
+typedef struct {
+  //(possibly) unique identifier of log stream which is created by single process
+  const char *id;
+
+  //if set to true, you need to call nq_log_flush() periodically to actually output logs.
+  //also useful for some environement like Unity Editor, which cannot call logging API from non-main thread.
+  //https://fogbugz.unity3d.com/default.asp?949512_dab6v5ranqbebqr5
+  bool manual_flush;
+
+  //log handler
+  nq_logger_t callback;
+} nq_logconf_t;
+//log severity
+typedef enum {
+  NQ_LOGLV_TRACE,
+  NQ_LOGLV_DEBUG,
+  NQ_LOGLV_INFO,
+  NQ_LOGLV_WARN,
+  NQ_LOGLV_ERROR,
+  NQ_LOGLV_FATAL,            
+  NQ_LOGLV_REPORT,
+  NQ_LOGLV_MAX,
+} nq_loglv_t;
+//structured log param
+typedef enum {
+  NQ_LOG_INTEGER,
+  NQ_LOG_STRING,
+  NQ_LOG_FLOAT,
+  NQ_LOG_BOOLEAN,
+} nq_logparam_type_t;
+typedef struct {
+  const char *key;
+  nq_logparam_type_t type;
+  union {
+    float f;
+    double d;
+    uint64_t n;
+    const char *s;
+    bool b;
+  } value;
+} nq_logparam_t;
+
+NQAPI_BOOTSTRAP void nq_log_config(const nq_logconf_t *conf);
+
+NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *params, int n_params);
+
+static inline void nq_msg(nq_loglv_t lv, const char *msg) { nq_log(lv, msg, NULL, 0); }
+//flush cached log. only enable if you configure manual_flush to true. 
+//recommend to call from only one thread. otherwise log output order may change from actual order.
+NQAPI_THREADSAFE void nq_log_flush(); 
+
+
 
 #if defined(__cplusplus)
 }

@@ -6,6 +6,17 @@
 
 using namespace nqtest;
 
+#if defined(STORE_DETAIL)
+extern bool is_conn_opened(uint64_t cid) {
+  return true;
+}
+extern bool is_packet_received(uint64_t cid) {
+  return true;
+}
+#endif
+
+
+
 void test_suites(const nq_addr_t &addr, bool skip = true) {
 #if 1
   TRACE("==================== test_rpc ====================");
@@ -33,38 +44,26 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(addr, test_reconnect_client);
     if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_client fails"); }
   }//*/
+  TRACE("==================== test_reconnect_server ====================");
+  {
+    auto tmp = addr;
+    tmp.port = 18443;
+    Test t(tmp, test_reconnect_server);
+    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server fails"); }
+  }//*/
 #endif
-  TRACE("==================== test_reconnect_server_conn ====================");
-  {
-    auto tmp = addr;
-    tmp.port = 18443;
-    Test t(tmp, test_reconnect_server_conn);
-    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server_conn fails"); }
-  }//*/
-  TRACE("==================== test_reconnect_server_stream ====================");
-  {
-    auto tmp = addr;
-    tmp.port = 18443;
-    Test t(tmp, test_reconnect_server_stream);
-    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server_stream fails"); }
-  }//*/
   /*{
     auto tmp = addr;
     tmp.port = 18443;
     Test t(addr, test_reconnect_stress, 64);
     if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_stress fails"); }
   }//*/
-  /*if (skip) {
-    Test t(addr, test_bench, 256);
-    if (!t.Run()) { ALERT_AND_EXIT("test_bench fails"); }
-  }//*/
 }
 
 int main(int argc, char *argv[]){
-  nq_addr_t a1 = {
-    .host = "127.0.0.1",
-    .port = 8443,
-  };
+  nq_addr_t a1;
+  a1.host = "127.0.0.1";
+  a1.port = 8443;
   test_suites(a1);
 
   return 0;

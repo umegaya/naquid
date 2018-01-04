@@ -6,25 +6,38 @@
 #include "net/quic/core/quic_server_id.h"
 #include "net/quic/core/quic_version_manager.h"
 
+#include "basis/allocator.h"
 #include "core/nq_loop.h"
+#include "core/nq_alarm.h"
 #include "core/nq_config.h"
 #include "core/nq_boxer.h"
+#include "core/nq_client.h"
+#include "core/nq_stream.h"
 
 namespace net {
-class NqClient;
-class NqAlarm;
 class NqClientLoop : public NqLoop,
                      public NqBoxer,
-                     public QuicSession::Visitor {
+                     public QuicSession::Visitor,
+                     public QuicStreamAllocator {
+  typedef NqSessiontMap<NqClient, NqSessionIndex> ClientMap;
+  typedef NqSessiontMap<NqAlarm, NqAlarmIndex> AlarmMap;
+  typedef nq::Allocator<NqClient, NqStaticSection> ClientAllocator;
+  typedef nq::Allocator<NqClientStream> StreamAllocator;
+  typedef NqAlarm::Allocator AlarmAllocator;
   nq::HandlerMap handler_map_;
-  typedef NqObjectExistenceMapMT<NqClient, NqSessionIndex> ClientMap;
   ClientMap client_map_;
-  NqObjectExistenceMap<NqAlarm, NqAlarmIndex> alarm_map_;
+  AlarmMap alarm_map_;
   NqBoxer::Processor processor_;
   QuicVersionManager versions_;
   std::thread::id thread_id_;
+  ClientAllocator client_allocator_;
+  StreamAllocator stream_allocator_;
+  AlarmAllocator alarm_allocator_;
+
  public:
-  NqClientLoop() : handler_map_(), client_map_(), alarm_map_(), processor_(), versions_(net::AllSupportedVersions()) {
+  NqClientLoop(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
+    processor_(), versions_(net::AllSupportedVersions()),
+    client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint) {
     set_main_thread();
   }
   ~NqClientLoop() { Close(); }
@@ -38,13 +51,12 @@ class NqClientLoop : public NqLoop,
 
   inline nq::HandlerMap *mutable_handler_map() { return &handler_map_; }
   inline const nq::HandlerMap *handler_map() const { return &handler_map_; }
-  inline NqSessionIndex new_session_index() { return client_map_.NewIndex(); }
-  inline NqAlarmIndex new_alarm_index() { return alarm_map_.NewIndex(); }
   inline nq_client_t ToHandle() { return (nq_client_t)this; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
   inline void set_main_thread() { thread_id_ = std::this_thread::get_id(); }
   inline const ClientMap &client_map() const { return client_map_; }
   inline ClientMap &client_map() { return client_map_; }
+  inline ClientAllocator &client_allocator() { return client_allocator_; }
 
   static inline NqClientLoop *FromHandle(nq_client_t cl) { return (NqClientLoop *)cl; }
   static bool ParseUrl(const std::string &host, 
@@ -54,18 +66,22 @@ class NqClientLoop : public NqLoop,
                        QuicSocketAddress &address, 
                        QuicConfig &config);
 
+  //implements QuicStreamAllocator
+  void *Alloc(size_t sz) override { return stream_allocator_.Alloc(sz); }
+  void Free(void *p) override { return stream_allocator_.Free(p); }
+
   //implements NqBoxer
   void Enqueue(NqBoxer::Op *op) override { processor_.enqueue(op); }
+  bool MainThread() const override { return main_thread(); }
   NqLoop *Loop() override { return this; }
-  nq_conn_t Box(NqSession::Delegate *d) override;
-  nq_stream_t Box(NqStream *s) override;
-  nq_alarm_t Box(NqAlarm *a) override;
-  NqBoxer::UnboxResult Unbox(uint64_t serial, NqSession::Delegate **unboxed) override;
-  NqBoxer::UnboxResult Unbox(uint64_t serial, NqStream **unboxed) override;
-  NqBoxer::UnboxResult Unbox(uint64_t serial, NqAlarm **unboxed) override;
+  NqAlarm *NewAlarm() override;
+  AlarmAllocator *GetAlarmAllocator() override { return &alarm_allocator_; }
   bool IsClient() const override { return true; }
-  const NqSession::Delegate *FindConn(uint64_t serial, NqBoxer::OpTarget target) const override;
-  const NqStream *FindStream(uint64_t serial) const override;
+  bool IsSessionLocked(NqSessionIndex idx) const override { return NqLoop::IsSessionLocked(idx); };
+  void LockSession(NqSessionIndex idx) override { NqLoop::LockSession(idx); }
+  void UnlockSession() override { NqLoop::UnlockSession(); }
+  NqSession::Delegate *FindConn(uint64_t serial, NqBoxer::OpTarget target) override;
+  NqStream *FindStream(uint64_t serial, void *p) override;
   void RemoveAlarm(NqAlarmIndex index) override;
 
   //implement QuicSession::Visitor

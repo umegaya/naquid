@@ -10,106 +10,39 @@ void NqClientLoop::Poll() {
   NqLoop::Poll();
 }
 void NqClientLoop::Close() {
+  client_map_.Iter([](NqSessionIndex idx, NqClient *cl) {
+    cl->Destroy();
+  });
   client_map_.Clear();
   NqLoop::Close();
 }
 //implements NqBoxer
-nq_conn_t NqClientLoop::Box(NqSession::Delegate *d) {
-  return {
-    .p = static_cast<NqBoxer*>(this),
-    .s = NqConnSerialCodec::ClientEncode(
-      d->SessionIndex()
-    ),
-  };
+NqAlarm *NqClientLoop::NewAlarm() {
+  auto a = new(this) NqAlarm();
+  auto idx = alarm_map_.Add(a);
+  a->InitSerial(NqAlarmSerialCodec::ClientEncode(idx));  
+  return a;
 }
-nq_stream_t NqClientLoop::Box(NqStream *s) {
-  auto cs = static_cast<NqClientStream *>(s);
-  return {
-    .p = static_cast<NqBoxer*>(this),
-    .s = NqStreamSerialCodec::ClientEncode(
-      cs->session_index(),
-      cs->name_id(),
-      cs->index_per_name_id()
-    ),
-  };
-}
-nq_alarm_t NqClientLoop::Box(NqAlarm *a) {
-  AddAlarm(a);
-  return {
-    .p = static_cast<NqBoxer*>(this),
-    .s = NqAlarmSerialCodec::ClientEncode(a->alarm_index()),
-  };
-}
-NqBoxer::UnboxResult 
-NqClientLoop::Unbox(uint64_t serial, NqSession::Delegate **unboxed) {
-  if (!main_thread()) {
-    return NqBoxer::UnboxResult::NeedTransfer;
-  }
-  auto index = NqConnSerialCodec::ClientSessionIndex(serial);
-  auto it = client_map_.find(index);
-  if (it != client_map_.end()) {
-    *unboxed = it->second;
-    return NqBoxer::UnboxResult::Ok;
-  }
-  return NqBoxer::UnboxResult::SerialExpire;
-}
-NqBoxer::UnboxResult 
-NqClientLoop::Unbox(uint64_t serial, NqAlarm **unboxed) {
-  if (!main_thread()) {
-    return NqBoxer::UnboxResult::NeedTransfer;
-  }
-  auto index = NqAlarmSerialCodec::ClientAlarmIndex(serial);
-  auto it = alarm_map_.find(index);
-  if (it != alarm_map_.end()) {
-    *unboxed = it->second;
-    return NqBoxer::UnboxResult::Ok;
-  }
-  return NqBoxer::UnboxResult::SerialExpire;
-}
-NqBoxer::UnboxResult
-NqClientLoop::Unbox(uint64_t serial, NqStream **unboxed) {
-  if (!main_thread()) {
-    return NqBoxer::UnboxResult::NeedTransfer;
-  }
-  auto index = NqStreamSerialCodec::ClientSessionIndex(serial);
-  auto name_id = NqStreamSerialCodec::ClientStreamNameId(serial);
-  auto stream_index = NqStreamSerialCodec::ClientStreamIndexPerName(serial);
-  auto it = client_map_.find(index);
-  if (it != client_map_.end()) {
-    *unboxed = it->second->FindOrCreateStream(name_id, stream_index);
-    if (*unboxed != nullptr) {
-      return NqBoxer::UnboxResult::Ok;
-    }
-  }
-  return NqBoxer::UnboxResult::SerialExpire;
-}
-const NqSession::Delegate *NqClientLoop::FindConn(uint64_t serial, NqBoxer::OpTarget target) const {
+NqSession::Delegate *NqClientLoop::FindConn(uint64_t serial, NqBoxer::OpTarget target) {
   switch (target) {
   case Conn:
-    return client_map().Active(NqConnSerialCodec::ClientSessionIndex(serial));
+    return client_map().Find(NqConnSerialCodec::ClientSessionIndex(serial));
   case Stream:
-    return client_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
+    return client_map().Find(NqStreamSerialCodec::ClientSessionIndex(serial));
   default:
     ASSERT(false);
     return nullptr;
   }
 }
-const NqStream *NqClientLoop::FindStream(uint64_t serial) const {
-  auto c = client_map().Active(NqStreamSerialCodec::ClientSessionIndex(serial));
-  if (c == nullptr) { return nullptr; }
-  return c->stream_manager().Find(NqStreamSerialCodec::ClientStreamNameId(serial), 
-                                  NqStreamSerialCodec::ClientStreamIndexPerName(serial));
-}
-void NqClientLoop::AddAlarm(NqAlarm *a) {
-  if (a->alarm_index() == 0) {
-    a->set_alarm_index(new_alarm_index());
-    alarm_map_.Add(a->alarm_index(), a);
-  } else {
-#if defined(DEBUG)
-    auto it = alarm_map_.find(a->alarm_index());
-    ASSERT(it != alarm_map_.end() && it->second == a);
-#endif
+NqStream *NqClientLoop::FindStream(uint64_t serial, void *p) {
+  //note that following code executed even if p already freed. 
+  //so cannot call virtual function of NqStream correctly inside of this func.
+  auto c = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(p));
+  if (c->session_index() != NqStreamSerialCodec::ClientSessionIndex(serial)) {
+    return nullptr;
   }
+  auto idx = NqStreamSerialCodec::ClientStreamIndex(serial);
+  return c->FindOrCreateStream(idx);
 }
 void NqClientLoop::RemoveAlarm(NqAlarmIndex index) {
   alarm_map_.Remove(index);
@@ -129,12 +62,11 @@ NqClient *NqClientLoop::Create(const std::string &host,
     return nullptr;
   }
   auto supported_versions = AllSupportedVersions();//versions_.GetSupportedVersions();
-  auto c = new NqClient(
+  auto c = new(this) NqClient(
     server_address,
     server_id, 
     supported_versions,
     config,
-    this,
     config.NewProofVerifier()
   );
   if (!c->Initialize()) {
@@ -142,7 +74,7 @@ NqClient *NqClientLoop::Create(const std::string &host,
     return nullptr;
   }
   c->StartConnect();
-  client_map_.Add(c->session_index(), c);
+  c->InitSerial(); //insert c into client_map_
   return c;
 }
 /* static */

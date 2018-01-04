@@ -19,6 +19,8 @@
 #include "net/quic/platform/api/quic_socket_address.h"
 
 #include "basis/defs.h"
+#include "basis/endian.h"
+#include "basis/header_codec.h"
 
 #ifndef SO_RXQ_OVFL
 #define SO_RXQ_OVFL 40
@@ -254,6 +256,8 @@ size_t QuicSocketUtils::SetIpInfoInCmsg(const QuicIpAddress& self_address,
   }
 }
 
+
+
 // static
 WriteResult QuicSocketUtils::WritePacket(
     int fd,
@@ -297,6 +301,7 @@ WriteResult QuicSocketUtils::WritePacket(
   if (rc >= 0) {
     return WriteResult(WRITE_STATUS_OK, rc);
   }
+  fprintf(stderr, "fail to send: errno %d %d(%s)\n", fd, errno, (errno == EAGAIN || errno == EWOULDBLOCK) ? "blocked" : "error");
   return WriteResult((errno == EAGAIN || errno == EWOULDBLOCK)
                          ? WRITE_STATUS_BLOCKED
                          : WRITE_STATUS_ERROR,
@@ -347,7 +352,7 @@ int QuicSocketUtils::CreateUDPSocket(const QuicSocketAddress& address,
   int rc = setsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &get_overflow,
                       sizeof(get_overflow));
   if (rc < 0) {
-    QUIC_DLOG(WARNING) << "Socket overflow detection not supported: " << strerror(errno);
+    /* QUIC_DLOG(WARNING) << "Socket overflow detection not supported: " << strerror(errno); */
   } else {
     *overflow_supported = true;
   }
@@ -368,8 +373,8 @@ int QuicSocketUtils::CreateUDPSocket(const QuicSocketAddress& address,
 
   rc = SetGetSoftwareReceiveTimestamp(fd);
   if (rc < 0) {
-    QUIC_LOG(WARNING) << "SO_TIMESTAMPING not supported; using fallback: "
-                      << strerror(errno);
+    /*QUIC_LOG(WARNING) << "SO_TIMESTAMPING not supported; using fallback: "
+                      << strerror(errno); */
   }
 
   return fd;

@@ -3,6 +3,7 @@
 #include "core/nq_session.h"
 
 namespace net {
+class NqClientStream;
 class NqClientSession : public NqSession {
  public:
   NqClientSession(QuicConnection *connection,

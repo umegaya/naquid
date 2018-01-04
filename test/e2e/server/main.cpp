@@ -1,22 +1,68 @@
 #include "common.h"
 
-static const int kThreads = 1;  //4 thread server
-static const char NotifySuccess[] = "notify success";
+#include "basis/header_codec.h"
+#include "basis/convert.h"
+#include <memory.h>
 
 using namespace nqtest;
+
+static const int kThreads = 1;  //1 thread server
+static const char NotifySuccess[] = "notify success";
+
+//#define STORE_DETAIL
+#if defined(STORE_DETAIL)
+nq::atomic<uint32_t> g_recv(0);
+std::map<uint64_t, uint64_t> g_recv_map;
+std::map<uint64_t, bool> g_cid_open_map;
+uint64_t g_index_conn_id_map[100];
+std::mutex g_recv_map_mtx;
+//be sure that calling with locking g_recv_map_mtxs
+void dump_recv() {
+  for (auto &kv : g_recv_map) {
+    fprintf(stderr, "seq for %llx = %llu\n", kv.first, kv.second);
+  }
+}
+extern bool is_conn_opened(uint64_t cid) {
+  auto it = g_cid_open_map.find(cid);
+  return it != g_cid_open_map.end() && it->second;
+}
+extern bool is_packet_received(uint64_t cid) {
+  for (int i = 0; i < 100; i++) {
+    if (g_index_conn_id_map[i] == cid) {
+      return true;
+    }
+  }
+  return false;
+}
+void add_recv(uint64_t serial, uint64_t data) {
+  std::unique_lock<std::mutex> lk(g_recv_map_mtx);
+  auto it = g_recv_map.find(serial);
+  if (it != g_recv_map.end()) {
+    if ((it->second + 1) != data) {
+      fprintf(stderr, "seq leap(%llx): %llu => %llu\n", it->first, it->second, data);
+      dump_recv();
+      exit(1);
+    } else {
+      it->second = data;
+    }
+  } else if (data != 1) {
+    fprintf(stderr, "seq leap(%llx): nil => %llu\n", serial, data);
+    dump_recv();
+    exit(1);
+  } else {
+    g_recv_map[serial] = data;
+  }
+}
+#endif
+
+
 
 /* conn callbacks */
 struct conn_context {
   int count;
 };
-void on_conn_open(void *, nq_conn_t, nq_handshake_event_t hsev, void **ppctx) {
+void on_conn_open(void *, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
   TRACE("on_conn_open event:%d\n", hsev);
-  if (hsev != NQ_HS_DONE) {
-    return;
-  }
-  auto ctx = (conn_context *)malloc(sizeof(conn_context));
-  ctx->count = 3;
-  *ppctx = ctx;
 }
 int g_reject = 2;
 void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
@@ -30,6 +76,10 @@ void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void
     nq_conn_close(c);
     return;
   }
+  auto ctx = (conn_context *)malloc(sizeof(conn_context));
+  ctx->count = 3;
+  *ppctx = ctx;
+  TRACE("set context for %p, %p", c.p, ctx);
   on_conn_open(arg, c, hsev, ppctx);
 }
 void on_conn_close(void *, nq_conn_t c, nq_result_t, const char *detail, bool) {
@@ -59,16 +109,37 @@ void on_alarm(void *p, nq_time_t *pnext) {
 
 
 /* rpc callbacks */
-bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
+bool on_rpc_open(void *p, nq_rpc_t rpc, void **ppctx) {
+  //fprintf(stderr, "on_rpc_open\n");
+  bool valid;
+  if (nq_rpc_outgoing(rpc, &valid)) {
+    //outgoing stream need to send rpc to peer
+    auto msg = (std::string *)(*ppctx);
+    RPC(rpc, RpcType::ServerRequest, msg->c_str(), msg->length(), ([rpc, msg](
+      nq_rpc_t rpc2, nq_result_t r, const void *data, nq_size_t dlen) {
+      TRACE("receive ServerRequest reply");
+      ASSERT(r >= 0 && nq_rpc_equal(rpc, rpc2) && MakeString(data, dlen) == ("from client:" + (*msg)));
+      delete msg;
+    }));
+  } else if (valid) {
+#if defined(STORE_DETAIL)
+    //incoming do nothing now
+    g_cid_open_map[nq_conn_cid(nq_rpc_conn(rpc))] = true;
+#endif
+  } else {
+    ASSERT(false);
+  }
   return true;
 }
 bool on_rpc_open_reject(void *p, nq_rpc_t rpc, void **ppctx) {
+  TRACE("on_rpc_open_reject");
   auto c = nq_rpc_conn(rpc);
   conn_context *ctx = reinterpret_cast<conn_context *>(nq_conn_ctx(c));
   if (ctx == nullptr) {
     ASSERT(false);
     return false;
   }
+  TRACE("on_rpc_open_reject %d", ctx->count);
   ctx->count--;
   if (ctx->count <= 0) {
     return on_rpc_open(p, rpc, ppctx);
@@ -77,14 +148,26 @@ bool on_rpc_open_reject(void *p, nq_rpc_t rpc, void **ppctx) {
 }
 void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
+
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
-  //TRACE("rpc req: %u", type);
+  TRACE("rpc req: %u", type);
   switch (type) {
     case RpcType::Ping: {
-      ASSERT(len == sizeof(nq_time_t));
-      //auto peer_ts = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-      //auto seq = nq::Endian::NetbytesToHost<uint64_t>((const char *)data);
-      nq_rpc_reply(rpc, RpcError::None, msgid, data, len);
+#if defined(STORE_DETAIL)
+      g_recv++;
+      if ((g_recv % 1000) == 0) {
+        fprintf(stderr, "%d.", (g_recv / 1000));
+      }
+      auto index = nq::Endian::NetbytesToHost<uint32_t>((const char *)data);
+      if (g_index_conn_id_map[index] == 0) {
+        g_index_conn_id_map[index] = nq_conn_cid(nq_rpc_conn(rpc));        
+      }
+      auto seq = nq::Endian::NetbytesToHost<uint64_t>((const char *)data + 4);
+      add_recv(index, seq);
+      nq_rpc_reply(rpc, RpcError::None, msgid, ((const char *)data) + 4, len - 4);
+#else
+      nq_rpc_reply(rpc, RpcError::None, msgid, (const char *)data, len);
+#endif
     } break;
     case RpcType::Raise:
       nq_rpc_reply(rpc, nq::Endian::NetbytesToHost<int32_t>(data), msgid, 
@@ -104,17 +187,9 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
           return;
         }
         auto name = s.substr(0, idx);
-        auto msg = "from server:" + s.substr(idx + 1);
+        auto msg = new std::string("from server:" + s.substr(idx + 1));
         auto c = nq_rpc_conn(rpc);
-        auto rpc2 = nq_conn_rpc(c, name.c_str());
-        if (!nq_rpc_is_valid(rpc2)) {
-          nq_rpc_reply(rpc, RpcError::NoSuchStream, msgid, s.c_str(), s.length());
-          return;          
-        }
-        RPC(rpc2, RpcType::ServerRequest, msg.c_str(), msg.length(), ([rpc2, msg](
-          nq_rpc_t rpc3, nq_result_t r, const void *data, nq_size_t dlen) {
-          ASSERT(r >= 0 && nq_rpc_sid(rpc2) == nq_rpc_sid(rpc3) && MakeString(data, dlen) == ("from client:" + msg));
-        }));
+        nq_conn_rpc(c, name.c_str(), msg);
         nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
       }
       break;
@@ -171,6 +246,7 @@ bool on_stream_open(void *p, nq_stream_t s, void **ppctx) {
     free(sc);
     return false; 
   }
+  TRACE("on_stream_open set context: %p %u", sc, nq_stream_sid(s));
   *ppctx = sc;
   return true;
 }
@@ -249,16 +325,18 @@ struct server_config {
 void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   nq_addr_t addr = {
     "0.0.0.0", 
-    "./test/e2e/server/certs/leaf_cert.pem", 
-    "./test/e2e/server/certs/leaf_cert.pkcs8", 
+    "./server/certs/leaf_cert.pem", 
+    "./server/certs/leaf_cert.pkcs8", 
     nullptr,
     port
   };
 
   nq_svconf_t conf;
   CONFIG_VAL(svconfig, quic_secret, "e336e27898ff1e17ac79e82fa0084999", conf.quic_secret);
-  conf.quic_cert_cache_size = 0;
-  conf.accept_per_loop = 0;
+  conf.quic_cert_cache_size = 0; //use default
+  conf.accept_per_loop = 0; //use default
+  conf.max_session_hint = 1024;
+  conf.max_stream_hint = 1024 * 4;
   conf.handshake_timeout = nq_time_sec(120);
   conf.idle_timeout = nq_time_sec(60);
   CONFIG_CB(svconfig, on_server_conn_open, on_conn_open, conf.on_open);
@@ -267,6 +345,7 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   nq_hdmap_t hm = nq_server_listen(sv, &addr, &conf);
 
   nq_rpc_handler_t rh;
+  rh.timeout = 0; //use default
   nq_closure_init(rh.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
   nq_closure_init(rh.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
   CONFIG_CB(svconfig, on_rpc_open, on_rpc_open, rh.on_rpc_open);
@@ -291,9 +370,21 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
 }
 
 
+
 /* main */
 int main(int argc, char *argv[]){
-  nq_server_t sv = nq_server_create(kThreads);
+#if defined(STORE_DETAIL)
+  memset(g_index_conn_id_map, 0, sizeof(g_index_conn_id_map));
+#endif
+  int n_threads = kThreads;
+  if (argc > 1) {
+    n_threads = nq::convert::Do(argv[1], kThreads);
+  }
+  nq::logger::info({
+    {"msg", "launch server"},
+    {"n_threads", n_threads},
+  });
+  nq_server_t sv = nq_server_create(n_threads);
 
   setup_server(sv, 8443, nullptr);
   server_config scf = {
@@ -303,7 +394,7 @@ int main(int argc, char *argv[]){
     1, 2, 1, 1,
   };
   nq_closure_init(scf.on_server_conn_open, on_server_conn_open, on_conn_open_reject, reject_counter + 0);
-  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open, reject_counter + 1);
+  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open_reject, reject_counter + 1);
   nq_closure_init(scf.on_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 2);
   nq_closure_init(scf.on_raw_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 3);
   setup_server(sv, 18443, &scf);

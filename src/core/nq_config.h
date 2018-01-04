@@ -31,7 +31,8 @@ class NqConfig : public QuicConfig {
         max_idle_time_before_crypto_handshake());
     }
     auto handshake_timeout_us = nq::clock::to_us(c.handshake_timeout);
-    if (handshake_timeout_us > max_time_before_crypto_handshake().ToMicroseconds()) {
+    if (handshake_timeout_us > 
+      static_cast<uint64_t>(max_time_before_crypto_handshake().ToMicroseconds())) {
       set_max_time_before_crypto_handshake(
         QuicTime::Delta::FromMicroseconds(handshake_timeout_us));
     }

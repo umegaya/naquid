@@ -26,7 +26,9 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
   index_(worker.index()), n_worker_(worker.server().n_worker()), 
   server_(worker.server()), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
-  server_map_(), alarm_map_(), thread_id_(worker.thread_id()) {
+  thread_id_(worker.thread_id()), server_map_(), alarm_map_(), 
+  session_allocator_(config.server().max_session_hint), stream_allocator_(config.server().max_stream_hint),
+  alarm_allocator_(config.server().max_session_hint) {
   invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
   SetFromConfig(config);
@@ -48,7 +50,6 @@ void NqDispatcher::OnConnectionClosed(QuicConnectionId connection_id,
   if (it != session_map().end()) {
     auto idx = static_cast<NqServerSession *>(it->second.get())->session_index();
     server_map_.Remove(idx);
-    server_map_.Deactivate(idx); //make connection invalid 
   }
   QuicDispatcher::OnConnectionClosed(connection_id, error, error_details);  
 }
@@ -97,22 +98,21 @@ bool NqDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& message,
 QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
                                              const QuicSocketAddress& client_address,
                                              QuicStringPiece alpn) {
-    auto it = server_.port_configs().find(port_);
-    if (it == server_.port_configs().end()) {
-    	return nullptr;
-    }
+  auto it = server_.port_configs().find(port_);
+  if (it == server_.port_configs().end()) {
+  	return nullptr;
+  }
 
-    QuicConnection* connection = new QuicConnection(
-      connection_id, client_address, &loop_, &loop_,
-      CreatePerConnectionWriter(),
-      /* owns_writer= */ true, Perspective::IS_SERVER, GetSupportedVersions());
+  QuicConnection* connection = new QuicConnection(
+    connection_id, client_address, &loop_, &loop_,
+    CreatePerConnectionWriter(),
+    /* owns_writer= */ true, Perspective::IS_SERVER, GetSupportedVersions());
 
-    auto s = new NqServerSession(connection, this, it->second);
-    s->Initialize();
-    server_map_.Add(s->session_index(), s);
-    server_map_.Activate(s->session_index(), s); //make connection valid
-    s->OnOpen(NQ_HS_START);
-    return s;
+  auto s = new(this) NqServerSession(connection, it->second);
+  s->Initialize();
+  s->InitSerial();
+  s->OnOpen(NQ_HS_START);
+  return s;
 }
 
 //implements NqBoxer
@@ -125,110 +125,40 @@ void NqDispatcher::Enqueue(Op *op) {
   case NqBoxer::Stream:
     windex = NqStreamSerialCodec::ServerWorkerIndex(op->serial_);
     break;
+  case NqBoxer::Alarm:
+    windex = NqAlarmSerialCodec::ServerWorkerIndex(op->serial_);
+    break;
   default:
     ASSERT(false);
     return;
   }
   invoke_queues_[windex].enqueue(op);
 }
-nq_conn_t NqDispatcher::Box(NqSession::Delegate *d) {
-  auto ss = static_cast<NqServerSession *>(d);
-  return {
-    .p = static_cast<NqBoxer*>(this),
-    .s = NqConnSerialCodec::ServerEncode(
-      ss->session_index(),
-      ss->connection_id(),
-      n_worker_
-    ),
-  };
+NqAlarm *NqDispatcher::NewAlarm() {
+  auto a = new(this) NqAlarm();
+  auto idx = alarm_map_.Add(a);
+  a->InitSerial(NqAlarmSerialCodec::ServerEncode(idx, worker_index()));
+  return a;
 }
-nq_stream_t NqDispatcher::Box(NqStream *s) {
-  auto ss = static_cast<NqServerSession *>(s->nq_session());
-  return {
-    .p = static_cast<NqBoxer*>(this),
-    .s = NqStreamSerialCodec::ServerEncode(
-      ss->session_index(),
-      ss->connection_id(),
-      s->id(),
-      n_worker_
-    ),
-  };
-}
-nq_alarm_t NqDispatcher::Box(NqAlarm *a) {
-  AddAlarm(a);
-  return {
-    .p = static_cast<NqBoxer*>(this),
-    .s = NqAlarmSerialCodec::ServerEncode(a->alarm_index(), index_),
-  };
-}
-NqBoxer::UnboxResult 
-NqDispatcher::Unbox(uint64_t serial, NqSession::Delegate **unboxed) {
-  if (!main_thread()) {
-    return NqBoxer::UnboxResult::NeedTransfer;
-  }
-  auto index = NqConnSerialCodec::ServerSessionIndex(serial);
-  auto it = server_map_.find(index);
-  if (it != server_map_.end()) {
-    *unboxed = it->second;
-    return NqBoxer::UnboxResult::Ok;
-  }
-  return NqBoxer::UnboxResult::SerialExpire;  
-}
-NqBoxer::UnboxResult
-NqDispatcher::Unbox(uint64_t serial, NqStream **unboxed) {
-  if (!main_thread()) {
-    return NqBoxer::UnboxResult::NeedTransfer;
-  }
-  auto index = NqStreamSerialCodec::ServerSessionIndex(serial);
-  auto it = server_map_.find(index);
-  if (it != server_map_.end()) {
-    auto stream_id = NqStreamSerialCodec::ServerStreamId(serial);
-    *unboxed = it->second->FindStream(stream_id);
-    if (*unboxed != nullptr) {
-      return NqBoxer::UnboxResult::Ok;
-    }
-  }
-  return NqBoxer::UnboxResult::SerialExpire;
-}
-NqBoxer::UnboxResult 
-NqDispatcher::Unbox(uint64_t serial, NqAlarm **unboxed) {
-  if (!main_thread()) {
-    return NqBoxer::UnboxResult::NeedTransfer;
-  }
-  auto index = NqAlarmSerialCodec::ServerAlarmIndex(serial);
-  auto it = alarm_map_.find(index);
-  if (it != alarm_map_.end()) {
-    *unboxed = it->second;
-    return NqBoxer::UnboxResult::Ok;
-  }
-  return NqBoxer::UnboxResult::SerialExpire;
-}
-const NqSession::Delegate *NqDispatcher::FindConn(uint64_t serial, OpTarget target) const {
+NqSession::Delegate *NqDispatcher::FindConn(uint64_t serial, OpTarget target) {
   switch (target) {
   case Conn:
-    return server_map().Active(NqConnSerialCodec::ServerSessionIndex(serial));
+    return server_map().Find(NqConnSerialCodec::ServerSessionIndex(serial));
   case Stream:
-    return server_map().Active(NqStreamSerialCodec::ServerSessionIndex(serial));
+    return server_map().Find(NqStreamSerialCodec::ServerSessionIndex(serial));
   default:
     ASSERT(false);
     return nullptr;
   }
 }
-const NqStream *NqDispatcher::FindStream(uint64_t serial) const {
-  auto c = server_map().Active(NqStreamSerialCodec::ServerSessionIndex(serial));
-  if (c == nullptr) { return nullptr; }
-  return c->FindStreamForRead(NqStreamSerialCodec::ServerStreamId(serial));
-}
-void NqDispatcher::AddAlarm(NqAlarm *a) {
-  if (a->alarm_index() == 0) {
-    a->set_alarm_index(new_alarm_index());
-    alarm_map_.Add(a->alarm_index(), a);
-  } else {
-#if defined(DEBUG)
-    auto it = alarm_map_.find(a->alarm_index());
-    ASSERT(it != alarm_map_.end() && it->second == a);
-#endif
+NqStream *NqDispatcher::FindStream(uint64_t serial, void *p) {
+  //note that following code executed even if p already freed. 
+  //so cannot call virtual function of NqStream correctly inside of this func.
+  auto s = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(p));
+  if (s->session_index() != NqStreamSerialCodec::ServerSessionIndex(serial)) {
+    return nullptr;
   }
+  return s->FindStreamBySerial(serial);
 }
 void NqDispatcher::RemoveAlarm(NqAlarmIndex index) {
   alarm_map_.Remove(index);
