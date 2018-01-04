@@ -17,7 +17,7 @@
 - [x] API: use direct pointer to access conn/stream
 - [ ] API: consider the good way to integrate nq_error_t and user defined error code, as the value of nq_result_t of nq_rpc_reply.
 - [x] API: more API to thread safe 
-- [ ] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
+- [x] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
 - [x] API: more detail control of rpc timeout (we providing nq_rpc_call_ex)
 - [ ] API: raw connection (do not use stream name to select stream protocol to be used)
 - [ ] API: ```nq_(conn|rpc|stream)_is_valid``` returns optional error detail msg 
@@ -37,17 +37,17 @@
 - [ ] test: ensure robustness for connectivity change
 - [ ] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread
-- [x] bench: latency, throughput, compare with mrs, which is ENet based, gaming specific udp network library
+- [x] bench: comparing latency and throughput with mrs, which contains ENet based gaming specific udp network library
   - ~10% faster than mrs, with 100ccu/5000 request (roughly 350k req/sec) almost batched (mrs does not allow 100+ ccu, so more comparision is not possible)
 
 
 #### remain tasks for 1.0.0
 - [ ] stream/rpc: unreliable packet sending (based on https://tools.ietf.org/html/draft-tiesel-quic-unreliable-streams-00)
-- [ ] stream/rpc: unencrypted packet sending 
 - [ ] conn: optional faster network stack by by-passing kernel (like dpdk)
 
 
 #### YAGNI
+- [ ] stream/rpc: unencrypted packet sending 
 - [ ] conn: more cert check. eg. optinally enable certificate transparency verification
   - maybe better just expose certificate data to user
 - [ ] conn: try to use let's encrypt cert (with corresponding host name) by default
