@@ -62,7 +62,6 @@ const char *INVALID_REASON(const H &h) {
       if (h.s == 0) {
         return "deallocated handle";
       } else {
-        ASSERT(false);
         return "outdated handle";
       }
   }
@@ -205,7 +204,9 @@ NQAPI_BOOTSTRAP bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t factory) {
 	return nq::HandlerMap::FromHandle(h)->AddEntry(name, factory);
 }
-
+NQAPI_BOOTSTRAP void nq_hdmap_raw_handler(nq_hdmap_t h, nq_stream_handler_t handler) {
+  nq::HandlerMap::FromHandle(h)->SetRawHandler(handler);
+}
 
 
 // --------------------------
@@ -251,9 +252,9 @@ NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn) {
   }, "nq_conn_reconnect_wait");
   return 0;
 }
-NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn) {
+NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn) {
   NqSession::Delegate *d;
-  UNWRAP_CONN(conn, d, {
+  UNSAFE_UNWRAP_CONN(conn, d, {
     return d->Context();
   }, "nq_conn_ctx");
   return nullptr;

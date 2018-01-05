@@ -76,6 +76,7 @@ class NqStream : public QuicStream {
   friend class NqStreamHandler;
   friend class NqDispatcher;
   NqStreamHandler *CreateStreamHandler(const std::string &name);
+  NqStreamHandler *CreateStreamHandler(const nq::HandlerMap::HandlerEntry *he);
 };
 
 class NqClientStream : public NqStream {

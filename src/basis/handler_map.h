@@ -8,9 +8,10 @@ namespace nq {
 class HandlerMap {
  public:
   typedef enum {
-  	STREAM = 0,
-  	RPC = 1,
-  	FACTORY = 2,
+    INVALID = 0,
+  	STREAM = 1,
+  	RPC = 2,
+  	FACTORY = 3,
   } HandlerFactoryType;
   typedef struct {
   	HandlerFactoryType type;
@@ -22,8 +23,9 @@ class HandlerMap {
   } HandlerEntry;
  private:
   std::map<std::string, HandlerEntry> map_;
+  HandlerEntry raw_;
  public:
-  HandlerMap() : map_() {}
+  HandlerMap() : map_() { raw_.type = INVALID; }
   inline bool AddEntry(const std::string &name, nq_stream_factory_t factory) {
   	HandlerEntry he;
     he.type = FACTORY;
@@ -48,6 +50,11 @@ class HandlerMap {
   inline const HandlerEntry *Find(const std::string &name) const {
     auto it = map_.find(name);
     return it == map_.end() ? nullptr : &(it->second);
+  }
+  inline const HandlerEntry *RawHandler() const { return raw_.type != INVALID ? &raw_ : nullptr; }
+  inline void SetRawHandler(nq_stream_handler_t stream) {
+    raw_.type = STREAM;
+    raw_.stream = stream;
   }
 
   inline nq_hdmap_t ToHandle() { return (nq_hdmap_t)this; }

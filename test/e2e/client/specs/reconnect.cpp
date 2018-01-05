@@ -90,11 +90,11 @@ void test_reconnect_client(Test::Conn &conn) {
 			if (nq_conn_is_valid(c, &reason)) {
 				done3(false);
 				return;
-			} else if (strcmp(reason, "outdated handle") == 0) {
+			} else if (strcmp(reason, "deallocated handle") != 0) {
 				done3(false);
 				return;
 			}
-			done3(close_counter == 5 && ctx == ctx_ptr && nq_conn_ctx(c) == nullptr);
+			done3(close_counter == 5 && ctx == ctx_ptr && nq_conn_ctx(c) == ctx_ptr);
 		}));
 		TRACE("test_reconnect_client: call RPC to close connection");
 		RPC(rpc, RpcType::Close, "", 0, ([done4](

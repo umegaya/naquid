@@ -47,7 +47,7 @@ void* NqClient::operator new(std::size_t sz) {
   r->loop_ = nullptr;
   return r;
 }
-void* NqClient::operator new(std::size_t sz, NqClientLoop* l) {
+void* NqClient::operator new(std::size_t sz, NqClientLoop *l) {
   auto r = reinterpret_cast<NqClient *>(l->client_allocator().Alloc(sz));
   r->loop_ = l;
   return r;

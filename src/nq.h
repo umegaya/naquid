@@ -198,10 +198,6 @@ typedef struct {
 
   //set true to ignore proof verification
   bool insecure; 
-
-  //NYI: set true to use raw connection, which does not send stream name to specify stream type
-  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
-  bool raw;
   
   //total handshake time limit / no input limit. default 1000ms/500ms
   nq_time_t handshake_timeout, idle_timeout; 
@@ -236,10 +232,6 @@ typedef struct {
 
   //quic secret. need to specify arbiter (hopefully unique) string
   const char *quic_secret;
-
-  //NYI: set true to use raw connection, which does not accept stream name to specify stream type.
-  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
-  bool raw;
 
   //cert cache size. default 16 and how meny sessions accepted per loop. default 1024
   int quic_cert_cache_size, accept_per_loop;
@@ -288,6 +280,9 @@ NQAPI_BOOTSTRAP bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_
 NQAPI_BOOTSTRAP bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc_handler_t handler);
 
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t factory);
+//if you call this API, nq_hdmap_t become "raw mode". any other hdmap settings are ignored, 
+//and all incoming/outgoing streams are handled with the handler which is given to this API.
+NQAPI_BOOTSTRAP void nq_hdmap_raw_handler(nq_hdmap_t h, nq_stream_handler_t handler);
 
 
 

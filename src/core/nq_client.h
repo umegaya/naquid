@@ -173,7 +173,7 @@ class NqClient : public QuicClientBase,
 
   //implement custom allocator
   void* operator new(std::size_t sz);
-  void* operator new(std::size_t sz, NqClientLoop* l);
+  void* operator new(std::size_t sz, NqClientLoop *l);
   void operator delete(void *p) noexcept;
   void operator delete(void *p, NqClientLoop *l) noexcept;
 

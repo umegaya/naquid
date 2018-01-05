@@ -20,6 +20,12 @@ NqStream::NqStream(QuicStreamId id, NqSession* nq_session,
   establish_side_(establish_side),
   established_(false), proto_sent_(false) {
   nq_session->RegisterStreamPriority(id, priority);
+  auto rh = nq_session->handler_map()->RawHandler();
+  if (rh != nullptr) {
+    handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(rh));
+    proto_sent_ = true;
+    established_ = true;
+  }
 }
 NqSession *NqStream::nq_session() { 
   return static_cast<NqSession *>(session()); 
@@ -72,6 +78,9 @@ NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
     ASSERT(false);
     return nullptr;
   }
+  return CreateStreamHandler(he);
+}
+NqStreamHandler *NqStream::CreateStreamHandler(const nq::HandlerMap::HandlerEntry *he) {
   NqStreamHandler *s;
   switch (he->type) {
   case nq::HandlerMap::FACTORY: {
