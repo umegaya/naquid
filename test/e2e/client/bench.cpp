@@ -148,13 +148,14 @@ int main(int argc, char *argv[]){
   conf.idle_timeout = nq_time_sec(60);
   conf.handshake_timeout = nq_time_sec(120);
 
+  const char *invalid_reason;
   for (int i = 0; i < N_CLIENT; i++) {
     //reinitialize closure, with giving client index as arg
     nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, (void *)(intptr_t)i);
     nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, (void *)(intptr_t)i);
     g_cs[i] = nq_client_connect(cl, &addr, &conf);
-    if (!nq_conn_is_valid(g_cs[i])) {
-      printf("fail to create connection\n");
+    if (!nq_conn_is_valid(g_cs[i], &invalid_reason)) {
+      printf("fail to create connection %s\n", invalid_reason);
       return -1;
     }
     g_ctxs[i].seed = 0;

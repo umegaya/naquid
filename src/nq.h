@@ -314,7 +314,8 @@ NQAPI_THREADSAFE void nq_conn_flush(nq_conn_t conn);
 //check connection is client mode or not.
 NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
 //check conn is valid. invalid means fail to create or closed, or temporary disconnected (will reconnect soon).
-NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn);
+//if you give valid pointer to const char * to reason, you can get invalid reason when its not valid..
+NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, const char **invalid_reason);
 //get reconnect wait duration in us. 0 means does not wait reconnection
 NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get context, which is set at on_conn_open
@@ -339,7 +340,8 @@ NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s);
 //get alarm from stream
 NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s);
 //check stream is valid. sugar for nq_conn_is_valid(nq_stream_conn(s));
-NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s);
+//if you give valid pointer to const char * to reason, you can get invalid reason when its not valid..
+NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s, const char **invalid_reason);
 //check stream is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
 //if p_valid returns true, means stream is incoming.
 NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid);
@@ -369,7 +371,8 @@ NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc);
 //get alarm from stream or rpc
 NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc);
 //check rpc is valid. sugar for nq_conn_is_valid(nq_rpc_conn(rpc));
-NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc);
+//if you give valid pointer to const char * to reason, you can get invalid reason when its not valid..
+NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc, const char **invalid_reason);
 //check rpc is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
 //if p_valid returns true, means stream is incoming.
 NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t s, bool *p_invalid);

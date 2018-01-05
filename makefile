@@ -81,3 +81,7 @@ testcl:
 testclean:
 	-@rm -r build/t/$(TEST_OS)
 	make -C test/e2e clean TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
+
+.PHONY: test
+test:
+	make -C test/e2e test TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)

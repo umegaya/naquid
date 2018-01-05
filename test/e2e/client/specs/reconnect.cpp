@@ -27,6 +27,10 @@ void test_reconnect_client(Test::Conn &conn) {
 			nq_conn_t c, nq_quic_error_t result, const char *detail, bool from_remote) -> nq_time_t {
 			close_counter++;
 			TRACE("ConnClose(%d): detail = %s", close_counter, detail);
+			if (!nq_conn_is_valid(c, nullptr)) {
+				done(false);
+				return 0;
+			}
 			switch (close_counter) {
 				case 1: //closed by RPC call, server side
 					if (!from_remote) {
@@ -55,6 +59,10 @@ void test_reconnect_client(Test::Conn &conn) {
 		int *ctx_ptr = reinterpret_cast<int *>(0x5678);
 		WATCH_CONN(conn, ConnOpen, ([done2, ctx_ptr](
 			nq_conn_t c, nq_handshake_event_t hsev, void *ppctx) {
+			if (!nq_conn_is_valid(c, nullptr)) {
+				done2(false);
+				return 0;
+			}
 			counter--;
 			*(int **)ppctx = ctx_ptr;
 			TRACE("ConnOpen, counter %d %d (%d)", counter, close_counter, hsev);
@@ -72,11 +80,20 @@ void test_reconnect_client(Test::Conn &conn) {
 					nq_conn_reset(c);
 				}
 			}
+			return 0;
 		}));
 		WATCH_CONN(conn, ConnFinalize, ([done3, ctx_ptr](nq_conn_t c, void *ctx) {
 			TRACE("ConnFinalize %u %p %p", close_counter, nq_conn_ctx(c), ctx_ptr);
 			//nq_conn_ctx should return nullptr because connection is no more valid.
 			//instead of this, variable ctx should have the value which is attached with this conn
+			const char *reason;
+			if (nq_conn_is_valid(c, &reason)) {
+				done3(false);
+				return;
+			} else if (strcmp(reason, "outdated handle") == 0) {
+				done3(false);
+				return;
+			}
 			done3(close_counter == 5 && ctx == ctx_ptr && nq_conn_ctx(c) == nullptr);
 		}));
 		TRACE("test_reconnect_client: call RPC to close connection");

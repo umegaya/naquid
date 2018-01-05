@@ -229,11 +229,12 @@ NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn) {
   }, "nq_conn_is_client");
   return false;
 }
-NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn) {
+NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, const char **invalid_reason) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
     return true;
   }, "nq_conn_is_valid");
+  if (invalid_reason != nullptr) { *invalid_reason = INVALID_REASON(conn); }
   return false;
 }
 NQAPI_THREADSAFE nq_hdmap_t nq_conn_hdmap(nq_conn_t conn) {
@@ -297,11 +298,12 @@ NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s) {
   }, "nq_stream_alarm");
   return INVALID_HANDLE<nq_alarm_t>(IHR_INVALID_STREAM);
 }
-NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s) {
+NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s, const char **invalid_reason) {
   NqStream *st;
   UNWRAP_STREAM(s, st, {
     return true;
   }, "nq_stream_is_valid");
+  if (invalid_reason != nullptr) { *invalid_reason = INVALID_REASON(s); }
   return false;
 }
 NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid) {
@@ -373,11 +375,12 @@ NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc) {
   }, "nq_rpc_alarm");
   return INVALID_HANDLE<nq_alarm_t>(IHR_INVALID_STREAM);
 }
-NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc) {
+NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc, const char **invalid_reason) {
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
     return true;
   }, "nq_rpc_is_valid");
+  if (invalid_reason != nullptr) { *invalid_reason = INVALID_REASON(rpc); }
   return false;
 }
 NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t rpc, bool *p_valid) {
