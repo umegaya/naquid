@@ -15,7 +15,7 @@
 - [ ] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
   - but ```nq_[stream|rpc]_[name|ctx]``` remained as hidden API (its only safe at single thread processing, and may useful for that case)
 - [x] API: use direct pointer to access conn/stream
-- [ ] API: consider the good way to integrate nq_error_t and user defined error code, as the value of nq_result_t of nq_rpc_reply.
+- [x] API: consider the good way to integrate nq_error_t and user defined error code, as the value of nq_result_t of nq_rpc_reply.
 - [x] API: more API to thread safe 
 - [x] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
 - [x] API: more detail control of rpc timeout (we providing nq_rpc_call_ex)

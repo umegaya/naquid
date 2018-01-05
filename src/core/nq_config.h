@@ -74,7 +74,7 @@ class NqServerConfig : public NqConfig {
   std::unique_ptr<QuicCryptoServerConfig> NewCryptoConfig(QuicClock *clock) const;
  protected:
   static void NoopOnOpen(void *, nq_conn_t, nq_handshake_event_t, void **) {}
-  static void NoopOnClose(void *, nq_conn_t, nq_result_t, const char*, bool) {}
+  static void NoopOnClose(void *, nq_conn_t, nq_quic_error_t, const char*, bool) {}
 };
 
 } //net

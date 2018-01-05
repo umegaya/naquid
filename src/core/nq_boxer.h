@@ -81,7 +81,7 @@ class NqBoxer {
         uint16_t type_;
       } notify_;
       struct {
-        nq_result_t result_;
+        nq_error_t result_;
         nq_msgid_t msgid_;
       } reply_;
       struct {
@@ -131,7 +131,7 @@ class NqBoxer {
       notify_.type_ = type;
     }
     Op(uint64_t serial, void *target_ptr, OpCode code, 
-       nq_result_t result, nq_msgid_t msgid, 
+       nq_error_t result, nq_msgid_t msgid, 
        const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) :
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
       reply_.result_ = result;
@@ -289,7 +289,7 @@ class NqBoxer {
     }
   }
   inline void InvokeStream(uint64_t serial, OpCode code, 
-                           nq_result_t result, nq_msgid_t msgid, 
+                           nq_error_t result, nq_msgid_t msgid, 
                            const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {
     if (unboxed != nullptr) {
       if (unboxed->stream_serial() == serial) {

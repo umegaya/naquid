@@ -82,8 +82,8 @@ void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void
   TRACE("set context for %p, %p", c.p, ctx);
   on_conn_open(arg, c, hsev, ppctx);
 }
-void on_conn_close(void *, nq_conn_t c, nq_result_t, const char *detail, bool) {
-  TRACE("on_conn_close reason:%s\n", detail);
+void on_conn_close(void *, nq_conn_t c, nq_quic_error_t r, const char *detail, bool) {
+  TRACE("on_conn_close reason:%s %s\n", detail, nq_quic_error_str(r));
   free(nq_conn_ctx(c));
 }
 
@@ -98,11 +98,11 @@ struct alarm_context {
 void on_alarm(void *p, nq_time_t *pnext) {
   auto ac = (alarm_context *)p;
   if (*pnext != ac->invoke_time) {
-    nq_rpc_reply(ac->rpc, RpcError::InternalError, ac->msgid, "", 0);
+    nq_rpc_error(ac->rpc, ac->msgid, "", 0);
     return;
   }
   TRACE("on_alarm for %u replies with %llu delay", ac->msgid, nq_time_now() - ac->start);
-  nq_rpc_reply(ac->rpc, RpcError::None, ac->msgid, "", 0);
+  nq_rpc_reply(ac->rpc, ac->msgid, "", 0);
   free(ac);
   //no write for *pnext will cause deletion of ac->alarm
 }
@@ -116,7 +116,7 @@ bool on_rpc_open(void *p, nq_rpc_t rpc, void **ppctx) {
     //outgoing stream need to send rpc to peer
     auto msg = (std::string *)(*ppctx);
     RPC(rpc, RpcType::ServerRequest, msg->c_str(), msg->length(), ([rpc, msg](
-      nq_rpc_t rpc2, nq_result_t r, const void *data, nq_size_t dlen) {
+      nq_rpc_t rpc2, nq_error_t r, const void *data, nq_size_t dlen) {
       TRACE("receive ServerRequest reply");
       ASSERT(r >= 0 && nq_rpc_equal(rpc, rpc2) && MakeString(data, dlen) == ("from client:" + (*msg)));
       delete msg;
@@ -164,18 +164,17 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
       }
       auto seq = nq::Endian::NetbytesToHost<uint64_t>((const char *)data + 4);
       add_recv(index, seq);
-      nq_rpc_reply(rpc, RpcError::None, msgid, ((const char *)data) + 4, len - 4);
+      nq_rpc_reply(rpc, msgid, ((const char *)data) + 4, len - 4);
 #else
-      nq_rpc_reply(rpc, RpcError::None, msgid, (const char *)data, len);
+      nq_rpc_reply(rpc, msgid, (const char *)data, len);
 #endif
     } break;
     case RpcType::Raise:
-      nq_rpc_reply(rpc, nq::Endian::NetbytesToHost<int32_t>(data), msgid, 
-        static_cast<const char *>(data) + sizeof(int32_t), len - sizeof(int32_t));
+      nq_rpc_error(rpc, msgid, data, len);
       break;
     case RpcType::NotifyText:
       nq_rpc_notify(rpc, RpcType::TextNotification, data, len);
-      nq_rpc_reply(rpc, RpcError::None, msgid, NotifySuccess, sizeof(NotifySuccess) - 1);
+      nq_rpc_reply(rpc, msgid, NotifySuccess, sizeof(NotifySuccess) - 1);
       break;
     case RpcType::ServerStream:
       {
@@ -183,14 +182,14 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
         auto idx = s.find('|');
         if (idx == std::string::npos) {
           s = std::string("parse fails:") + s;
-          nq_rpc_reply(rpc, RpcError::Parse, msgid, s.c_str(), s.length());
+          nq_rpc_reply(rpc, msgid, s.c_str(), s.length());
           return;
         }
         auto name = s.substr(0, idx);
         auto msg = new std::string("from server:" + s.substr(idx + 1));
         auto c = nq_rpc_conn(rpc);
         nq_conn_rpc(c, name.c_str(), msg);
-        nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
+        nq_rpc_reply(rpc, msgid, "", 0);
       }
       break;
     case RpcType::Sleep:
@@ -210,19 +209,19 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
     case RpcType::Close:
       {
         nq_conn_t c = nq_rpc_conn(rpc);
-        nq_rpc_reply(rpc, RpcError::None, msgid, "", 0);
+        nq_rpc_reply(rpc, msgid, "", 0);
         nq_conn_close(c);
       }
       break;
     case RpcType::SetupReject:
       {
         g_reject = 2;
-        nq_rpc_reply(rpc, RpcError::None, msgid, data, len);
+        nq_rpc_reply(rpc, msgid, data, len);
       }
       break;
   }
 }
-void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
+void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq_size_t len) {
 
 }
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {

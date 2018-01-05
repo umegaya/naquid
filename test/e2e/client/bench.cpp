@@ -65,9 +65,9 @@ void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
 #endif
   TRACE("on_conn_open event:%ld %d\n", idx, hsev);
 }
-nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_result_t, const char *detail, bool) {
+nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *detail, bool) {
   intptr_t idx = (intptr_t)arg;
-  fprintf(stderr, "on_conn_close: reason:%ld %s\n", idx, detail);
+  fprintf(stderr, "on_conn_close: reason:%ld %s %s\n", idx, detail, nq_quic_error_str(e));
   return nq_time_sec(2);
 }
 
@@ -93,7 +93,7 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
 }
 static uint64_t g_idx = 0;
 static bool g_alive = true;
-void on_rpc_reply(void *p, nq_rpc_t rpc, nq_result_t result, const void *data, nq_size_t len) {
+void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq_size_t len) {
   ASSERT(result >= 0);
 #if defined(STORE_DETAIL)
   auto v = (closure_ctx *)p;

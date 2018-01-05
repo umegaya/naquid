@@ -23,7 +23,7 @@ class ClosureCallerBase {
 
 class ReplyClosureCaller : public ClosureCallerBase {
  public:
-  std::function<void (nq_rpc_t, nq_result_t, const void *, nq_size_t)> cb_;
+  std::function<void (nq_rpc_t, nq_error_t, const void *, nq_size_t)> cb_;
  public:
   ReplyClosureCaller() : cb_() {}
   ~ReplyClosureCaller() override {}
@@ -32,7 +32,7 @@ class ReplyClosureCaller : public ClosureCallerBase {
     nq_closure_init(clsr, on_rpc_reply, &ReplyClosureCaller::Call, this);
     return clsr;
   }
-  static void Call(void *arg, nq_rpc_t rpc, nq_result_t r, const void *p, nq_size_t l) {
+  static void Call(void *arg, nq_rpc_t rpc, nq_error_t r, const void *p, nq_size_t l) {
     auto pcc = (ReplyClosureCaller *)arg;
     pcc->cb_(rpc, r, p, l);
     delete pcc;
@@ -161,7 +161,7 @@ class ConnOpenClosureCaller : public ClosureCallerBase {
 };
 class ConnCloseClosureCaller : public ClosureCallerBase {
  public:
-  std::function<nq_time_t (nq_conn_t, nq_result_t, const char*, bool)> cb_;
+  std::function<nq_time_t (nq_conn_t, nq_quic_error_t, const char*, bool)> cb_;
  public:
   ConnCloseClosureCaller() : cb_() {}
   ~ConnCloseClosureCaller() override {}
@@ -170,7 +170,7 @@ class ConnCloseClosureCaller : public ClosureCallerBase {
     nq_closure_init(clsr, on_client_conn_close, &ConnCloseClosureCaller::Call, this);
     return clsr;
   }
-  static nq_time_t Call(void *arg, nq_conn_t conn, nq_result_t result, const char *detail, bool from_remote) { 
+  static nq_time_t Call(void *arg, nq_conn_t conn, nq_quic_error_t result, const char *detail, bool from_remote) { 
     auto pcc = (ConnCloseClosureCaller *)arg;
     return pcc->cb_(conn, result, detail, from_remote);
   }
@@ -446,7 +446,7 @@ class Test {
   static void RegisterCallback(Conn &tc, const RunOptions &options);
 
   static void OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx);
-  static nq_time_t OnConnClose(void *arg, nq_conn_t c, nq_result_t r, const char *reason, bool closed_from_remote);
+  static nq_time_t OnConnClose(void *arg, nq_conn_t c, nq_quic_error_t r, const char *reason, bool closed_from_remote);
   static void OnConnFinalize(void *arg, nq_conn_t c, void *ctx);
 
   static bool OnStreamOpen(void *arg, nq_stream_t s, void **pctx);

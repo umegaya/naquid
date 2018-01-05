@@ -41,16 +41,16 @@ void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **
   tc->t->StartThread();
   return;
 }
-nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_result_t r, const char *reason, bool close_from_remote) {
+nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_quic_error_t r, const char *reason, bool close_from_remote) {
   auto tc = (Conn *)arg;
   tc->should_signal = true;
   tc->disconnect++;
   nq_closure_t clsr;
   if (tc->FindClosure(CallbackType::ConnClose, clsr)) {
-  TRACE("OnConnClose: call closure, %d", tc->disconnect);
+  TRACE("OnConnClose: call closure, %d %s", tc->disconnect, nq_quic_error_str(r));
     return nq_closure_call(clsr, on_client_conn_close, c, r, reason, close_from_remote);
   }
-  TRACE("OnConnClose: no closure set yet, %d", tc->disconnect);
+  TRACE("OnConnClose: no closure set yet, %d %s", tc->disconnect, nq_quic_error_str(r));
   return nq_time_sec(1);
 }
 void Test::OnConnFinalize(void *arg, nq_conn_t c, void *ctx) {

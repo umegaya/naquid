@@ -118,6 +118,17 @@ static void lib_init() {
 
 // --------------------------
 //
+// misc API
+//
+// --------------------------
+NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code) {
+  return QuicErrorCodeToString(static_cast<QuicErrorCode>(code));
+}
+
+
+
+// --------------------------
+//
 // client API
 //
 // --------------------------
@@ -409,7 +420,7 @@ NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data
     st->Handler<NqSimpleRPCStreamHandler>()->Notify(type, data, datalen);
   }, "nq_rpc_notify");
 }
-NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
+static inline void rpc_reply_common(nq_rpc_t rpc, nq_error_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
 #if defined(USE_WRITE_OP)
   NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen, nullptr, ToConn(rpc));
 #else
@@ -417,8 +428,14 @@ NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t 
   NqStream *st;
   UNWRAP_STREAM(rpc, st, {
     st->Handler<NqSimpleRPCStreamHandler>()->Reply(result, msgid, data, datalen);
-  }, "nq_rpc_reply");
+  }, result < 0 ? "nq_rpc_error" : "nq_rpc_reply");
 #endif
+}
+NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
+  rpc_reply_common(rpc, NQ_OK, msgid, data, datalen);
+}
+NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
+  rpc_reply_common(rpc, NQ_EUSER, msgid, data, datalen);
 }
 //these are hidden API for test, because returned value is unstable
 //when used with client connection (under reconnection)

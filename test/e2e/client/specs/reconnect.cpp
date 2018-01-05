@@ -24,7 +24,7 @@ void test_reconnect_client(Test::Conn &conn) {
 		static nq_time_t last_close = 0;
 
 		WATCH_CONN(conn, ConnClose, ([done](
-			nq_conn_t c, nq_result_t result, const char *detail, bool from_remote) -> nq_time_t {
+			nq_conn_t c, nq_quic_error_t result, const char *detail, bool from_remote) -> nq_time_t {
 			close_counter++;
 			TRACE("ConnClose(%d): detail = %s", close_counter, detail);
 			switch (close_counter) {
@@ -81,7 +81,7 @@ void test_reconnect_client(Test::Conn &conn) {
 		}));
 		TRACE("test_reconnect_client: call RPC to close connection");
 		RPC(rpc, RpcType::Close, "", 0, ([done4](
-			nq_rpc_t, nq_result_t r, const void *data, nq_size_t dlen) {
+			nq_rpc_t, nq_error_t r, const void *data, nq_size_t dlen) {
 			TRACE("test_reconnect_client: reply RPC");
 			done4(r == 0);
 		}));
@@ -89,7 +89,7 @@ void test_reconnect_client(Test::Conn &conn) {
 	});
 }
 
-static void send_rpc(nq_rpc_t rpc, nq_time_t now, std::function<void (nq_rpc_t, nq_result_t, const void *, nq_size_t)> cb) {
+static void send_rpc(nq_rpc_t rpc, nq_time_t now, std::function<void (nq_rpc_t, nq_error_t, const void *, nq_size_t)> cb) {
 	char buff[sizeof(now)];
 	nq::Endian::HostToNetbytes(now, buff);
 	RPC(rpc, RpcType::SetupReject, buff, sizeof(buff), cb);
@@ -106,7 +106,7 @@ void test_reconnect_server(Test::Conn &conn) {
 		TRACE("ConnOpen: %d %d %d", close_counter, open_counter, stream_close_counter);
 		return true;
 	}));
-	WATCH_CONN(conn, ConnClose, ([](nq_conn_t conn, nq_result_t result, const char *detail, bool from_remote) -> nq_time_t {
+	WATCH_CONN(conn, ConnClose, ([](nq_conn_t conn, nq_quic_error_t result, const char *detail, bool from_remote) -> nq_time_t {
 		close_counter++;
 		TRACE("ConnClose: %d %d %d", close_counter, open_counter, stream_close_counter);
 		return nq_time_sec(1);		
@@ -122,7 +122,7 @@ void test_reconnect_server(Test::Conn &conn) {
 		}
 		rpcs[stream_open_counter++] = rpc;
 		auto now = nq_time_now();
-		send_rpc(rpc, now, [done, now](nq_rpc_t, nq_result_t r, const void *data, nq_size_t){
+		send_rpc(rpc, now, [done, now](nq_rpc_t, nq_error_t r, const void *data, nq_size_t){
 			//finally can execute rpc correctly and connection closed as we expected
 			TRACE("close_counter = %d %d %d %d", r, close_counter, open_counter, stream_close_counter);
 			if (r == 0) {

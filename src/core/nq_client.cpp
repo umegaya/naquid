@@ -7,7 +7,6 @@
 #include "net/quic/platform/api/quic_ptr_util.h"
 #include "net/quic/core/quic_crypto_client_stream.h"
 
-#include "basis/closure.h"
 #include "basis/timespec.h"
 #include "core/nq_stream.h"
 #include "core/nq_network_helper.h"
@@ -140,7 +139,7 @@ void NqClient::OnClose(QuicErrorCode error,
              const std::string& error_details,
              ConnectionCloseSource close_by_peer_or_self) {
   uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, on_client_conn_close, ToHandle(), 
-                                              (int)error, 
+                                              static_cast<int>(error), 
                                               error_details.c_str(), 
                                               close_by_peer_or_self == ConnectionCloseSource::FROM_PEER));
   if (destroyed()) {

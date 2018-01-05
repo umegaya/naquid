@@ -29,8 +29,6 @@ extern "C" {
 // Base type
 //
 // --------------------------
-typedef int16_t nq_result_t;
-
 typedef uint32_t nq_size_t;
 
 typedef uint64_t nq_cid_t;
@@ -71,7 +69,6 @@ typedef struct nq_alarm_tag {
   uint64_t s;   //alarm_index (0-31bit) | reserved (32 - 63bit)
 } nq_alarm_t;
 
-//these values may be provided via nq_result_t
 typedef enum {
   NQ_OK = 0,
   NQ_ESYSCALL = -1,
@@ -79,8 +76,12 @@ typedef enum {
   NQ_EALLOC = -3,
   NQ_ENOTSUPPORT = -4,
   NQ_EGOAWAY = -5,
-  NQ_EUSER = -6, //for rpc, user calls raise to reply
+  NQ_EQUIC = -6,  //quic library error
+  NQ_EUSER = -7,  //for rpc, user calls raise to reply
 } nq_error_t;
+//quic library error
+typedef int nq_quic_error_t;
+NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code);
 
 typedef enum {
   NQ_HS_START = 0, //client: client send first packet, server: server receive initial packet
@@ -103,7 +104,7 @@ typedef void (*nq_on_client_conn_open_t)(void *, nq_conn_t, nq_handshake_event_t
 //client connection closed. after this called, nq_stream_t/nq_rpc_t created by given nq_conn_t, will be invalid.
 //last boolean indicates connection is closed from local or remote. if this function returns positive value, 
 //connection automatically reconnect with back off which equals to returned value.
-typedef nq_time_t (*nq_on_client_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
+typedef nq_time_t (*nq_on_client_conn_close_t)(void *, nq_conn_t, nq_quic_error_t, const char*, bool);
 //client connection finalized. just after this callback is done, memory corresponding to the nq_conn_t, will be freed. 
 //because nq_conn_t is already invalidate when this callback invokes, almost nq_conn_* API returns invalid value in this callback.
 //so the callback is basically for cleanup user defined resourse, like closure arg pointer (1st arg) or user context (3rd arg).
@@ -113,7 +114,7 @@ typedef void (*nq_on_client_conn_finalize_t)(void *, nq_conn_t, void *);
 //server connection opened. same as nq_on_client_conn_open_t.
 typedef nq_on_client_conn_open_t nq_on_server_conn_open_t;
 //server connection closed. no reconnection feature
-typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_result_t, const char*, bool);
+typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_quic_error_t, const char*, bool);
 
 
 //stream opened. return false to reject stream
@@ -138,7 +139,7 @@ typedef void (*nq_on_rpc_request_t)(void *, nq_rpc_t, uint16_t, nq_msgid_t, cons
 
 typedef void (*nq_on_rpc_notify_t)(void *, nq_rpc_t, uint16_t, const void *, nq_size_t);
 
-typedef void (*nq_on_rpc_reply_t)(void *, nq_rpc_t, nq_result_t, const void *, nq_size_t);
+typedef void (*nq_on_rpc_reply_t)(void *, nq_rpc_t, nq_error_t, const void *, nq_size_t);
 
 typedef void *(*nq_create_stream_t)(void *, nq_conn_t);
 
@@ -381,7 +382,9 @@ NQAPI_THREADSAFE void nq_rpc_call_ex(nq_rpc_t rpc, int16_t type, const void *dat
 //send arbiter byte array or object to stream peer, without receving reply. type should be positive
 NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen);
 //send reply of specified request. result >= 0, data and datalen is response, otherwise error detail
-NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_result_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen);
+NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen);
+//send error response to specified request. data and datalen is error detail
+NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen);
 //check equality of nq_rpc_t
 static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
 //will deprecate

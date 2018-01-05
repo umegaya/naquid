@@ -11,7 +11,7 @@ static void test_ping(nq_rpc_t rpc, Test::Conn &tc) {
 	nq::Endian::HostToNetbytes(now, buff);
 	TRACE("test_ping: call RPC");
 	RPC(rpc, RpcType::Ping, buff, sizeof(buff), ([rpc, done, now](
-		nq_rpc_t rpc2, nq_result_t r, const void *data, nq_size_t dlen) {
+		nq_rpc_t rpc2, nq_error_t r, const void *data, nq_size_t dlen) {
 		TRACE("test_ping: reply RPC");
 		if (dlen != sizeof(now)) {
 			done(false);
@@ -33,13 +33,15 @@ static void test_raise(nq_rpc_t rpc, Test::Conn &tc) {
 
 	TRACE("test_raise: call RPC");
 	RPC(rpc, RpcType::Raise, buff, sizeof(buff), ([done, code, msg](
-		nq_rpc_t rpc, nq_result_t r, const void *data, nq_size_t dlen) {
+		nq_rpc_t rpc, nq_error_t r, const void *data, nq_size_t dlen) {
 		TRACE("test_raise: reply RPC");
-		if (dlen != msg.length()) {
+		if (dlen != (sizeof(int32_t) + msg.length())) {
 			done(false);
 			return;
 		}
-		done(r == code && memcmp(msg.c_str(), data, msg.length()) == 0);
+		done(r == NQ_EUSER && 
+			(nq::Endian::NetbytesToHost<int32_t>(data) == code) && 
+			memcmp(msg.c_str(), static_cast<const char *>(data) + sizeof(int32_t), msg.length()) == 0);
 	}));
 }
 
@@ -54,7 +56,7 @@ static void test_notify(nq_rpc_t rpc, Test::Conn &tc) {
 	});
 	TRACE("test_notify: call RPC");
 	RPC(rpc, RpcType::NotifyText, text.c_str(), text.length(), ([done2](
-		nq_rpc_t, nq_result_t r, const void *data, nq_size_t dlen) {
+		nq_rpc_t, nq_error_t r, const void *data, nq_size_t dlen) {
 		TRACE("test_notify: reply RPC");
 		done2(r >= 0 && MakeString(data, dlen) == "notify success");
 	})));
@@ -89,7 +91,7 @@ static void test_server_stream(nq_rpc_t rpc, const std::string &stream_name, Tes
 			}
 			auto reqstr = MakeString(data, dlen);
 			auto reply = (std::string("from client:") + reqstr);
-			nq_rpc_reply(rpc3, RpcError::None, msgid, reply.c_str(), reply.length());
+			nq_rpc_reply(rpc3, msgid, reply.c_str(), reply.length());
 			TRACE("test_server_stream: reply to server done");
 			if ((std::string("from server:") + text) == reqstr && type == RpcType::ServerRequest) {
 				auto a = nq_rpc_alarm(rpc3);
@@ -108,7 +110,7 @@ static void test_server_stream(nq_rpc_t rpc, const std::string &stream_name, Tes
 	TRACE("test_server_stream: call RPC");
 	std::string buffer = (stream_name + "|" + text);
 	RPC(rpc, RpcType::ServerStream, buffer.c_str(), buffer.length(), ([done](
-		nq_rpc_t, nq_result_t r, const void *data, nq_size_t dlen) {
+		nq_rpc_t, nq_error_t r, const void *data, nq_size_t dlen) {
 		TRACE("test_server_stream: reply RPC");
 		done(r >= 0 && dlen == 0);
 	}));

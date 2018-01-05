@@ -12,7 +12,6 @@
 #include "net/tools/quic/quic_client_base.h"
 
 #include "basis/allocator.h"
-#include "basis/closure.h"
 #include "core/nq_client_session.h"
 #include "core/nq_config.h"
 

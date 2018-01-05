@@ -287,10 +287,11 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   //prepare tmp variables
   const char *pstr = parse_buffer_.c_str();
   size_t plen = parse_buffer_.length(), read_ofs;
-  int16_t type; nq_msgid_t msgid; nq_size_t reclen;
+  int16_t type_tmp; nq_msgid_t msgid; nq_size_t reclen;
+  nq_error_t type;
   do {
     //decode header
-    read_ofs = nq::HeaderCodec::Decode(&type, &msgid, pstr, plen);
+    read_ofs = nq::HeaderCodec::Decode(&type_tmp, &msgid, pstr, plen);
     /* tmp_ofs => length of encoded header, reclen => actual payload length */
     auto tmp_ofs = nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
     if (tmp_ofs == 0) { break; }
@@ -305,6 +306,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
       type <= 0 && msgid != 0 => reply
       type > 0 && msgid == 0 => notify
     */
+    type = static_cast<nq_error_t>(type_tmp);
     pstr += read_ofs; //move pointer to top of payload
     if (msgid != 0) {
       if (type <= 0) {
@@ -366,7 +368,7 @@ void NqSimpleRPCStreamHandler::CallEx(uint16_t type, const void *p, nq_size_t le
   EntryRequest(msgid, opt.callback, opt.timeout);
 }
 
-void NqSimpleRPCStreamHandler::Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len) {
+void NqSimpleRPCStreamHandler::Reply(nq_error_t result, nq_msgid_t msgid, const void *p, nq_size_t len) {
   //QuicConnection::ScopedPacketBundler bundler(
     //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);

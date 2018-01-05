@@ -6,7 +6,6 @@
 #include "net/quic/core/quic_alarm.h"
 #include "net/quic/core/quic_spdy_stream.h"
 
-#include "basis/closure.h"
 #include "basis/header_codec.h"
 #include "basis/id_factory.h"
 #include "basis/timespec.h"
@@ -258,7 +257,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   virtual void Call(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb);
   virtual void CallEx(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt);
   void Notify(uint16_t type, const void *p, nq_size_t len);
-  void Reply(nq_result_t result, nq_msgid_t msgid, const void *p, nq_size_t len);
+  void Reply(nq_error_t result, nq_msgid_t msgid, const void *p, nq_size_t len);
 
  protected:
   inline void SendCommon(uint16_t type, nq_msgid_t msgid, const void *p, nq_size_t len) {
