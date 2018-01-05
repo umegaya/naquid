@@ -20,8 +20,8 @@
 - [x] API: delegate chromium log output to our callback (now LogMessage output logs by itself)
 - [x] API: more detail control of rpc timeout (we providing nq_rpc_call_ex)
 - [ ] API: raw connection (do not use stream name to select stream protocol to be used)
-- [ ] API: ```nq_(conn|rpc|stream)_is_valid``` returns optional error detail msg 
-- [ ] API: actually obsolute APIs which are decided to obsolute (hide header declaration)
+- [x] API: ```nq_(conn|rpc|stream)_is_valid``` returns optional error detail msg 
+- [x] API: actually obsolute APIs which are decided to obsolute (hide header declaration)
 - [x] server: QuicAlarm should be more efficient
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
 - [ ] server: graceful shutdown

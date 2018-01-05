@@ -327,11 +327,9 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
     st->Handler<NqStreamHandler>()->Send(data, datalen);
   }, "nq_stream_send");
 }
-//these are hidden API for test, because returned value is unstable
-//when used with client connection (under reconnection)
-NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s) {
+NQAPI_CLOSURECALL void *nq_stream_ctx(nq_stream_t s) {
   NqSession::Delegate *d;
-  UNWRAP_CONN(s, d, {
+  UNSAFE_UNWRAP_CONN(s, d, {
     return d->StreamContext(s.s);
   }, "nq_stream_ctx");
   return nullptr;
@@ -342,13 +340,6 @@ NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s) {
     return st->id();
   }, "nq_stream_sid");
   return 0;
-}
-NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s) {
-  NqStream *st;
-  UNWRAP_STREAM(s, st, {
-    return st->Protocol().c_str();
-  }, "nq_stream_name");
-  return nullptr;
 }
 
 
@@ -440,11 +431,9 @@ NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_msgid_t msgid, const void *d
 NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
   rpc_reply_common(rpc, NQ_EUSER, msgid, data, datalen);
 }
-//these are hidden API for test, because returned value is unstable
-//when used with client connection (under reconnection)
-NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t rpc) {
+NQAPI_CLOSURECALL void *nq_rpc_ctx(nq_rpc_t rpc) {
   NqSession::Delegate *d;
-  UNWRAP_CONN(rpc, d, {
+  UNSAFE_UNWRAP_CONN(rpc, d, {
     return d->StreamContext(rpc.s);
   }, "nq_rpc_ctx");
   return nullptr;
@@ -455,13 +444,6 @@ NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc) {
     return st->id();
   }, "nq_rpc_sid");
   return 0;
-}
-NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t rpc) {
-  NqStream *st;
-  UNWRAP_STREAM(rpc, st, {
-    return st->Protocol().c_str();
-  }, "nq_rpc_name");
-  return nullptr;
 }
 
 

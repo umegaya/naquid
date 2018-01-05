@@ -74,7 +74,7 @@ nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *d
 
 
 /* rpc stream callback */
-bool on_rpc_open(void *p, nq_rpc_t rpc, void **) {
+bool on_rpc_open(void *p, nq_rpc_t rpc, void **ctx) {
   auto v = (closure_ctx *)nq_rpc_ctx(rpc);
   g_rpcs[v->index] = rpc;
   auto rep = g_reps[v->index];

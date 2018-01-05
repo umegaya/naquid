@@ -124,7 +124,7 @@ nq_size_t Test::StreamWriter(void *arg, nq_stream_t s, const void *data, nq_size
   *pbuf = c->send_buf;
   return len + 1;
 }
-void *Test::StreamReader(void *arg, const char *data, nq_size_t dlen, int *p_reclen) {
+void *Test::StreamReader(void *arg, nq_stream_t s, const char *data, nq_size_t dlen, int *p_reclen) {
   //auto c = (Conn *)arg;
   //use text protocol (use \n as delimiter)
   auto idx = MakeString(data, dlen).find('\n');

@@ -263,7 +263,7 @@ void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
 
 void NqRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
   int reclen;
-  void *rec = nq_closure_call(reader_, stream_reader, ToCStr(p), len, &reclen);
+  void *rec = nq_closure_call(reader_, stream_reader, stream_->ToHandle<nq_stream_t>(), ToCStr(p), len, &reclen);
   if (rec != nullptr) {
     nq_closure_call(on_recv_, on_stream_record, stream_->ToHandle<nq_stream_t>(), rec, reclen);
   } else if (reclen < 0) {

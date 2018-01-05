@@ -21,6 +21,9 @@ extern "C" {
 #define NQAPI_BOOTSTRAP extern
 //indicate this call can be done concurrently, and works correctly
 #define NQAPI_THREADSAFE extern
+//indicate this call only safe when invoked with nq_conn/rpc/stream_t which passed to
+//functions of nq_closure_t. 
+#define NQAPI_CLOSURECALL extern
 
 
 
@@ -95,8 +98,6 @@ typedef struct {
 
 
 //closure
-
-
 //receive client handshake progress and done event.
 //optionally you can set arbiter pointer via last argument, which can be retrieved via nq_conn_ctx afterward.
 //TODO(iyatomi): give more imformation for deciding shutdown connection from nq_conn_t
@@ -122,9 +123,9 @@ typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void**);
 //stream closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_stream_close_t)(void *, nq_stream_t);
 
-typedef void *(*nq_stream_reader_t)(void *, const char *, nq_size_t, int *);
-//stores pointer to serialized byte array last argument. memory for byte array owned by callee and 
-//should be available for next call of this callback.
+typedef void *(*nq_stream_reader_t)(void *, nq_stream_t, const char *, nq_size_t, int *);
+//need to return pointer to serialized byte array via last argument. 
+//memory for byte array owned by callee and have to be available until next call of this callback.
 typedef nq_size_t (*nq_stream_writer_t)(void *, nq_stream_t, const void *, nq_size_t, void **);
 
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
@@ -184,7 +185,13 @@ NQAPI_THREADSAFE nq_closure_t nq_closure_empty();
 
 #define nq_closure_call(__pclsr, __type, ...) ((__pclsr).__type((__pclsr).arg, __VA_ARGS__))
 
-//config
+
+
+// --------------------------
+//
+// client API
+//
+// --------------------------
 typedef struct {
   //connection open/close/finalize watcher
   nq_closure_t on_open, on_close, on_finalize;
@@ -200,53 +207,6 @@ typedef struct {
   nq_time_t handshake_timeout, idle_timeout; 
 } nq_clconf_t;
 
-typedef struct {
-  //connection open/close watcher
-  nq_closure_t on_open, on_close;
-
-  //quic secret. need to specify arbiter (hopefully unique) string
-  const char *quic_secret;
-
-  //NYI: set true to use raw connection, which does not accept stream name to specify stream type.
-  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
-  bool raw;
-
-  //cert cache size. default 16 and how meny sessions accepted per loop. default 1024
-  int quic_cert_cache_size, accept_per_loop;
-
-  //allocation hint about max sessoin and max stream
-  int max_session_hint, max_stream_hint;
-
-  //total handshake time limit / no input limit. default 1000ms/5000ms
-  nq_time_t handshake_timeout, idle_timeout; 
-} nq_svconf_t;
-
-//handlers
-typedef nq_closure_t nq_stream_factory_t;
-
-typedef struct {
-  nq_closure_t on_stream_record, on_stream_open, on_stream_close;
-  nq_closure_t stream_reader, stream_writer;
-} nq_stream_handler_t;
-
-typedef struct {
-  nq_closure_t on_rpc_request, on_rpc_notify, on_rpc_open, on_rpc_close;
-  nq_time_t timeout; //call timeout
-  bool use_large_msgid; //use 4byte for msgid
-} nq_rpc_handler_t;
-
-typedef struct {
-  nq_closure_t callback;
-  nq_time_t timeout;
-} nq_rpc_opt_t;
-
-
-
-// --------------------------
-//
-// client API
-//
-// --------------------------
 // create client object which have max_nfd of connection. 
 NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint);
 // do actual network IO. need to call periodically
@@ -270,6 +230,27 @@ NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl);
 // server API
 //
 // --------------------------
+typedef struct {
+  //connection open/close watcher
+  nq_closure_t on_open, on_close;
+
+  //quic secret. need to specify arbiter (hopefully unique) string
+  const char *quic_secret;
+
+  //NYI: set true to use raw connection, which does not accept stream name to specify stream type.
+  //it just callbacks/sends packet as it is. TODO(iyatomi): implement
+  bool raw;
+
+  //cert cache size. default 16 and how meny sessions accepted per loop. default 1024
+  int quic_cert_cache_size, accept_per_loop;
+
+  //allocation hint about max sessoin and max stream
+  int max_session_hint, max_stream_hint;
+
+  //total handshake time limit / no input limit. default 1000ms/5000ms
+  nq_time_t handshake_timeout, idle_timeout; 
+} nq_svconf_t;
+
 //create server which has n_worker of workers
 NQAPI_THREADSAFE nq_server_t nq_server_create(int n_worker);
 //listen and returns handler map associated with it. 
@@ -287,6 +268,19 @@ NQAPI_BOOTSTRAP void nq_server_join(nq_server_t sv);
 // hdmap API
 //
 // --------------------------
+typedef nq_closure_t nq_stream_factory_t;
+
+typedef struct {
+  nq_closure_t on_stream_record, on_stream_open, on_stream_close;
+  nq_closure_t stream_reader, stream_writer;
+} nq_stream_handler_t;
+
+typedef struct {
+  nq_closure_t on_rpc_request, on_rpc_notify, on_rpc_open, on_rpc_close;
+  nq_time_t timeout; //call timeout
+  bool use_large_msgid; //use 4byte for msgid
+} nq_rpc_handler_t;
+
 //setup original stream protocol (client), with 3 pattern
 // TODO(iyatomi): make it NQAPI_THREADSAFE
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler);
@@ -319,12 +313,10 @@ NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, const char **invalid_reas
 //get reconnect wait duration in us. 0 means does not wait reconnection
 NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get context, which is set at on_conn_open
-NQAPI_THREADSAFE void *nq_conn_ctx(nq_conn_t conn);
+NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t
 static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
-//will deprecate
-NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t c);
-NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t c);
+
 
 
 // --------------------------
@@ -351,10 +343,11 @@ NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s);
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
 //check equality of nq_stream_t
 static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
-//will deprecate
-NQAPI_THREADSAFE void *nq_stream_ctx(nq_stream_t s);
+//get quic stream id. this may change as you re-created stream on reconnection. 
+//useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
-NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
+//get context, which is set at nq_conn_stream. only safe with nq_stream_t which passed to closure callbacks
+NQAPI_CLOSURECALL void *nq_stream_ctx(nq_stream_t s);
 
 
 
@@ -363,6 +356,11 @@ NQAPI_THREADSAFE const char *nq_stream_name(nq_stream_t s);
 // rpc API
 //
 // --------------------------
+typedef struct {
+  nq_closure_t callback;
+  nq_time_t timeout;
+} nq_rpc_opt_t;
+
 //create single rpc stream from conn, which has type specified by "name". need to use valid conn && call from owner thread of it
 //return invalid stream on error. ctx will be void **ppctx of open callback of this stream handler
 NQAPI_THREADSAFE void nq_conn_rpc(nq_conn_t conn, const char *name, void *ctx);
@@ -375,7 +373,7 @@ NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc);
 NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc, const char **invalid_reason);
 //check rpc is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
 //if p_valid returns true, means stream is incoming.
-NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t s, bool *p_invalid);
+NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t s, bool *p_valid);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
 NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc);
 //send arbiter byte array or object to stream peer. type should be positive
@@ -390,10 +388,11 @@ NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_msgid_t msgid, const void *d
 NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen);
 //check equality of nq_rpc_t
 static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
-//will deprecate
-NQAPI_THREADSAFE void *nq_rpc_ctx(nq_rpc_t s);
+//get quic stream id. this may change as you re-created rpc on reconnection.
+//useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc);
-NQAPI_THREADSAFE const char *nq_rpc_name(nq_rpc_t rpc);
+//get context, which is set at nq_conn_rpc. only safe with nq_rpc_t which passed to closure callbacks
+NQAPI_CLOSURECALL void *nq_rpc_ctx(nq_rpc_t s);
 
 
 

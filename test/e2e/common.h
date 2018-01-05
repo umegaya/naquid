@@ -454,7 +454,7 @@ class Test {
   static void OnStreamRecord(void *arg, nq_stream_t s, const void *data, nq_size_t len);
   static void OnStreamRecordSimple(void *arg, nq_stream_t s, const void *data, nq_size_t len);
   static nq_size_t StreamWriter(void *arg, nq_stream_t s, const void *data, nq_size_t len, void **ppbuf);
-  static void *StreamReader(void *arg, const char *data, nq_size_t dlen, int *p_reclen);
+  static void *StreamReader(void *arg, nq_stream_t s, const char *data, nq_size_t dlen, int *p_reclen);
 
   static bool OnRpcOpen(void *arg, nq_rpc_t s, void **pctx);
   static void OnRpcClose(void *arg, nq_rpc_t s);

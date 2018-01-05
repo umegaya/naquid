@@ -288,7 +288,7 @@ nq_size_t stream_writer(void *arg, nq_stream_t s, const void *data, nq_size_t le
   *pbuf = c->send_buf;
   return len + 1;
 }
-void *stream_reader(void *arg, const char *data, nq_size_t dlen, int *p_reclen) {
+void *stream_reader(void *arg, nq_stream_t s, const char *data, nq_size_t dlen, int *p_reclen) {
   //auto c = (Conn *)arg;
   //use text protocol (use \n as delimiter)
   auto idx = MakeString(data, dlen).find('\n');

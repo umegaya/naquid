@@ -13,13 +13,13 @@
 namespace net {
 //these code does valid check of nq_conn_t, nq_stream_t, nq_rpc_t, nq_alarm_t even if related pointer (member p)
 //already freed, and return casted NqSession::Delegate* or NqStream* if valid. its really wild part of the codes, be careful to make change.
-//but as a result, following restriction caused.
+//especially, keep following restriction in mind.
 //  1. member p can be cast to NqSession::Delegate* or NqStream* (and its derived classes, NqServerStream, NqClientStream, NqClient, NqServerSession)
 //     but none of its virtual function can be called. because its vtbl may become invalid already.
 //  2. validity should be check serial stored in pointer of casted object and handle (nq_conn_t.s, nq_rpc_t.s, nq_stream_t.s, nq_alarm_t.s),
 //     with locking mutex which is returned by StaticMutex(nq_conn_t/nq_rpc_t/nq_stream_t/nq_alarm_t)
 //
-//caller should be use following functions with following step.
+//caller should be use following functions with following step. for convenience, UNWRAP_CONN and UNWRAP_STREAM is provided.
 //  1. lock mutex which is returned by NqUnwrapper::UnwrapMutex. 
 //  2. get storead serial
 //  3. get NqSession::Delegate* or NqStream* or NqAlarm* by getting corresponding UnwrapXXX method
@@ -184,6 +184,10 @@ class NqUnwrapper {
       } \
     } \
   } \
+}
+#define UNSAFE_UNWRAP_CONN(__handle, __d, __code, __purpose) { \
+  __d = reinterpret_cast<NqSession::Delegate *>(__handle.p); \
+  __code; \
 }
 #define UNWRAP_STREAM(__handle, __s, __code, __purpose) { \
   if (__handle.s == 0) { \
