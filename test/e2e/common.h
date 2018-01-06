@@ -211,6 +211,40 @@ class AlarmClosureCaller : public ClosureCallerBase {
     }
   }  
 };
+class StreamTaskClosureCaller : public ClosureCallerBase {
+ public:
+  bool is_stream_;
+  std::function<void (nq_rpc_t rpc)> cb_;
+  std::function<void (nq_stream_t s)> stream_cb_;
+ public:
+  StreamTaskClosureCaller() : cb_() {}
+  StreamTaskClosureCaller(std::function<void (nq_rpc_t)> cb) : is_stream_(false), cb_(cb) {}
+  StreamTaskClosureCaller(std::function<void (nq_stream_t)> cb) : is_stream_(true), stream_cb_(cb) {}
+  ~StreamTaskClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    if (is_stream_) {
+      nq_closure_init(clsr, on_stream_task, &StreamTaskClosureCaller::Call, this);
+    } else {
+      nq_closure_init(clsr, on_rpc_task, &StreamTaskClosureCaller::Call, this);
+    }
+    return clsr;
+  }
+  static void Call(void *arg, nq_stream_t s) { 
+    auto pcc = (StreamTaskClosureCaller *)arg;
+    return pcc->stream_cb_(s);
+  }  
+  static void Call(void *arg, nq_rpc_t rpc) { 
+    auto pcc = (StreamTaskClosureCaller *)arg;
+    return pcc->cb_(rpc);
+  }  
+  inline void InvokeTask(nq_rpc_t rpc) {
+    nq_rpc_task(rpc, closure());
+  }
+  inline void InvokeTask(nq_stream_t s) {
+    nq_stream_task(s, closure());
+  }  
+};
 
 
 class Test {
@@ -490,7 +524,10 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
   opt.timeout = to; \
   nq_rpc_call_ex(stream, type, buff, blen, &opt); \
 }
-
+#define TASK(stream, callback) { \
+  auto *pcc = new nqtest::StreamTaskClosureCaller(callback); \
+  pcc->InvokeTask(stream); \
+}
 #define WATCH_CONN(conn, type, callback) { \
   auto *pcc = new nqtest::type##ClosureCaller(); \
   pcc->cb_ = callback; \

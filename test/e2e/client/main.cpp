@@ -3,6 +3,7 @@
 #include "stream.h"
 #include "timeout.h"
 #include "reconnect.h"
+#include "task.h"
 
 using namespace nqtest;
 
@@ -18,11 +19,15 @@ extern bool is_packet_received(uint64_t cid) {
 
 
 void test_suites(const nq_addr_t &addr, bool skip = true) {
-#if 1
   TRACE("==================== test_rpc ====================");
   {
     Test t(addr, test_rpc);
     if (!t.Run()) { ALERT_AND_EXIT("test_rpc fails"); }
+  }//*/
+  TRACE("==================== test_task ====================");
+  {
+    Test t(addr, test_task);
+    if (!t.Run()) { ALERT_AND_EXIT("test_task fails"); }
   }//*/
   TRACE("==================== test_stream ====================");
   {
@@ -34,7 +39,7 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     auto tmp = addr;
     tmp.port = 28443;
     Test t(addr, test_stream);
-    if (!t.Run()) { ALERT_AND_EXIT("test_stream fails"); }
+    if (!t.Run()) { ALERT_AND_EXIT("test_raw_stream fails"); }
   }//*/
   TRACE("==================== test_timeout ====================");
   {
@@ -58,7 +63,6 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(tmp, test_reconnect_server);
     if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server fails"); }
   }//*/
-#endif
   /*{
     auto tmp = addr;
     tmp.port = 18443;

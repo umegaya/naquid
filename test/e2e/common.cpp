@@ -70,9 +70,9 @@ bool Test::OnStreamOpen(void *arg, nq_stream_t s, void **ppctx) {
   c->should_signal = true;
   if (*ppctx != nullptr) {
     auto cc = (ConnOpenStreamClosureCaller *)(*ppctx);
+    *ppctx = nullptr;
     nq_closure_call(cc->closure(), on_stream_open, s, ppctx);   
     delete cc;
-    *ppctx = nullptr;
   }
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {
@@ -143,9 +143,9 @@ bool Test::OnRpcOpen(void *arg, nq_rpc_t rpc, void **ppctx) {
   c->should_signal = true;
   if (*ppctx != nullptr) {
     auto cc = (ConnOpenStreamClosureCaller *)(*ppctx);
+    *ppctx = nullptr;
     nq_closure_call(cc->closure(), on_rpc_open, rpc, ppctx);   
     delete cc;
-    *ppctx = nullptr;
   }
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {

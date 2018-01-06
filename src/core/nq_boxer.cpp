@@ -38,6 +38,9 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
       case Disconnect:
         p->InvokeStream(op->serial_, op->code_, s, nullptr);
         break;
+      case Task: 
+        p->InvokeStream(op->serial_, op->code_, s, op->task_.callback_, nullptr);
+        break;
 #if defined(USE_WRITE_OP)
       case Send:
         p->InvokeStream(op->serial_, op->code_,

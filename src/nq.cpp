@@ -77,11 +77,12 @@ NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr) {
 static inline NqSession::Delegate *ToConn(nq_conn_t c) { 
   return reinterpret_cast<NqSession::Delegate *>(c.p); 
 }
-#if defined(USE_WRITE_OP)
 static inline NqSession::Delegate *ToConn(nq_rpc_t c) { 
   return reinterpret_cast<NqSession::Delegate *>(c.p); 
 }
-#endif
+static inline NqSession::Delegate *ToConn(nq_stream_t c) { 
+  return reinterpret_cast<NqSession::Delegate *>(c.p); 
+}
 static inline NqAlarm *ToAlarm(nq_alarm_t a) { 
   return reinterpret_cast<NqAlarm *>(a.p); 
 }
@@ -328,6 +329,9 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
     st->Handler<NqStreamHandler>()->Send(data, datalen);
   }, "nq_stream_send");
 }
+NQAPI_THREADSAFE void nq_stream_task(nq_stream_t s, nq_closure_t cb) {
+  NqUnwrapper::UnwrapBoxer(s)->InvokeStream(s.s, NqBoxer::OpCode::Task, nullptr, cb, ToConn(s));
+}
 NQAPI_CLOSURECALL void *nq_stream_ctx(nq_stream_t s) {
   NqSession::Delegate *d;
   UNSAFE_UNWRAP_CONN(s, d, {
@@ -431,6 +435,9 @@ NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_msgid_t msgid, const void *d
 }
 NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
   rpc_reply_common(rpc, NQ_EUSER, msgid, data, datalen);
+}
+NQAPI_THREADSAFE void nq_rpc_task(nq_rpc_t rpc, nq_closure_t cb) {
+  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Task, nullptr, cb, ToConn(rpc));
 }
 NQAPI_CLOSURECALL void *nq_rpc_ctx(nq_rpc_t rpc) {
   NqSession::Delegate *d;

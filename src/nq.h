@@ -54,22 +54,22 @@ typedef struct nq_hdmap_tag *nq_hdmap_t; //nq::HandlerMap
 
 typedef struct nq_conn_tag {
     void *p;    //NqSession::Delegate
-    uint64_t s; //session_index (0-30bit) | reserved (31-63bit)
+    uint64_t s; //see NqConnSerialCodec
 } nq_conn_t;
 
 typedef struct nq_stream_tag {
-    void *p;    //NqSessoin::Delegate(client)/NqServerStream(server)
-    uint64_t s; //session_index (0-30bit) | client_flag (1bit) | stream_index (32-63bit)
+    void *p;    //NqSession::Delegate
+    uint64_t s; //see NqStreamSerialCodec
 } nq_stream_t; 
-
-typedef struct nq_rpc_tag { //this is essentially same as nq_stream, but would helpful to prevent misuse of rpc/stream
-    void *p;    //NqSessoin::Delegate(client)/NqServerStream(server)
-    uint64_t s; //session_index (0-30bit) | client_flag (1bit) | stream_index (32-63bit)
+//this is essentially same as nq_stream, but would helpful to prevent misuse of rpc/stream
+typedef struct nq_rpc_tag {
+    void *p;    //NqSession::Delegate
+    uint64_t s; //see NqStreamSerialCodec
 } nq_rpc_t; 
 
 typedef struct nq_alarm_tag {
   void *p;      //NqAlarm
-  uint64_t s;   //alarm_index (0-31bit) | reserved (32 - 63bit)
+  uint64_t s;   //see NqAlarmSerialCodec
 } nq_alarm_t;
 
 typedef enum {
@@ -97,10 +97,17 @@ typedef struct {
 } nq_addr_t;
 
 
-//closure
-//receive client handshake progress and done event.
+
+// --------------------------
+//
+// Closure type
+//
+// --------------------------
+/* client */
+//receive client handshake progress and done event. note that this usucally called twice to establish connection.
 //optionally you can set arbiter pointer via last argument, which can be retrieved via nq_conn_ctx afterward.
 //TODO(iyatomi): give more imformation for deciding shutdown connection from nq_conn_t
+//TODO(iyatomi): re-evaluate we should call this twice (now mainly because to make open/close callback surely called as pair)
 typedef void (*nq_on_client_conn_open_t)(void *, nq_conn_t, nq_handshake_event_t, void **);
 //client connection closed. after this called, nq_stream_t/nq_rpc_t created by given nq_conn_t, will be invalid.
 //last boolean indicates connection is closed from local or remote. if this function returns positive value, 
@@ -112,12 +119,14 @@ typedef nq_time_t (*nq_on_client_conn_close_t)(void *, nq_conn_t, nq_quic_error_
 typedef void (*nq_on_client_conn_finalize_t)(void *, nq_conn_t, void *);
 
 
+/* server */
 //server connection opened. same as nq_on_client_conn_open_t.
 typedef nq_on_client_conn_open_t nq_on_server_conn_open_t;
-//server connection closed. no reconnection feature
+//server connection closed. same as nq_on_client_conn_close_t but no reconnection feature
 typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_quic_error_t, const char*, bool);
 
 
+/* stream */
 //stream opened. return false to reject stream
 typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void**);
 //stream closed. after this called, nq_stream_t which given to this function will be invalid.
@@ -130,8 +139,13 @@ typedef nq_size_t (*nq_stream_writer_t)(void *, nq_stream_t, const void *, nq_si
 
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
 
+typedef void (*nq_on_stream_task_t)(void *, nq_stream_t);
 
-//rpc opened. return false to reject 
+typedef void *(*nq_create_stream_t)(void *, nq_conn_t);
+
+
+/* rpc */
+//rpc opened. return false to reject rpc
 typedef bool (*nq_on_rpc_open_t)(void *, nq_rpc_t, void**);
 //rpc closed. after this called, nq_stream_t which given to this function will be invalid.
 typedef void (*nq_on_rpc_close_t)(void *, nq_rpc_t);
@@ -142,10 +156,14 @@ typedef void (*nq_on_rpc_notify_t)(void *, nq_rpc_t, uint16_t, const void *, nq_
 
 typedef void (*nq_on_rpc_reply_t)(void *, nq_rpc_t, nq_error_t, const void *, nq_size_t);
 
-typedef void *(*nq_create_stream_t)(void *, nq_conn_t);
+typedef void (*nq_on_rpc_task_t)(void *, nq_rpc_t);
 
+
+/* alarm */
 typedef void (*nq_on_alarm_t)(void *, nq_time_t *);
 
+
+/* closure */
 typedef struct {
   void *arg;
   union {
@@ -162,12 +180,14 @@ typedef struct {
     nq_stream_reader_t stream_reader;
     nq_stream_writer_t stream_writer;
     nq_on_stream_record_t on_stream_record;
+    nq_on_stream_task_t on_stream_task;
 
     nq_on_rpc_open_t on_rpc_open;
     nq_on_rpc_close_t on_rpc_close;
     nq_on_rpc_request_t on_rpc_request;
     nq_on_rpc_reply_t on_rpc_reply;
     nq_on_rpc_notify_t on_rpc_notify;
+    nq_on_rpc_task_t on_rpc_task;
 
     nq_create_stream_t create_stream;
     nq_on_alarm_t on_alarm;
@@ -246,7 +266,6 @@ typedef struct {
 //create server which has n_worker of workers
 NQAPI_THREADSAFE nq_server_t nq_server_create(int n_worker);
 //listen and returns handler map associated with it. 
-// TODO(iyatomi): make it NQAPI_THREADSAFE
 NQAPI_BOOTSTRAP nq_hdmap_t nq_server_listen(nq_server_t sv, const nq_addr_t *addr, const nq_svconf_t *config);
 //if block is true, nq_server_start blocks until some other thread calls nq_server_join. 
 NQAPI_BOOTSTRAP void nq_server_start(nq_server_t sv, bool block);
@@ -336,9 +355,11 @@ NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid);
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s);
 //send arbiter byte array/arbiter object to stream peer. 
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
+//schedule execution of closure which is given to cb, will called with given s.
+NQAPI_THREADSAFE void nq_stream_task(nq_stream_t s, nq_closure_t cb);
 //check equality of nq_stream_t
 static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
-//get quic stream id. this may change as you re-created stream on reconnection. 
+//get stream id. this may change as you re-created stream on reconnection. 
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
 //get context, which is set at nq_conn_stream. only safe with nq_stream_t which passed to closure callbacks
@@ -381,9 +402,11 @@ NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen);
 //send error response to specified request. data and datalen is error detail
 NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen);
+//schedule execution of closure which is given to cb, will called with given rpc.
+NQAPI_THREADSAFE void nq_rpc_task(nq_rpc_t rpc, nq_closure_t cb);
 //check equality of nq_rpc_t
 static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
-//get quic stream id. this may change as you re-created rpc on reconnection.
+//get rpc id. this may change as you re-created rpc on reconnection.
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc);
 //get context, which is set at nq_conn_rpc. only safe with nq_rpc_t which passed to closure callbacks
@@ -460,7 +483,7 @@ typedef enum {
   NQ_LOGLV_WARN,
   NQ_LOGLV_ERROR,
   NQ_LOGLV_FATAL,            
-  NQ_LOGLV_REPORT,
+  NQ_LOGLV_REPORT, //intend to use for msg that is very important, but not error.
   NQ_LOGLV_MAX,
 } nq_loglv_t;
 //structured log param

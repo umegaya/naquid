@@ -294,7 +294,6 @@ NqClientStream *NqClient::StreamManager::FindOrCreateStream(
   auto it = stream_map_.find(stream_index);
   if (it != stream_map_.end()) {
     auto &e = it->second;
-    //TODO(iyatomi): somehow enable this code to allow user to create 
     /*if (e.name_.length() > 0) {
       auto s = e.Stream();
       if (s == nullptr && connected) {

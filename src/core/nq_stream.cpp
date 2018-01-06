@@ -286,7 +286,6 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, n
   auto req = new Request(this, msgid, cb);
   req_map_[msgid] = req;
   auto now = nq_time_now();
-  TRACE("EntryRequest timeout %llu ns", timeout_duration_ts);
   req->Start(loop_, now + timeout_duration_ts);
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {

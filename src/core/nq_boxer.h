@@ -31,6 +31,7 @@ class NqBoxer {
     Start,
     CreateStream,
     CreateRpc,
+    Task,
 #if defined(USE_WRITE_OP)
     Send,
     Call,
@@ -92,6 +93,9 @@ class NqBoxer {
         char *name_;
         void *ctx_;
       } stream_;
+      struct {
+        nq_closure_t callback_;
+      } task_;
     };
     Op(uint64_t serial, void *target_ptr, OpCode code, OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {}
@@ -100,6 +104,10 @@ class NqBoxer {
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       alarm_.invocation_ts_ = ts;
       alarm_.callback_ = cb;
+    }
+    Op(uint64_t serial, void *target_ptr, OpCode code, nq_closure_t cb, OpTarget target) : 
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
+      task_.callback_ = cb;
     }
     Op(uint64_t serial, void *target_ptr, OpCode code, const char *name, void *ctx, 
       OpTarget target) : 
@@ -239,6 +247,19 @@ class NqBoxer {
     } else {
       ASSERT(d != nullptr);
       Enqueue(new Op(serial, d, code, OpTarget::Stream));
+    }
+  }
+  inline void InvokeStream(uint64_t serial, OpCode code, NqStream *unboxed, nq_closure_t cb, NqSession::Delegate *d) {
+    //UnboxResult r = UnboxResult::Ok;
+    //always enter queue to be safe when this call inside protocol handler
+    if (unboxed != nullptr) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == Task);
+        unboxed->RunTask(cb);
+      }
+    } else {
+      ASSERT(d != nullptr);
+      Enqueue(new Op(serial, d, code, cb, OpTarget::Stream));
     }
   }
 #if defined(USE_WRITE_OP)

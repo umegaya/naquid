@@ -69,6 +69,15 @@ class NqStream : public QuicStream {
   bool set_protocol(const std::string &name);
   nq_conn_t conn();
 
+  //following code assumes nq_stream_t and nq_rpc_t has exactly same way to create and memory layout, 
+  //which can be partially checked this static assertion.
+  STATIC_ASSERT(sizeof(nq_stream_t) == sizeof(nq_rpc_t) && sizeof(nq_stream_t) == 16, "size difer");
+  STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 0, "offset of p differ");
+  STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 8, "offset of s differ");
+  //FYI(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
+  inline void RunTask(nq_closure_t cb) {
+    return nq_closure_call(cb, on_stream_task, ToHandle<nq_stream_t>());
+  }
   template <class T> inline T *Handler() const { return static_cast<T *>(handler_.get()); }
   template <class H> inline H ToHandle() { return { .p = stream_ptr_, .s = stream_serial_ }; }
 
@@ -132,15 +141,8 @@ public:
   virtual void Send(const void *p, nq_size_t len) = 0;  
 
   //operation
-  //following code assumes nq_stream_t and nq_rpc_t just has same way to create, 
-  //which can be partially checked this static assertion.
-  //if so, it passes nq_stream_t but it can be treated as nq_rpc_t for that kind of stream, too. 
-  STATIC_ASSERT(sizeof(nq_stream_t) == sizeof(nq_rpc_t) && sizeof(nq_stream_t) == 16, "size difer");
-  STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 0, "offset of p differ");
-  STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 8, "offset of s differ");
-  //FYI(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
+  //it has same assumption and restriction as NqStream::RunTask
   inline bool OnOpen() { 
-    TRACE("NqSreamHandler::OnOpen");
     return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), stream_->ContextBuffer());
   }
   inline void OnClose() { nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); }
