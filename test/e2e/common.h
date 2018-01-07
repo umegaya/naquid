@@ -252,11 +252,13 @@ class Test {
   struct Conn;
   struct RunOptions {
     nq_time_t idle_timeout, handshake_timeout, rpc_timeout, execute_duration;
+    bool raw_mode;
     RunOptions() {
       idle_timeout = nq_time_sec(60);
       handshake_timeout = nq_time_sec(60);
       rpc_timeout = nq_time_sec(60);
       execute_duration = 0;
+      raw_mode = false;
     }
   };
   typedef std::function<void (bool)> Latch;

@@ -20,12 +20,6 @@ NqStream::NqStream(QuicStreamId id, NqSession* nq_session,
   establish_side_(establish_side),
   established_(false), proto_sent_(false) {
   nq_session->RegisterStreamPriority(id, priority);
-  auto rh = nq_session->handler_map()->RawHandler();
-  if (rh != nullptr) {
-    handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(rh));
-    proto_sent_ = true;
-    established_ = true;
-  }
 }
 NqSession *NqStream::nq_session() { 
   return static_cast<NqSession *>(session()); 
@@ -41,9 +35,27 @@ NqSessionIndex NqStream::session_index() const {
 nq_conn_t NqStream::conn() { 
   return nq_session()->conn(); 
 }
+bool NqStream::TryOpenRawHandler(bool *p_on_open_result) {
+  auto rh = nq_session()->handler_map()->RawHandler();
+  if (rh != nullptr) {
+    handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(rh));
+    proto_sent_ = true;
+    established_ = true;
+    *p_on_open_result = handler_->OnOpen();
+    TRACE("TryOpenRawHandler: established!");
+    return true;
+  }
+  return false;
+}
 bool NqStream::OpenHandler(const std::string &name, bool update_buffer_with_name) {
   if (handler_ != nullptr) {
     return establish_side(); //because non establish side never call this twice.
+  }
+  bool on_open_result;
+  if (TryOpenRawHandler(&on_open_result)) {
+    //should open raw handler but OnOpen fails. 
+    //caller behave same as usual handler_->OnOpen failure
+    return on_open_result;
   }
   //FYI(iyatomi): name.c_str() will create new string without null terminate
   handler_ = std::unique_ptr<NqStreamHandler>(CreateStreamHandler(name.c_str()));
@@ -110,8 +122,8 @@ NqStreamHandler *NqStream::CreateStreamHandler(const nq::HandlerMap::HandlerEntr
   return s;
 }
 void NqStream::Disconnect() {
-  //WriteOrBufferData(QuicStringPiece(), true, nullptr);
-  //CloseReadSide(); //prevent further receiving packet
+  //auto b = NqUnwrapper::UnwrapBoxer(NqStreamSerialCodec::IsClient(stream_serial_), nq_session());
+  //b->InvokeStream(stream_serial_, NqBoxer::OpCode::Disconnect, nullptr, nq_session());
   nq_session()->CloseStream(id());
 }
 void NqStream::OnClose() {
@@ -127,10 +139,17 @@ void NqStream::OnDataAvailable() {
   //greedy read and called back
   struct iovec v[256];
   int n_blocks = sequencer()->GetReadableRegions(v, 256);
-  int i = 0;
+  int i = 0; bool on_raw_open_result;
   if (!established_) {
     //establishment
     if (establish_side()) {
+      established_ = true;
+    } else if (TryOpenRawHandler(&on_raw_open_result)) {
+      if (!on_raw_open_result) {
+        Disconnect();
+        return;
+      }
+      set_proto_sent();
       established_ = true;
     } else {
       for (;i < n_blocks;) {
@@ -289,7 +308,7 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, n
   req->Start(loop_, now + timeout_duration_ts);
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
-  //fprintf(stderr, "stream %llx handler OnRecv %u bytes\n", stream_->stream_serial(), len);
+  fprintf(stderr, "stream %llx handler OnRecv %u bytes\n", stream_->stream_serial(), len);
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
   //prepare tmp variables

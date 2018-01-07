@@ -42,7 +42,7 @@ NqStream *NqServerSession::FindStreamBySerial(uint64_t s, bool include_closed) {
   //but better to handle so-many-stream per session case separately
   for (auto &kv : dynamic_streams()) {
     auto st = static_cast<NqStream *>(kv.second.get());
-    TRACE("FindStreamBySerial: %p(a), s = %llx, sts = %llx %p", this, s, st->stream_serial(), st);
+    TRACE("FindStreamBySerial: %p(a), s = %llx, sts = %llx %p %p", this, s, st->stream_serial(), st, static_cast<NqServerStream *>(st)->context());
     if (st->stream_serial() == s) {
       return st;
     }

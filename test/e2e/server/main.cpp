@@ -344,18 +344,6 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
 
   nq_hdmap_t hm = nq_server_listen(sv, &addr, &conf);
 
-  if (svconfig != nullptr && svconfig->raw_mode) {
-    printf("rawmode\n");
-    nq_stream_handler_t rsh;
-    nq_closure_init(rsh.on_stream_open, on_stream_open, on_stream_open, nullptr);
-    nq_closure_init(rsh.on_stream_close, on_stream_close, on_stream_close, nullptr);
-    nq_closure_init(rsh.on_stream_record, on_stream_record, on_stream_record, nullptr);
-    nq_closure_init(rsh.stream_reader, stream_reader, stream_reader, nullptr);
-    nq_closure_init(rsh.stream_writer, stream_writer, stream_writer, nullptr);
-    nq_hdmap_raw_handler(hm, rsh);
-    return;
-  }
-
   nq_rpc_handler_t rh;
   rh.timeout = 0; //use default
   nq_closure_init(rh.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
@@ -379,6 +367,17 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   ssh.stream_reader = nq_closure_empty();
   ssh.stream_writer = nq_closure_empty();
   nq_hdmap_stream_handler(hm, "sst", ssh);
+
+  //for testing raw handler ignores other handlers
+  if (svconfig != nullptr && svconfig->raw_mode) {
+    nq_stream_handler_t rmh;
+    nq_closure_init(rmh.on_stream_open, on_stream_open, on_stream_open, nullptr);
+    nq_closure_init(rmh.on_stream_close, on_stream_close, on_stream_close, nullptr);
+    nq_closure_init(rmh.on_stream_record, on_stream_record, on_stream_record, nullptr);
+    nq_closure_init(rmh.stream_reader, stream_reader, stream_reader, nullptr);
+    nq_closure_init(rmh.stream_writer, stream_writer, stream_writer, nullptr);
+    nq_hdmap_raw_handler(hm, rmh);
+  }
 }
 
 
@@ -401,11 +400,11 @@ int main(int argc, char *argv[]){
   setup_server(sv, 8443, nullptr);
   server_config scf = {
     .quic_secret = "8b090e1a7f6b40a818f3563160bd43e1",
-    .raw_mode = false
   };
   int reject_counter[4] = {
     1, 2, 1, 1,
   };
+  scf.raw_mode = false;
   nq_closure_init(scf.on_server_conn_open, on_server_conn_open, on_conn_open_reject, reject_counter + 0);
   nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open_reject, reject_counter + 1);
   nq_closure_init(scf.on_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 2);
@@ -414,8 +413,9 @@ int main(int argc, char *argv[]){
 
   if (n_threads <= 1) {
     server_config scf2 = {
-      .raw_mode = true,
+      .quic_secret = nullptr,
     };
+    scf2.raw_mode = true;
     setup_server(sv, 28443, &scf2);
   }
 

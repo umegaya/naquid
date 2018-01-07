@@ -46,6 +46,7 @@ class NqStream : public QuicStream {
       proto_sent_ = true;
     }
   }
+  bool TryOpenRawHandler(bool *p_on_open_fail);
   bool OpenHandler(const std::string &name, bool update_buffer_with_name);
 
   void Disconnect();

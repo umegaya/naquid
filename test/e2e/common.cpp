@@ -223,6 +223,17 @@ void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
   ssh.stream_writer = nq_closure_empty();
   nq_hdmap_stream_handler(hm, "sst", ssh);
   //tc.AddStream(nq_conn_stream(tc.c, "sst"));
+
+  if (options.raw_mode) {
+    nq_stream_handler_t rmh;
+    nq_closure_init(rmh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
+    nq_closure_init(rmh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
+    nq_closure_init(rmh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
+    nq_closure_init(rmh.stream_reader, stream_reader, &Test::StreamReader, ptc);
+    nq_closure_init(rmh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
+    nq_hdmap_raw_handler(hm, rmh);
+    return;
+  }
 }
 
 

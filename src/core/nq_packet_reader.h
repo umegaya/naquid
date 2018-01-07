@@ -15,7 +15,11 @@
 
 #include "basis/endian.h"
 
+#if defined(__linux__)
+#define MMSG_MORE 1
+#else
 #define MMSG_MORE 0
+#endif
 
 namespace net {
 
@@ -131,7 +135,7 @@ class NqPacketReader {
     // cbuf is used for ancillary data from the kernel on recvmmsg.
     char cbuf[QuicSocketUtils::kSpaceForCmsg];
     // buf is used for the data read from the kernel on recvmmsg.
-    std::unique_ptr<char> buf;
+    char *buf;
   };
   // TODO(danzh): change it to be a pointer to avoid the allocation on the stack
   // from exceeding maximum allowed frame size.

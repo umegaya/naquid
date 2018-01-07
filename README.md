@@ -13,7 +13,7 @@
 - [x] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
 - [ ] conn: enable MMSG_MORE for linux
 - [ ] conn: handle connectivity change (if not handled)
-- [ ] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
+- [x] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
 - [x] API: use direct pointer to access conn/stream
 - [x] API: consider the good way to integrate nq_error_t and user defined error code, as the value of nq_result_t of nq_rpc_reply.
 - [x] API: more API to thread safe 

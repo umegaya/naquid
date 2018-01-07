@@ -72,6 +72,7 @@ bool NqPacketReader::Read(
     Delegate *delegate,
     QuicPacketCount* packets_dropped) {
 #if MMSG_MORE
+  logger::info("mmsg_more enabled");
   return ReadPacketsMulti(fd, port, clock, delegate, packets_dropped);
 #else
   return ReadPackets(fd, port, clock, delegate,

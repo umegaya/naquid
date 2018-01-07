@@ -36,10 +36,14 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
   }//*/
   TRACE("==================== test_raw_stream ====================");
   {
+    Test::RunOptions o;
+    o.raw_mode = true;
+
     auto tmp = addr;
     tmp.port = 28443;
-    Test t(addr, test_stream);
-    if (!t.Run()) { ALERT_AND_EXIT("test_raw_stream fails"); }
+
+    Test t(tmp, test_stream);
+    if (!t.Run(&o)) { ALERT_AND_EXIT("test_raw_stream fails"); }
   }//*/
   TRACE("==================== test_timeout ====================");
   {
