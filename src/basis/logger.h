@@ -34,6 +34,11 @@ namespace logger {
     ASSERT(j.is_object() || j.is_string());
     if (lv >= level::debug) {
       json &mj = const_cast<json &>(j);
+      if (j.is_string()) {
+        mj = {
+          {"msg", j},
+        };
+      }
       //fill default properties
       long sec, nsec;
       clock::now(sec, nsec);

@@ -20,6 +20,7 @@
 #include "net/tools/quic/quic_process_packet_interface.h"
 
 #include "basis/syscall.h"
+#include "basis/logger.h"
 
 #ifndef SO_RXQ_OVFL
 #define SO_RXQ_OVFL 40
@@ -72,7 +73,6 @@ bool NqPacketReader::Read(
     Delegate *delegate,
     QuicPacketCount* packets_dropped) {
 #if MMSG_MORE
-  logger::info("mmsg_more enabled");
   return ReadPacketsMulti(fd, port, clock, delegate, packets_dropped);
 #else
   return ReadPackets(fd, port, clock, delegate,
@@ -90,13 +90,13 @@ bool NqPacketReader::ReadPacketsMulti(
   for (int i = 0; i < kNumPacketsPerReadMmsgCall; ++i) {
     DCHECK_EQ(kMaxPacketSize, packets_[i].iov.iov_len);
     if (packets_[i].buf == nullptr) { //if packet send to queue or consumed, assign new one.
-      packets_[i].buf = NewBuffer();
-      packets_[i].iov.iov_base = p->buffer();
-      packets_[i].packet.reset(p);
+      auto buf = NewBuffer();
+      packets_[i].buf = buf;
+      packets_[i].iov.iov_base = buf;
     }
     msghdr* hdr = &mmsg_hdr_[i].msg_hdr;
     hdr->msg_namelen = sizeof(sockaddr_storage);
-    DCHECK_EQ(1, hdr->msg_iovlen);
+    DCHECK_EQ(static_cast<size_t>(1), hdr->msg_iovlen);
     hdr->msg_controllen = QuicSocketUtils::kSpaceForCmsg;
   }
 
@@ -138,11 +138,12 @@ bool NqPacketReader::ReadPacketsMulti(
     QuicTime timestamp = clock.ConvertWallTimeToQuicTime(packet_walltimestamp);
     int ttl = 0;
     bool has_ttl = QuicSocketUtils::GetTtlFromMsghdr(&mmsg_hdr_[i].msg_hdr, &ttl);
-    auto packet = NewPacket(packets_[i].buf.release(),
-                              mmsg_hdr_[i].msg_len, timestamp, false, ttl,
+    auto packet = NewPacket(packets_[i].buf,
+                              mmsg_hdr_[i].msg_len, timestamp, ttl,
                               has_ttl, packets_[i].raw_address, server_ip, port);
     packet->set_port(port);
     delegate->OnRecv(packet);
+    packets_[i].buf = nullptr;
   }
 
   if (packets_dropped != nullptr) {

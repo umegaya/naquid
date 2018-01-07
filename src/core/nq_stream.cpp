@@ -308,7 +308,7 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, n
   req->Start(loop_, now + timeout_duration_ts);
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
-  fprintf(stderr, "stream %llx handler OnRecv %u bytes\n", stream_->stream_serial(), len);
+  //fprintf(stderr, "stream %llx handler OnRecv %u bytes\n", stream_->stream_serial(), len);
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
   //prepare tmp variables
