@@ -11,7 +11,7 @@
 #include "core/nq_alarm.h"
 #include "core/nq_serial_codec.h"
 
-//#define USE_WRITE_OP (1)
+//#define USE_DIRECT_WRITE (1)
 
 namespace net {
 class NqLoop;
@@ -29,16 +29,13 @@ class NqBoxer {
     Flush,
     Finalize,
     Start,
-    CreateStream,
-    CreateRpc,
+    OpenStream,
     Task,
-#if defined(USE_WRITE_OP)
     Send,
     Call,
     CallEx,
     Reply,
     Notify,
-#endif
   };
   enum OpTarget : uint8_t {
     Invalid = 0,
@@ -112,10 +109,11 @@ class NqBoxer {
     Op(uint64_t serial, void *target_ptr, OpCode code, const char *name, void *ctx, 
       OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
-      stream_.name_ = strdup(name);
-      stream_.ctx_ = ctx;
+      if (*name != 0) {
+        stream_.name_ = strdup(name);
+        stream_.ctx_ = ctx;
+      }
     }
-#if defined(USE_WRITE_OP)
     Op(uint64_t serial, void *target_ptr, OpCode code, const void *data, nq_size_t datalen, 
        OpTarget target = OpTarget::Stream) : 
       serial_(serial), code_(code), target_(target), data_(data, datalen) {}
@@ -145,7 +143,6 @@ class NqBoxer {
       reply_.result_ = result;
       reply_.msgid_ = msgid;
     }
-#endif
     ~Op() {}
   };
   class Processor : public moodycamel::ConcurrentQueue<Op*> {
@@ -203,7 +200,7 @@ class NqBoxer {
     //always enter queue to be safe when this call inside protocol handler
     if (from_queue) {
       if (unboxed->SessionSerial() == serial) {
-        unboxed->NewStream(name, ctx);
+        unboxed->OpenStream(name, ctx);
       } else {
         //already got invalid
       }
@@ -262,7 +259,6 @@ class NqBoxer {
       Enqueue(new Op(serial, d, code, cb, OpTarget::Stream));
     }
   }
-#if defined(USE_WRITE_OP)
   inline void InvokeStream(uint64_t serial, OpCode code, 
                            const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {
     if (unboxed != nullptr) {
@@ -321,7 +317,6 @@ class NqBoxer {
       Enqueue(new Op(serial, d, code, result, msgid, data, datalen));
     }
   }
-#endif
 
   
   template <class H>

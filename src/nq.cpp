@@ -99,6 +99,7 @@ static nq::logger::level::def cr_severity_to_nq_map[] = {
 };
 static bool nq_chromium_logger(int severity,
   const char* file, int line, size_t message_start, const std::string& str) {
+  ASSERT(severity < logging::LOG_FATAL);
   auto lv = cr_severity_to_nq_map[severity + 1];
   nq::logger::log(lv, {
     {"tag", "crlog"},
@@ -283,8 +284,16 @@ NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn) {
 // stream API
 //
 // --------------------------
+static inline void conn_stream_common(nq_conn_t conn, const char *name, void *ctx, const char *purpose) {
+  NqSession::Delegate *d;
+  UNWRAP_CONN(conn, d, ({
+    d->InitStream(name, ctx);
+  }), purpose);
+}
+
+
 NQAPI_THREADSAFE void nq_conn_stream(nq_conn_t conn, const char *name, void *ctx) {
-  NqUnwrapper::UnwrapBoxer(conn)->InvokeConn(conn.s, NqBoxer::OpCode::CreateStream, ToConn(conn), name, ctx);
+  conn_stream_common(conn, name, ctx, "nq_conn_stream");
 }
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
   NqSession::Delegate *d;
@@ -318,10 +327,7 @@ NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid) {
   return false;
 }
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s) {
-  NqStream *st;
-  UNWRAP_STREAM(s, st, {
-    st->Disconnect();
-  }, "nq_stream_close");
+  NqUnwrapper::UnwrapBoxer(s)->InvokeStream(s.s, NqBoxer::OpCode::Disconnect, nullptr, ToConn(s));
 }
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen) {
   NqStream *st;
@@ -354,8 +360,21 @@ NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s) {
 // rpc API
 //
 // --------------------------
+static inline void rpc_reply_common(nq_rpc_t rpc, nq_error_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
+#if defined(USE_WRITE_OP)
+  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen, nullptr, ToConn(rpc));
+#else
+  ASSERT(result <= 0);
+  NqStream *st;
+  UNWRAP_STREAM(rpc, st, {
+    st->Handler<NqSimpleRPCStreamHandler>()->Reply(result, msgid, data, datalen);
+  }, result < 0 ? "nq_rpc_error" : "nq_rpc_reply");
+#endif
+}
+
+
 NQAPI_THREADSAFE void nq_conn_rpc(nq_conn_t conn, const char *name, void *ctx) {
-  NqUnwrapper::UnwrapBoxer(conn)->InvokeConn(conn.s, NqBoxer::OpCode::CreateRpc, ToConn(conn), name, ctx);
+  conn_stream_common(conn, name, ctx, "nq_conn_rpc");
 }
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   NqSession::Delegate *d;
@@ -389,10 +408,7 @@ NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t rpc, bool *p_valid) {
   return false;
 }
 NQAPI_THREADSAFE void nq_rpc_close(nq_rpc_t rpc) {
-  NqStream *st;
-  UNWRAP_STREAM(rpc, st, {
-    st->Disconnect();
-  }, "nq_rpc_close");
+  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Disconnect, nullptr, ToConn(rpc));
 }
 NQAPI_THREADSAFE void nq_rpc_call(nq_rpc_t rpc, int16_t type, const void *data, nq_size_t datalen, nq_closure_t on_reply) {
 #if defined(USE_WRITE_OP)
@@ -418,17 +434,6 @@ NQAPI_THREADSAFE void nq_rpc_notify(nq_rpc_t rpc, int16_t type, const void *data
   UNWRAP_STREAM(rpc, st, {
     st->Handler<NqSimpleRPCStreamHandler>()->Notify(type, data, datalen);
   }, "nq_rpc_notify");
-}
-static inline void rpc_reply_common(nq_rpc_t rpc, nq_error_t result, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
-#if defined(USE_WRITE_OP)
-  NqUnwrapper::UnwrapBoxer(rpc)->InvokeStream(rpc.s, NqBoxer::OpCode::Reply, result, msgid, data, datalen, nullptr, ToConn(rpc));
-#else
-  ASSERT(result <= 0);
-  NqStream *st;
-  UNWRAP_STREAM(rpc, st, {
-    st->Handler<NqSimpleRPCStreamHandler>()->Reply(result, msgid, data, datalen);
-  }, result < 0 ? "nq_rpc_error" : "nq_rpc_reply");
-#endif
 }
 NQAPI_THREADSAFE void nq_rpc_reply(nq_rpc_t rpc, nq_msgid_t msgid, const void *data, nq_size_t datalen) {
   rpc_reply_common(rpc, NQ_OK, msgid, data, datalen);

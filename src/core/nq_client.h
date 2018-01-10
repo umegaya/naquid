@@ -20,6 +20,7 @@ namespace net {
 class QuicServerId;
 class NqClientLoop;
 class NqClientStream;
+class NqBoxer;
 
 class NqClient : public QuicClientBase, 
                  public QuicAlarm::Delegate,
@@ -65,7 +66,7 @@ class NqClient : public QuicClientBase,
    public:
     StreamManager() : stream_map_(), index_seed_() {}
     
-    bool OnOutgoingOpen(NqClientSession *session, bool connected, 
+    bool OnOutgoingOpen(NqClient *client, bool connected,
                         const std::string &name, void *ctx);
     bool OnIncomingOpen(NqClientStream *s);
     void OnClose(NqClientStream *s);
@@ -77,6 +78,7 @@ class NqClient : public QuicClientBase,
 
     //recover all created outgoing streams on reconnection done
     void RecoverOutgoingStreams(NqClientSession *session);
+    void CleanupStreamsOnClose();
     
     //it should be used by non-owner thread of this client. 
     inline void *FindContext(NqStreamIndex index) const {
@@ -164,7 +166,8 @@ class NqClient : public QuicClientBase,
   uint64_t ReconnectDurationUS() const override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
-  bool NewStream(const std::string &name, void *ctx) override;
+  void InitStream(const std::string &name, void *ctx) override;
+  void OpenStream(const std::string &name, void *ctx) override;
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
   NqLoop *GetLoop() override;
   QuicConnection *Connection() override { return session()->connection(); }

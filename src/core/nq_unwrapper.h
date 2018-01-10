@@ -168,6 +168,7 @@ class NqUnwrapper {
   } else { \
     auto m = NqUnwrapper::UnwrapMutex(__handle); \
     if (m != nullptr) { \
+      /* TRACE("UNWRAP_CONN(%s): try lock %p", __purpose, m); */ \
       std::unique_lock<std::mutex> lock(*m); \
       __d = NqUnwrapper::UnwrapConn(__handle); \
       if (__d != nullptr) { \
@@ -175,6 +176,7 @@ class NqUnwrapper {
       } else { \
         TRACE("UNWRAP_CONN(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
       } \
+      /* TRACE("UNWRAP_CONN(%s): try lock exit %p", __purpose, m); */ \
     } else { \
       __d = NqUnwrapper::UnwrapConn(__handle); \
       if (__d != nullptr) { \
@@ -195,15 +197,15 @@ class NqUnwrapper {
   } else { \
     auto m = NqUnwrapper::UnwrapMutex(__handle); \
     if (m != nullptr) { \
-      /*TRACE("UNWRAP_STREAM(%s): try lock %p", __purpose, m);//*/ \
+      /* TRACE("UNWRAP_STREAM(%s): try lock %p", __purpose, m); */\
       std::unique_lock<std::mutex> lock(*m); \
-      /*TRACE("UNWRAP_STREAM(%s): try lock success %p", __purpose, m);//*/ \
       __s = NqUnwrapper::UnwrapStream(__handle); \
       if (__s != nullptr) { \
         __code; \
       } else { \
         TRACE("UNWRAP_STREAM(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
       } \
+      /* TRACE("UNWRAP_STREAM(%s): try lock exit %p", __purpose, m); */\
     } else { \
       __s = NqUnwrapper::UnwrapStream(__handle); \
       if (__s != nullptr) { \
@@ -211,6 +213,19 @@ class NqUnwrapper {
       } else { \
         TRACE("UNWRAP_STREAM(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
       } \
+    } \
+  } \
+}
+#define UNWRAP_STREAM_OR_RESCUE(__handle, __s, __boxer, __code, __rescue, __purpose) { \
+  if (__handle.s == 0) { \
+    TRACE("UNWRAP_STREAM_OR_RESCUE(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
+  } else { \
+    __boxer = NqUnwrapper::UnwrapBoxer(__handle); \
+    if (__boxer->MainThread()) { \
+      __s = __boxer->FindStream(__handle.s, __handle.p); \
+      __code; \
+    } else { \
+      __rescue; \
     } \
   } \
 }

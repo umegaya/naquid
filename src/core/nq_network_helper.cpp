@@ -123,11 +123,10 @@ QuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
 
 void NqNetworkHelper::OnRecv(NqPacketReader::Packet *p) {
   //self == server, peer == client
-#if defined(USE_WRITE_OP)
+#if !defined(USE_DIRECT_WRITE)
   client_->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
 #else
   auto m = &(client_->static_mutex());
-  //TRACE("NqNetworkHelper try get static mutex %p", m);
   std::unique_lock<std::mutex> session_lock(*m);
   loop_->LockSession(client_->session_index());
   //TRACE("NqNetworkHelper try get static mutex success %p", m);

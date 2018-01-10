@@ -8,26 +8,25 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
     switch (op->target_) {
     case Conn: {
       auto c = reinterpret_cast<NqSession::Delegate *>(op->target_ptr_);
-#if !defined(USE_WRITE_OP)
+#if defined(USE_DIRECT_WRITE)
       auto m = NqUnwrapper::UnsafeUnwrapMutex(NqConnSerialCodec::IsClient(op->serial_), c);
       std::unique_lock<std::mutex> lock(*m);
       p->LockSession(NqConnSerialCodec::SessionIndex(op->serial_));
 #endif
       switch (op->code_) {
-      case CreateStream:
-      case CreateRpc:
+      case OpenStream:
         p->InvokeConn(op->serial_, op->code_, c, op->stream_.name_, op->stream_.ctx_, true);
         break;
       default:
         p->InvokeConn(op->serial_, op->code_, c, true);
         break;
       }
-#if !defined(USE_WRITE_OP)
+#if defined(USE_DIRECT_WRITE)
       p->UnlockSession();
 #endif
     } break;
     case Stream: {
-#if !defined(USE_WRITE_OP)
+#if defined(USE_DIRECT_WRITE)
       auto c = reinterpret_cast<NqSession::Delegate *>(op->target_ptr_);
       auto m = NqUnwrapper::UnsafeUnwrapMutex(NqStreamSerialCodec::IsClient(op->serial_), c);
       std::unique_lock<std::mutex> lock(*m);
@@ -41,7 +40,6 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
       case Task: 
         p->InvokeStream(op->serial_, op->code_, s, op->task_.callback_, nullptr);
         break;
-#if defined(USE_WRITE_OP)
       case Send:
         p->InvokeStream(op->serial_, op->code_,
                        op->data_.ptr(), op->data_.length(), s, nullptr);
@@ -62,12 +60,11 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
         p->InvokeStream(op->serial_, op->code_, op->reply_.result_, 
                         op->reply_.msgid_, op->data_.ptr(), op->data_.length(), s, nullptr);
         break;
-#endif
       default:
         ASSERT(false);
         break;
       }
-#if !defined(USE_WRITE_OP)
+#if defined(USE_WRITE_OP)
       p->UnlockSession();
 #endif
     } break;

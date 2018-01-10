@@ -159,6 +159,8 @@ void NqClient::OnClose(QuicErrorCode error,
     //or nq_conn_close to remove completely.
     connect_state_ = DISCONNECT;
   }
+  //remove non established outgoing streams.
+  stream_manager_.CleanupStreamsOnClose();
   return;
 }
 void NqClient::Disconnect() {
@@ -202,13 +204,15 @@ nq::HandlerMap* NqClient::ResetHandlerMap() {
   own_handler_map_.reset(new nq::HandlerMap());
   return own_handler_map_.get();
 }
-//TODO(iyatomi): concurrency limitation with NewStream
 NqClientStream *NqClient::FindOrCreateStream(NqStreamIndex index) {
   return stream_manager_.FindOrCreateStream(nq_session(), index, connect_state_ == CONNECTED);
 }
-//TODO(iyatomi): concurrency limitation with FindOrCreateStream
-bool NqClient::NewStream(const std::string &name, void *ctx) {
-  return stream_manager_.OnOutgoingOpen(nq_session(), connect_state_ == CONNECTED, name, ctx);
+void NqClient::InitStream(const std::string &name, void *ctx) {
+  TRACE("NqClient::InitStream");
+  stream_manager_.OnOutgoingOpen(this, connect_state_ == CONNECTED, name, ctx);
+}
+void NqClient::OpenStream(const std::string &, void *) {
+  stream_manager_.RecoverOutgoingStreams(nq_session());
 }
 QuicCryptoStream *NqClient::NewCryptoStream(NqSession* session) {
   return new QuicCryptoClientStream(server_id(), session,  new ProofVerifyContext(), crypto_config(), this);
@@ -218,16 +222,19 @@ QuicCryptoStream *NqClient::NewCryptoStream(NqSession* session) {
 
 //ReconnectAlarm
 void NqClient::ReconnectAlarm::OnAlarm() { 
+#if defined(USE_DIRECT_WRITE)
   auto loop = client_->loop_;
   loop->LockSession(client_->session_index());
   auto m = &(client_->static_mutex());
   std::unique_lock<std::mutex> session_lock(*m);
+#endif
 
   client_->Initialize();
   client_->StartConnect(); 
   //here, this already become invalid. but loop can be used
-
+#if defined(USE_DIRECT_WRITE)
   loop->UnlockSession();  
+#endif
 }
 
 
@@ -258,6 +265,10 @@ void NqClient::StreamManager::RecoverOutgoingStreams(NqClientSession *session) {
     }
   }
 }
+void NqClient::StreamManager::CleanupStreamsOnClose() {
+  TRACE("CleanupStreamsOnClose");
+  stream_map_.clear(); //after that stream_map_.erase may called.
+}
 bool NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
   ASSERT((s->id() % 2) == 0); //must be incoming stream from server (server outgoing stream)
   auto idx = index_seed_.New();
@@ -269,7 +280,7 @@ void NqClient::StreamManager::OnIncomingClose(NqClientStream *s) {
   stream_map_.erase(s->stream_index());
 }
 
-bool NqClient::StreamManager::OnOutgoingOpen(NqClientSession *session, bool connected, 
+bool NqClient::StreamManager::OnOutgoingOpen(NqClient *client, bool connected,
                                             const std::string &name, void *ctx) {
   auto idx = index_seed_.New();
   auto r = stream_map_.emplace(idx, Entry(nullptr, name));
@@ -279,7 +290,7 @@ bool NqClient::StreamManager::OnOutgoingOpen(NqClientSession *session, bool conn
     r.first->second.context_ = ctx;
     if (connected) {
       //when connected means RecoverOutgoingStreams is not called automatically in NqClient::OnOpen.
-      RecoverOutgoingStreams(session);
+      client->boxer()->InvokeConn(client->session_serial_, NqBoxer::OpCode::OpenStream, client, name.c_str(), ctx);
     }
     return true;
   }

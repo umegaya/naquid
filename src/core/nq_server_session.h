@@ -49,7 +49,8 @@ class NqServerSession : public NqSession,
   bool Reconnect() override; //only supported for client 
   bool IsClient() const override;
   bool IsConnected() const override { return true; }
-  bool NewStream(const std::string &name, void *ctx) override;
+  void InitStream(const std::string &name, void *ctx) override;
+  void OpenStream(const std::string &name, void *ctx) override;
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;

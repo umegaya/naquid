@@ -56,7 +56,7 @@ class NqDispatcher : public QuicDispatcher,
   inline void Process(NqPacket *p) {
     {
       //get NqServerSession's mutex, which is corresponding to this packet's connection id
-#if defined(USE_WRITE_OP)
+#if !defined(USE_DIRECT_WRITE)
       ProcessPacket(p->server_address(), p->client_address(), *p);        
 #else
       auto cid = p->ConnectionId();

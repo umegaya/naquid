@@ -62,17 +62,17 @@ struct conn_context {
   int count;
 };
 void on_conn_open(void *, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  TRACE("on_conn_open event:%d\n", hsev);
+  TRACE("on_conn_open event:%d", hsev);
 }
 int g_reject = 2;
 void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  TRACE("on_conn_open_reject event:%d\n", hsev);
+  TRACE("on_conn_open_reject event:%d", hsev);
   if (hsev != NQ_HS_DONE) {
     return;
   }
   if (g_reject > 0) {
     g_reject--;
-    TRACE("on_conn_open_reject g_reject:%d\n", g_reject);
+    TRACE("on_conn_open_reject g_reject:%d", g_reject);
     nq_conn_close(c);
     return;
   }
@@ -83,7 +83,7 @@ void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void
   on_conn_open(arg, c, hsev, ppctx);
 }
 void on_conn_close(void *, nq_conn_t c, nq_quic_error_t r, const char *detail, bool) {
-  TRACE("on_conn_close reason:%s %s\n", detail, nq_quic_error_str(r));
+  TRACE("on_conn_close reason:%s %s", detail, nq_quic_error_str(r));
   free(nq_conn_ctx(c));
 }
 
@@ -209,8 +209,13 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
     case RpcType::Close:
       {
         nq_conn_t c = nq_rpc_conn(rpc);
+        auto s = MakeString(data, len);
         nq_rpc_reply(rpc, msgid, "", 0);
-        nq_conn_close(c);
+        if (s == "conn") {
+          nq_conn_close(c);
+        } else {
+          nq_rpc_close(rpc);
+        }
       }
       break;
     case RpcType::SetupReject:

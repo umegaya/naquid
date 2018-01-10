@@ -119,15 +119,16 @@ QuicStream* NqServerSession::CreateOutgoingDynamicStream() {
   ActivateStream(QuicWrapUnique(s)); //activate here. it needs to send packet normally in stream OnOpen handler
   return s;
 }
-bool NqServerSession::NewStream(const std::string &name, void *ctx) {
+void NqServerSession::InitStream(const std::string &name, void *ctx) {
+  boxer()->InvokeConn(session_serial_, NqBoxer::OpCode::OpenStream, this, name.c_str(), ctx);
+}
+void NqServerSession::OpenStream(const std::string &name, void *ctx) {
   auto s = reinterpret_cast<NqStream *>(CreateOutgoingDynamicStream());
   auto ppctx = s->ContextBuffer();
   *ppctx = ctx;
   if (!s->OpenHandler(name, true)) {
     CloseStream(s->id());
-    return false;
   }
-  return true;
 }
 QuicCryptoStream *NqServerSession::NewCryptoStream(NqSession *session) {
   return new QuicCryptoServerStream(

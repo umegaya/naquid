@@ -2,6 +2,8 @@
 
 #include <cstdlib>
 #include <memory.h>
+#include <condition_variable>
+#include <mutex>
 
 namespace nqtest {
 nq_stream_t Test::Conn::invalid_stream = { const_cast<char *>("invalid"), 0 };
@@ -13,41 +15,29 @@ void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **
     return;
   }
   auto tc = (Conn *)arg;
-  if (tc->th.joinable()) {
+  if (tc->opened) {
     //already start
-    tc->should_signal = true;
     nq_closure_t clsr;
     if (tc->FindClosure(CallbackType::ConnOpen, clsr)) {
-  TRACE("OnConnOpen: call closure, %d", tc->disconnect);
+      TRACE("OnConnOpen: call closure, %d", tc->disconnect);
       nq_closure_call(clsr, on_client_conn_open, c, hsev, ppctx);
     }
-  TRACE("OnConnOpen: no closure, %d", tc->disconnect);
+    TRACE("OnConnOpen: no closure, %d", tc->disconnect);
     return; 
   }
-  TRACE("OnConnOpen: launch proc");
-  auto cid = c.s;
-  tc->th = std::thread([tc, cid] {
-    auto t = tc->t;
-    if (cid != 0) {
-      TRACE("launch connection_id=%llx", cid);
-      t->testproc_(*tc);
-    } else {
-      //run as immediate failure
-      TRACE("fail to launch connection");
-      t->Start();
-      t->End(false);
-    }
-  });
+  //ensure thread completely start up before next network event happens
+  TRACE("launch connection_id=%llx", c.s);
+  tc->t->testproc_(*tc);
+  tc->opened = true;
   tc->t->StartThread();
   return;
 }
 nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_quic_error_t r, const char *reason, bool close_from_remote) {
   auto tc = (Conn *)arg;
-  tc->should_signal = true;
   tc->disconnect++;
   nq_closure_t clsr;
   if (tc->FindClosure(CallbackType::ConnClose, clsr)) {
-  TRACE("OnConnClose: call closure, %d %s", tc->disconnect, nq_quic_error_str(r));
+    TRACE("OnConnClose: call closure, %d %s", tc->disconnect, nq_quic_error_str(r));
     return nq_closure_call(clsr, on_client_conn_close, c, r, reason, close_from_remote);
   }
   TRACE("OnConnClose: no closure set yet, %d %s", tc->disconnect, nq_quic_error_str(r));
@@ -67,7 +57,6 @@ void Test::OnConnFinalize(void *arg, nq_conn_t c, void *ctx) {
 bool Test::OnStreamOpen(void *arg, nq_stream_t s, void **ppctx) {
   auto c = (Conn *)arg;
   c->AddStream(s);
-  c->should_signal = true;
   if (*ppctx != nullptr) {
     auto cc = (ConnOpenStreamClosureCaller *)(*ppctx);
     *ppctx = nullptr;
@@ -76,7 +65,7 @@ bool Test::OnStreamOpen(void *arg, nq_stream_t s, void **ppctx) {
   }
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {
-    nq_closure_call(clsr, on_stream_open, s, ppctx);   
+    return nq_closure_call(clsr, on_stream_open, s, ppctx);   
   }
   return true;
 }
@@ -86,9 +75,7 @@ void Test::OnStreamClose(void *arg, nq_stream_t s) {
   if (c->FindClosure(CallbackType::ConnCloseStream, clsr)) {
     nq_closure_call(clsr, on_stream_close, s);    
   }
-  if (c->RemoveStream(s)) {
-    c->should_signal = true;
-  }
+  c->RemoveStream(s);
 }
 void Test::OnStreamRecord(void *arg, nq_stream_t s, const void *data, nq_size_t len) {
   auto c = (Conn *)arg;
@@ -140,7 +127,6 @@ void *Test::StreamReader(void *arg, nq_stream_t s, const char *data, nq_size_t d
 bool Test::OnRpcOpen(void *arg, nq_rpc_t rpc, void **ppctx) {
   auto c = (Conn *)arg;
   c->AddStream(rpc);
-  c->should_signal = true;
   if (*ppctx != nullptr) {
     auto cc = (ConnOpenStreamClosureCaller *)(*ppctx);
     *ppctx = nullptr;
@@ -149,7 +135,7 @@ bool Test::OnRpcOpen(void *arg, nq_rpc_t rpc, void **ppctx) {
   }
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {
-    nq_closure_call(clsr, on_rpc_open, rpc, ppctx);    
+    return nq_closure_call(clsr, on_rpc_open, rpc, ppctx);    
   }
   return true;
 }
@@ -159,9 +145,7 @@ void Test::OnRpcClose(void *arg, nq_rpc_t rpc) {
   if (c->FindClosure(CallbackType::ConnCloseStream, clsr)) {
     nq_closure_call(clsr, on_rpc_close, rpc);    
   }
-  if (c->RemoveStream(rpc)) {
-    c->should_signal = true;
-  }
+  c->RemoveStream(rpc);
 }
 void Test::OnRpcRequest(void *arg, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t dlen) {
   auto c = (Conn *)arg;
@@ -259,18 +243,7 @@ bool Test::Run(const RunOptions *opt) {
   nq_time_t end = nq_time_now() + execute_duration;
   while (!Finished() && (execute_duration == 0 || nq_time_now() < end)) {
     nq_client_poll(cl);
-    for (int i = 0; i < concurrency_; i++) {
-      if (conns[i].should_signal) {
-        conns[i].should_signal = false;
-        conns[i].Signal();
-      }
-    }
     nq_time_sleep(nq_time_msec(1));
-  }
-  for (int i = 0; i < concurrency_; i++) {
-    if (conns[i].th.joinable()) {
-      conns[i].th.join();
-    }
   }
   for (int i = 0; i < concurrency_; i++) {
     nq_conn_close(conns[i].c);

@@ -17,7 +17,6 @@
 namespace net {
 class NqLoop;
 class NqStream;
-class NqBoxer;
 // A QUIC session with a headers stream.
 class NqSession : public QuicSession {
  public:
@@ -42,7 +41,8 @@ class NqSession : public QuicSession {
     virtual uint64_t ReconnectDurationUS() const = 0;
     virtual bool IsClient() const = 0;
     virtual bool IsConnected() const = 0;
-    virtual bool NewStream(const std::string &name, void *ctx) = 0;
+    virtual void InitStream(const std::string &name, void *ctx) = 0;
+    virtual void OpenStream(const std::string &name, void *ctx) = 0;
     virtual QuicCryptoStream *NewCryptoStream(NqSession *session) = 0;
     virtual const nq::HandlerMap *GetHandlerMap() const = 0;
     virtual nq::HandlerMap *ResetHandlerMap() = 0;

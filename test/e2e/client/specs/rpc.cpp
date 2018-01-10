@@ -45,6 +45,24 @@ static void test_raise(nq_rpc_t rpc, Test::Conn &tc) {
 	}));
 }
 
+static void test_close(nq_rpc_t rpc, Test::Conn &tc) {
+	auto done = tc.NewLatch(); //ok
+	TRACE("test_close: call RPC");
+	RPC(rpc, RpcType::Close, "stream", 6, ([done](
+		nq_rpc_t rpc, nq_error_t r, const void *data, nq_size_t dlen) {
+		TRACE("test_close: reply RPC");
+		if (r != NQ_OK || dlen != 0) {
+			done(false);
+			return;
+		}
+	}));
+	WATCH_CONN(tc, ConnCloseStream, ([rpc, done](nq_rpc_t rpc2){
+		if (nq_rpc_equal(rpc, rpc2)) {
+			done(true);
+		}
+	}));
+}
+
 static void test_notify(nq_rpc_t rpc, Test::Conn &tc) {
 	auto done = tc.NewLatch(); //ok
 	auto done2 = tc.NewLatch(); //ok
@@ -120,6 +138,7 @@ void test_rpc(Test::Conn &conn) {
 	conn.OpenRpc("rpc", [&conn](nq_rpc_t rpc, void **ppctx) {
 		test_ping(rpc, conn);
 		test_raise(rpc, conn);
+		test_close(rpc, conn);
 		return true;
 	});
 	conn.OpenRpc("rpc", [&conn](nq_rpc_t rpc, void **ppctx) {

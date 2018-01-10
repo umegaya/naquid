@@ -177,7 +177,7 @@ bool NqPacketReader::ReadPackets(
     return false;  // ReadPacket failed.
   }
 
-  TRACE("Read %u bytes from %d, my ip: %s", bytes_read, fd, server_ip.ToString().c_str());
+  //TRACE("Read %u bytes from %d, my ip: %s", bytes_read, fd, server_ip.ToString().c_str());
 
   if (!server_ip.IsInitialized()) {
     QUIC_BUG << "Unable to get server address.";

@@ -304,8 +304,7 @@ class Test {
     typedef uint64_t SessionSerialType;
    public:
     int index, disconnect;
-    std::thread th;
-    std::mutex mtx;
+    bool opened;
     Test *t;
 
     nq_conn_t c;
@@ -321,7 +320,6 @@ class Test {
     std::vector<NotifyData> notifies;
     std::condition_variable cond;
 
-    bool should_signal;
    public:
     ~Conn() {
       if (send_buf != nullptr) {
@@ -329,8 +327,11 @@ class Test {
       }
     }
     void Signal() {
-      std::unique_lock<std::mutex> lock(mtx);
       cond.notify_one();
+    }
+    void Wait(std::mutex &mtx) {
+      std::unique_lock<std::mutex> lk(mtx);
+      cond.wait(lk);
     }
     void OpenStream(const std::string &name, std::function<bool (nq_stream_t, void **)> cb) {
       auto cc = new ConnOpenStreamClosureCaller(cb);
@@ -431,9 +432,9 @@ class Test {
       send_buf_len = 256;
       index = idx;
       disconnect = 0;
+      opened = false;
       t = test;
       c = conn;
-      should_signal = false;
       (t->init_ != nullptr ? t->init_ : Test::RegisterCallback)(*this, options);
 
     }
@@ -466,15 +467,15 @@ class Test {
     running_--; 
     TRACE("End: running = %u\n", running_.load());
     while (true) {
-            int32_t expect = result_.load();
-            if (expect < 0) {
-              break;
-            }
-            int32_t desired = ok ? 1 : -1;
-            if (atomic_compare_exchange_weak(&result_, &expect, desired)) {
-                return;
-            }
-        }
+      int32_t expect = result_.load();
+      if (expect < 0) {
+        break;
+      }
+      int32_t desired = ok ? 1 : -1;
+      if (atomic_compare_exchange_weak(&result_, &expect, desired)) {
+          return;
+      }
+    }
   }
   bool IsSuccess() const { return result_.load() == 1; }
   bool Finished() const { return test_start_.load() > 0 && thread_start_ == concurrency_ && running_.load() == 0; }
