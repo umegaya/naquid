@@ -4,7 +4,7 @@
 
 namespace net {
 NqAlarmIndex NqAlarm::alarm_index() const {
-  if (NqAlarmSerialCodec::IsClient(alarm_serial_)) {
+  if (NqSerial::IsClient(alarm_serial_)) {
     return NqAlarmSerialCodec::ClientAlarmIndex(alarm_serial_);
   } else {
     return NqAlarmSerialCodec::ServerAlarmIndex(alarm_serial_);    

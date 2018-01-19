@@ -21,6 +21,7 @@ void NqWorker::Run(PacketQueue &pq) {
   InvokeQueue *iq[n_dispatcher];
   NqDispatcher *ds[n_dispatcher];
   if (!Listen(iq, ds)) {
+    nq::logger::fatal("fail to listen");
     exit(1);
     return;
   }

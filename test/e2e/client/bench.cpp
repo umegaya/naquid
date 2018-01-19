@@ -121,7 +121,11 @@ void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {
 
 }
-
+void on_rpc_validate(void *p, nq_rpc_t rpc, const char *error) {
+  if (error != nullptr) {
+    printf("fail to create connection %s\n", error);
+  }
+}
 
 
 /* main */
@@ -148,14 +152,14 @@ int main(int argc, char *argv[]){
   conf.idle_timeout = nq_time_sec(60);
   conf.handshake_timeout = nq_time_sec(120);
 
-  const char *invalid_reason;
+  nq_closure_t on_validate;
+  nq_closure_init(on_validate, on_rpc_validate, on_rpc_validate, nullptr);
   for (int i = 0; i < N_CLIENT; i++) {
     //reinitialize closure, with giving client index as arg
     nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, (void *)(intptr_t)i);
     nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, (void *)(intptr_t)i);
     g_cs[i] = nq_client_connect(cl, &addr, &conf);
-    if (!nq_conn_is_valid(g_cs[i], &invalid_reason)) {
-      printf("fail to create connection %s\n", invalid_reason);
+    if (!nq_conn_is_valid(g_cs[i], on_validate)) {
       return -1;
     }
     g_ctxs[i].seed = 0;

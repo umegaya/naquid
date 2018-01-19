@@ -31,7 +31,6 @@ class NqSession : public QuicSession {
    public:
     virtual ~Delegate() {}
     virtual void *Context() const = 0;
-    virtual void *StreamContext(uint64_t stream_serial) const = 0;
     virtual void OnClose(QuicErrorCode error,
                          const std::string& error_details,
                          ConnectionCloseSource close_by_peer_or_self) = 0;
@@ -48,7 +47,10 @@ class NqSession : public QuicSession {
     virtual nq::HandlerMap *ResetHandlerMap() = 0;
     virtual NqLoop *GetLoop() = 0;
     virtual QuicConnection *Connection() = 0;
-    virtual uint64_t SessionSerial() const = 0;
+    virtual const NqSerial &SessionSerial() const = 0;
+    inline NqSessionIndex SessionIndex() const { 
+      return NqSerial::ObjectIndex<NqSessionIndex>(SessionSerial());
+    }
   };
  private:
   std::unique_ptr<QuicCryptoStream> crypto_stream_;
@@ -68,8 +70,8 @@ class NqSession : public QuicSession {
   inline bool IsClient() const { return connection()->perspective() == Perspective::IS_CLIENT; }
   inline Delegate *delegate() { return delegate_; }
   inline const Delegate *delegate() const { return delegate_; }
-  inline nq_conn_t conn() { return { .p = delegate_, .s = delegate_->SessionSerial() }; }
   inline const nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
+  inline nq_conn_t ToHandle() { return MakeHandle<nq_conn_t, Delegate>(delegate_, delegate_->SessionSerial()); }
 
   //implements QuicConnectionVisitorInterface
   void OnConnectionClosed(QuicErrorCode error,

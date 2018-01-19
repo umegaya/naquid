@@ -19,7 +19,7 @@ class NqWorker {
   NqPacketReader reader_;
   std::thread thread_;
   //TODO(iyatomi): measture this to confirm
-  //almost case, should only has a few element. I think linear scan of vector faster
+  //almost case, should only have a few element. I think linear scan of vector faster
   std::vector<std::pair<int, NqDispatcher*>> dispatchers_;
   bool overflow_supported_;
  public:

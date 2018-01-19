@@ -75,11 +75,11 @@ class NqAlarmBase : public NqAlarmInterface {
 class NqAlarm : public NqAlarmBase {
   nq_closure_t cb_;
   NqBoxer *boxer_;
-  uint64_t alarm_serial_;
+  NqSerial alarm_serial_;
  public:
   typedef nq::Allocator<NqAlarm> Allocator;
 
-  NqAlarm() : NqAlarmBase(), cb_(nq_closure_empty()), alarm_serial_(0) {}
+  NqAlarm() : NqAlarmBase(), cb_(nq_closure_empty()), alarm_serial_() {}
   ~NqAlarm() override {}
 
   inline void Start(NqLoop *loop, nq_time_t first_invocation_ts, nq_closure_t cb) {
@@ -87,10 +87,11 @@ class NqAlarm : public NqAlarmBase {
     cb_ = cb;
     NqAlarmBase::Start(loop, first_invocation_ts);
   }
-  inline NqBoxer *GetBoxer() { return boxer_; }
+  inline NqBoxer *boxer() { return boxer_; }
+  inline const NqSerial &alarm_serial() const { return alarm_serial_; }
+  inline nq_alarm_t ToHandle() { return MakeHandle<nq_alarm_t, NqAlarm>(this, alarm_serial_); }
   NqAlarmIndex alarm_index() const;
-  uint64_t alarm_serial() { return alarm_serial_; }
-  void InitSerial(uint64_t serial) { alarm_serial_ = serial; }
+  void InitSerial(const nq_serial_t &serial) { alarm_serial_ = serial; }
 
   // implements NqAlarmInterface
   void OnFire(NqLoop *loop) override {

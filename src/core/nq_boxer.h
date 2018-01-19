@@ -44,7 +44,7 @@ class NqBoxer {
     Alarm = 3,
   };
   struct Op {
-    uint64_t serial_;
+    nq_serial_t serial_;
     void *target_ptr_;
     OpCode code_;
     OpTarget target_; 
@@ -94,19 +94,19 @@ class NqBoxer {
         nq_closure_t callback_;
       } task_;
     };
-    Op(uint64_t serial, void *target_ptr, OpCode code, OpTarget target) : 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {}
-    Op(uint64_t serial, void *target_ptr, OpCode code, nq_time_t ts, nq_closure_t cb, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, nq_time_t ts, nq_closure_t cb, 
       OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       alarm_.invocation_ts_ = ts;
       alarm_.callback_ = cb;
     }
-    Op(uint64_t serial, void *target_ptr, OpCode code, nq_closure_t cb, OpTarget target) : 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, nq_closure_t cb, OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       task_.callback_ = cb;
     }
-    Op(uint64_t serial, void *target_ptr, OpCode code, const char *name, void *ctx, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, const char *name, void *ctx, 
       OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       if (*name != 0) {
@@ -114,29 +114,29 @@ class NqBoxer {
         stream_.ctx_ = ctx;
       }
     }
-    Op(uint64_t serial, void *target_ptr, OpCode code, const void *data, nq_size_t datalen, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, const void *data, nq_size_t datalen, 
        OpTarget target = OpTarget::Stream) : 
       serial_(serial), code_(code), target_(target), data_(data, datalen) {}
-    Op(uint64_t serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
        nq_size_t datalen, nq_closure_t on_reply, 
        OpTarget target = OpTarget::Stream) :
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
       call_.type_ = type;
       call_.on_reply_ = on_reply;
     }
-    Op(uint64_t serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
        nq_size_t datalen, nq_rpc_opt_t rpc_opt, 
        OpTarget target = OpTarget::Stream) :
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
       call_ex_.type_ = type;
       call_ex_.rpc_opt_ = rpc_opt;
     }
-    Op(uint64_t serial, void *target_ptr, OpCode code, uint16_t type, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, uint16_t type, 
        const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
       notify_.type_ = type;
     }
-    Op(uint64_t serial, void *target_ptr, OpCode code, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, 
        nq_error_t result, nq_msgid_t msgid, 
        const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) :
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
@@ -154,9 +154,6 @@ class NqBoxer {
   virtual void Enqueue(Op *op) = 0;
   virtual bool MainThread() const = 0;
   virtual NqLoop *Loop() = 0;
-  //TODO(iyatomi): remove this
-  virtual NqSession::Delegate *FindConn(uint64_t serial, OpTarget target) = 0;
-  virtual NqStream *FindStream(uint64_t serial, void *p) = 0;
   virtual NqAlarm *NewAlarm() = 0;
   virtual NqAlarm::Allocator *GetAlarmAllocator() = 0;
   virtual void RemoveAlarm(NqAlarmIndex index) = 0;
@@ -166,7 +163,7 @@ class NqBoxer {
   virtual void UnlockSession() = 0;
 
   //invoker
-  inline void InvokeConn(uint64_t serial, OpCode code, NqSession::Delegate *unboxed, bool from_queue = false) {
+  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
     if (from_queue) {
@@ -195,7 +192,7 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, OpTarget::Conn));      
     }
   }
-  inline void InvokeConn(uint64_t serial, OpCode code, NqSession::Delegate *unboxed, const char *name, void *ctx, bool from_queue = false) {
+  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, const char *name, void *ctx, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
     if (from_queue) {
@@ -208,8 +205,8 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, name, ctx, OpTarget::Conn));      
     }
   }
-  inline void InvokeAlarm(uint64_t serial, OpCode code, nq_time_t invocation_ts, nq_closure_t cb, NqAlarm *unboxed) {
-    if (MainThread()) {
+  inline void InvokeAlarm(const nq_serial_t &serial, NqAlarm *unboxed, OpCode code, nq_time_t invocation_ts, nq_closure_t cb, bool from_queue = false) {
+    if (from_queue) {
       if (unboxed->alarm_serial() == serial) {
         ASSERT(code == Start);
         unboxed->Start(Loop(), invocation_ts, cb);
@@ -220,7 +217,7 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, invocation_ts, cb, OpTarget::Alarm));
     }    
   }
-  inline void InvokeAlarm(uint64_t serial, OpCode code, NqAlarm *unboxed, bool from_queue = false) {
+  inline void InvokeAlarm(const nq_serial_t &serial, NqAlarm *unboxed, OpCode code, bool from_queue = false) {
     if (from_queue) {
       if (unboxed->alarm_serial() == serial) {
         ASSERT(code == Finalize);
@@ -233,88 +230,86 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, OpTarget::Alarm));
     }    
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, NqStream *unboxed, NqSession::Delegate *d) {
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
-    if (unboxed != nullptr) {
+    if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == Disconnect);
         unboxed->Disconnect();
       }
     } else {
-      ASSERT(d != nullptr);
-      Enqueue(new Op(serial, d, code, OpTarget::Stream));
+      Enqueue(new Op(serial, unboxed, code, OpTarget::Stream));
     }
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, NqStream *unboxed, nq_closure_t cb, NqSession::Delegate *d) {
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code, nq_closure_t cb, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
-    if (unboxed != nullptr) {
+    if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == Task);
         unboxed->RunTask(cb);
       }
     } else {
-      ASSERT(d != nullptr);
-      Enqueue(new Op(serial, d, code, cb, OpTarget::Stream));
+      Enqueue(new Op(serial, unboxed, code, cb, OpTarget::Stream));
     }
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, 
-                           const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {
-    if (unboxed != nullptr) {
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code, 
+                           const void *data, nq_size_t datalen, bool from_queue = false) {
+    if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == Send);
         unboxed->Handler<NqStreamHandler>()->Send(data, datalen);
       }
     } else {
-      Enqueue(new Op(serial, d, code, data, datalen));
+      Enqueue(new Op(serial, unboxed, code, data, datalen));
     }
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, 
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code,
                            uint16_t type, const void *data, 
-                           nq_size_t datalen, nq_closure_t on_reply, NqStream *unboxed, NqSession::Delegate *d) {
-    if (unboxed != nullptr) {
+                           nq_size_t datalen, nq_closure_t on_reply, bool from_queue = false) {
+    if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == Call);
         unboxed->Handler<NqSimpleRPCStreamHandler>()->Call(type, data, datalen, on_reply);
       }
     } else {
-      Enqueue(new Op(serial, d, code, type, data, datalen, on_reply));
+      Enqueue(new Op(serial, unboxed, code, type, data, datalen, on_reply));
     }
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, 
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code, 
                            uint16_t type, const void *data, 
-                           nq_size_t datalen, nq_rpc_opt_t &rpc_opt, NqStream *unboxed, NqSession::Delegate *d) {
-    if (unboxed != nullptr) {
+                           nq_size_t datalen, nq_rpc_opt_t &rpc_opt, bool from_queue = false) {
+    if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == CallEx);
         unboxed->Handler<NqSimpleRPCStreamHandler>()->CallEx(type, data, datalen, rpc_opt);
       }
     } else {
-      Enqueue(new Op(serial, d, code, type, data, datalen, rpc_opt));
+      Enqueue(new Op(serial, unboxed, code, type, data, datalen, rpc_opt));
     }
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, 
-                           uint16_t type, const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {    
-    if (unboxed != nullptr) {
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code, 
+                           uint16_t type, const void *data, nq_size_t datalen, bool from_queue = false) {    
+    if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == Notify);
         unboxed->Handler<NqSimpleRPCStreamHandler>()->Notify(type, data, datalen);
       }
     } else {
-      Enqueue(new Op(serial, d, code, type, data, datalen));
+      Enqueue(new Op(serial, unboxed, code, type, data, datalen));
     }
   }
-  inline void InvokeStream(uint64_t serial, OpCode code, 
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code, 
                            nq_error_t result, nq_msgid_t msgid, 
-                           const void *data, nq_size_t datalen, NqStream *unboxed, NqSession::Delegate *d) {
-    if (unboxed != nullptr) {
+                           const void *data, nq_size_t datalen, bool from_queue = false) {
+    if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == Reply);
         unboxed->Handler<NqSimpleRPCStreamHandler>()->Reply(result, msgid, data, datalen);
       }
     } else {
-      Enqueue(new Op(serial, d, code, result, msgid, data, datalen));
+      Enqueue(new Op(serial, unboxed, code, result, msgid, data, datalen));
     }
   }
 

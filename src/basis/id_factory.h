@@ -13,6 +13,7 @@ class IdFactory {
     ((((NUMBER)0x80) << (8 * (sizeof(NUMBER) - 1))) - 100);
  public:
   IdFactory() : seed_(0), limit_(kLimit) {}
+  IdFactory(NUMBER limit) : seed_(0), limit_(limit) {}
   void set_limit(NUMBER limit) { limit_ = limit; }
 
   NUMBER New() {

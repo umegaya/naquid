@@ -24,6 +24,8 @@ extern "C" {
 //indicate this call only safe when invoked with nq_conn/rpc/stream_t which passed to
 //functions of nq_closure_t. 
 #define NQAPI_CLOSURECALL extern
+//for external variable
+#define NQAPI_EXTERN extern
 
 
 
@@ -52,24 +54,28 @@ typedef struct nq_server_tag *nq_server_t; //NqServer
 
 typedef struct nq_hdmap_tag *nq_hdmap_t; //nq::HandlerMap
 
+typedef struct {
+  uint64_t data[1];
+} nq_serial_t;
+
 typedef struct nq_conn_tag {
+    nq_serial_t s; //see NqConnSerialCodec
     void *p;    //NqSession::Delegate
-    uint64_t s; //see NqConnSerialCodec
 } nq_conn_t;
 
 typedef struct nq_stream_tag {
-    void *p;    //NqSession::Delegate
-    uint64_t s; //see NqStreamSerialCodec
+    nq_serial_t s; //see NqStreamSerialCodec
+    void *p;    //NqStream
 } nq_stream_t; 
 //this is essentially same as nq_stream, but would helpful to prevent misuse of rpc/stream
 typedef struct nq_rpc_tag {
-    void *p;    //NqSession::Delegate
-    uint64_t s; //see NqStreamSerialCodec
+    nq_serial_t s; //see NqStreamSerialCodec
+    void *p;    //NqStream
 } nq_rpc_t; 
 
 typedef struct nq_alarm_tag {
+  nq_serial_t s;   //see NqAlarmSerialCodec
   void *p;      //NqAlarm
-  uint64_t s;   //see NqAlarmSerialCodec
 } nq_alarm_t;
 
 typedef enum {
@@ -126,6 +132,13 @@ typedef nq_on_client_conn_open_t nq_on_server_conn_open_t;
 typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_quic_error_t, const char*, bool);
 
 
+/* conn */
+//called as 2nd argument nq_conn_valid, when actually given conn is valid.
+typedef void (*nq_on_conn_validate_t)(void *, nq_conn_t, const char *);
+//called when nq_conn_modify_hdmap invoked with valid nq_conn_t
+typedef void (*nq_on_conn_modify_hdmap_t)(void *, nq_hdmap_t);
+
+
 /* stream */
 //stream opened. return false to reject stream
 typedef bool (*nq_on_stream_open_t)(void *, nq_stream_t, void**);
@@ -140,6 +153,8 @@ typedef nq_size_t (*nq_stream_writer_t)(void *, nq_stream_t, const void *, nq_si
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
 
 typedef void (*nq_on_stream_task_t)(void *, nq_stream_t);
+//called as 2nd argument nq_stream_valid, when actually given stream is valid.
+typedef void (*nq_on_stream_validate_t)(void *, nq_stream_t, const char *);
 
 typedef void *(*nq_create_stream_t)(void *, nq_conn_t);
 
@@ -157,6 +172,8 @@ typedef void (*nq_on_rpc_notify_t)(void *, nq_rpc_t, uint16_t, const void *, nq_
 typedef void (*nq_on_rpc_reply_t)(void *, nq_rpc_t, nq_error_t, const void *, nq_size_t);
 
 typedef void (*nq_on_rpc_task_t)(void *, nq_rpc_t);
+//called as 2nd argument nq_stream_valid, when actually given stream is valid.
+typedef void (*nq_on_rpc_validate_t)(void *, nq_rpc_t, const char *);
 
 
 /* alarm */
@@ -175,12 +192,16 @@ typedef struct {
     nq_on_server_conn_open_t on_server_conn_open;
     nq_on_server_conn_close_t on_server_conn_close;
 
+    nq_on_conn_validate_t on_conn_validate;
+    nq_on_conn_modify_hdmap_t on_conn_modify_hdmap;
+
     nq_on_stream_open_t on_stream_open;
     nq_on_stream_close_t on_stream_close;
     nq_stream_reader_t stream_reader;
     nq_stream_writer_t stream_writer;
     nq_on_stream_record_t on_stream_record;
     nq_on_stream_task_t on_stream_task;
+    nq_on_stream_validate_t on_stream_validate;
 
     nq_on_rpc_open_t on_rpc_open;
     nq_on_rpc_close_t on_rpc_close;
@@ -188,6 +209,7 @@ typedef struct {
     nq_on_rpc_reply_t on_rpc_reply;
     nq_on_rpc_notify_t on_rpc_notify;
     nq_on_rpc_task_t on_rpc_task;
+    nq_on_rpc_validate_t on_rpc_validate;
 
     nq_create_stream_t create_stream;
     nq_on_alarm_t on_alarm;
@@ -198,13 +220,14 @@ NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr);
 
 NQAPI_THREADSAFE nq_closure_t nq_closure_empty();
 
+NQAPI_EXTERN void *(nq_closure_noop)(...);
+
 #define nq_closure_init(__pclsr, __type, __cb, __arg) { \
   (__pclsr).arg = (void *)(__arg); \
   (__pclsr).__type = (__cb); \
 }
 
 #define nq_closure_call(__pclsr, __type, ...) ((__pclsr).__type((__pclsr).arg, __VA_ARGS__))
-
 
 
 // --------------------------
@@ -310,8 +333,8 @@ NQAPI_BOOTSTRAP void nq_hdmap_raw_handler(nq_hdmap_t h, nq_stream_handler_t hand
 // conn API
 //
 // --------------------------
-//can change handler map of connection, which is usually inherit from nq_client_t or nq_server_t
-NQAPI_THREADSAFE nq_hdmap_t nq_conn_hdmap(nq_conn_t conn);
+//can modify handler map of connection, which is usually inherit from nq_client_t or nq_server_t
+NQAPI_THREADSAFE void nq_conn_modify_hdmap(nq_conn_t conn, nq_closure_t modifier);
 //close and destroy conn/associated stream eventually, so never touch conn/stream/rpc after calling this API.
 NQAPI_THREADSAFE void nq_conn_close(nq_conn_t conn); 
 //this just restart connection, if connection not start, start it, otherwise close connection once, then start again.
@@ -322,14 +345,16 @@ NQAPI_THREADSAFE void nq_conn_flush(nq_conn_t conn);
 //check connection is client mode or not.
 NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn);
 //check conn is valid. invalid means fail to create or closed, or temporary disconnected (will reconnect soon).
-//if you give valid pointer to const char * to reason, you can get invalid reason when its not valid..
-NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, const char **invalid_reason);
+//note that if (nq_conn_is_valid(...)) does not assure any safety of following operation, when multi threaded event loop runs
+//you should give cb parameter with filling nq_on_conn_validate member, to operate this conn safety on validation success.
+//you can pass nq_closure_empty() for nq_conn_is_valid, if you dont need to callback.
+NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, nq_closure_t cb);
 //get reconnect wait duration in us. 0 means does not wait reconnection
 NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get context, which is set at on_conn_open
 NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t.
-static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
+static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && c1.s.data[1] == c2.s.data[1]; }
 
 
 
@@ -345,9 +370,10 @@ NQAPI_THREADSAFE void nq_conn_stream(nq_conn_t conn, const char *name, void *ctx
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s);
 //get alarm from stream
 NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s);
-//check stream is valid. sugar for nq_conn_is_valid(nq_stream_conn(s));
-//if you give valid pointer to const char * to reason, you can get invalid reason when its not valid..
-NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s, const char **invalid_reason);
+//check stream is valid. note that if (nq_stream_is_valid(...)) does not assure any safety of following operation.
+//you should give cb parameter with filling nq_on_stream_validate member, to operate this stream safety on validation success.
+//you can pass nq_closure_empty() for nq_conn_is_valid, if you dont need to callback.
+NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s, nq_closure_t *pcb);
 //check stream is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
 //if p_valid returns true, means stream is incoming.
 NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid);
@@ -358,7 +384,7 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
 //schedule execution of closure which is given to cb, will called with given s.
 NQAPI_THREADSAFE void nq_stream_task(nq_stream_t s, nq_closure_t cb);
 //check equality of nq_stream_t.
-static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
+static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s.data[0] == c2.s.data[0] && c1.s.data[1] == c2.s.data[1]; }
 //get stream id. this may change as you re-created stream on reconnection. 
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
@@ -384,9 +410,10 @@ NQAPI_THREADSAFE void nq_conn_rpc(nq_conn_t conn, const char *name, void *ctx);
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc);
 //get alarm from stream or rpc
 NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc);
-//check rpc is valid. sugar for nq_conn_is_valid(nq_rpc_conn(rpc));
-//if you give valid pointer to const char * to reason, you can get invalid reason when its not valid..
-NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc, const char **invalid_reason);
+//check rpc is valid. note that if (nq_rpc_is_valid(...)) does not assure any safety of following operation.
+//you should give cb parameter with filling nq_on_rpc_validate member, to operate this rpc safety on validation success.
+//you can pass nq_closure_empty() for nq_conn_is_valid, if you dont need to callback.
+NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc, nq_closure_t *pcb);
 //check rpc is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
 //if p_valid returns true, means stream is incoming.
 NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t s, bool *p_valid);
@@ -405,7 +432,7 @@ NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *d
 //schedule execution of closure which is given to cb, will called with given rpc.
 NQAPI_THREADSAFE void nq_rpc_task(nq_rpc_t rpc, nq_closure_t cb);
 //check equality of nq_rpc_t.
-static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s == c2.s && (c1.s == 0 || c1.p == c2.p); }
+static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s.data[0] == c2.s.data[0] && c1.s.data[1] == c2.s.data[1]; }
 //get rpc id. this may change as you re-created rpc on reconnection.
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc);

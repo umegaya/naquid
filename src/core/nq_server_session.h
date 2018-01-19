@@ -14,20 +14,23 @@ class NqServerSession : public NqSession,
  public:
   NqServerSession(QuicConnection *connection,
                   const NqServer::PortConfig &port_config);
-  ~NqServerSession() { ASSERT(session_serial_ == 0); }
+  ~NqServerSession() { ASSERT(session_serial_.IsEmpty()); }
 
   nq_conn_t ToHandle();
   NqStream *FindStream(QuicStreamId id);
   //if you set included closed to true, be careful to use returned value, 
   //this pointer soon will be invalid.
-  NqStream *FindStreamBySerial(uint64_t s, bool include_closed = false);
+  NqStream *FindStreamBySerial(const nq_serial_t &s, bool include_closed = false);
   void InitSerial();
-  inline void InvalidateSerial() { session_serial_ = 0; }  
+  inline void InvalidateSerial() { 
+    std::unique_lock<std::mutex> lk(static_mutex());
+    session_serial_.Clear(); 
+  }  
 
   std::mutex &static_mutex();
   NqBoxer *boxer();
   NqDispatcher *dispatcher();
-  inline uint64_t session_serial() const { return session_serial_; }
+  inline const NqSerial &session_serial() const { return session_serial_; }
   inline NqSessionIndex session_index() const { 
     return NqConnSerialCodec::ServerSessionIndex(session_serial_); }
   inline nq::IdFactory<NqStreamIndex> &index_factory() { return index_factory_; }
@@ -40,7 +43,6 @@ class NqServerSession : public NqSession,
 
   //implements NqSession::Delegate
   void *Context() const override { return context_; }
-  void *StreamContext(uint64_t stream_serial) const override;
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
@@ -57,13 +59,13 @@ class NqServerSession : public NqSession,
   NqLoop *GetLoop() override;
   uint64_t ReconnectDurationUS() const override { return 0; }
   QuicConnection *Connection() override { return connection(); }
-  uint64_t SessionSerial() const override { return session_serial(); }
+  const NqSerial &SessionSerial() const override { return session_serial(); }
 
  private:
   const NqServer::PortConfig &port_config_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
-  nq::IdFactory<NqStreamIndex> index_factory_;
-  uint64_t session_serial_;
+  nq::IdFactoryNoAtomic<NqStreamIndex> index_factory_;
+  NqSerial session_serial_;
   void *context_;
 };
 

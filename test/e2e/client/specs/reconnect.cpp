@@ -9,6 +9,11 @@ using namespace nqtest;
 	finalize is called
 */
 
+static void on_rpc_validate(void *arg, nq_rpc_t rpc, const char *reason) {
+	const char **p_reason = (const char **)arg;
+	*p_reason = reason;
+}
+
 void test_reconnect_client(Test::Conn &conn) {
 	conn.OpenRpc("rpc", [&conn](nq_rpc_t rpc, void **) {
 		auto done = conn.NewLatch();
@@ -27,7 +32,7 @@ void test_reconnect_client(Test::Conn &conn) {
 			nq_conn_t c, nq_quic_error_t result, const char *detail, bool from_remote) -> nq_time_t {
 			close_counter++;
 			TRACE("ConnClose(%d): detail = %s", close_counter, detail);
-			if (!nq_conn_is_valid(c, nullptr)) {
+			if (!nq_conn_is_valid(c, nq_closure_empty())) {
 				done(false);
 				return 0;
 			}
@@ -59,7 +64,7 @@ void test_reconnect_client(Test::Conn &conn) {
 		int *ctx_ptr = reinterpret_cast<int *>(0x5678);
 		WATCH_CONN(conn, ConnOpen, ([done2, ctx_ptr](
 			nq_conn_t c, nq_handshake_event_t hsev, void *ppctx) {
-			if (!nq_conn_is_valid(c, nullptr)) {
+			if (!nq_conn_is_valid(c, nq_closure_empty())) {
 				done2(false);
 				return 0;
 			}
@@ -87,7 +92,9 @@ void test_reconnect_client(Test::Conn &conn) {
 			//nq_conn_ctx should return nullptr because connection is no more valid.
 			//instead of this, variable ctx should have the value which is attached with this conn
 			const char *reason;
-			if (nq_conn_is_valid(c, &reason)) {
+			nq_closure_t check_closure;
+			nq_closure_init(check_closure, on_rpc_validate, on_rpc_validate, &reason);
+			if (nq_conn_is_valid(c, check_closure)) {
 				done3(false);
 				return;
 			} else if (strcmp(reason, "deallocated handle") != 0) {
@@ -135,7 +142,9 @@ void test_reconnect_server(Test::Conn &conn) {
 	WATCH_CONN(conn, ConnOpenStream, ([&conn, done](nq_rpc_t rpc, void **){
 		TRACE("test_reconnect_server ConnOpenStream %d %d %d %d", close_counter, open_counter, stream_close_counter, stream_open_counter);
 		for (int i = 0; i < stream_open_counter; i++) {
-			TRACE("test_reconnect_server check for %d %s", i, nq_rpc_equal(rpc, rpcs[i]) ? "eq" : "ne");
+			TRACE("test_reconnect_server check for %d %s %llx|%llx, %llx|%llx", i, nq_rpc_equal(rpc, rpcs[i]) ? "eq" : "ne", 
+				rpc.s.data[0], rpc.s.data[1], 
+				rpcs[i].s.data[0], rpcs[i].s.data[1]);
 			if (nq_rpc_equal(rpc, rpcs[i])) {
 				done(false);
 				return false;

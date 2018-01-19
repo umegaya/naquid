@@ -53,22 +53,23 @@ class NqClient : public QuicClientBase,
       inline void SetStream(NqClientStream *s) { handle_ = s; }
       inline void ClearStream() { handle_ = nullptr; }
       inline NqClientStream *Stream() { return handle_; }
-      inline void *Context() { return context_; }
+      inline void *Context() const { return context_; }
       inline void **ContextBuffer() { return &context_; }      
       inline void SetName(const std::string &name) { name_ = name; }
-      inline const std::string &Name() { return name_; }
+      inline const std::string &Name() const { return name_; }
     };
 
     using StreamMap = QuicSmallMap<NqStreamIndex, Entry, 10>;
+    using StreamVector = std::vector<Entry>;
 
-    StreamMap stream_map_;
-    nq::IdFactoryNoAtomic<NqStreamIndex> index_seed_;
+    StreamMap entries_;
+    nq::IdFactoryNoAtomic<NqStreamIndex> index_factory_;
    public:
-    StreamManager() : stream_map_(), index_seed_() {}
+    StreamManager() : entries_(), index_factory_(0x7FFFFFFF) {}
     
     bool OnOutgoingOpen(NqClient *client, bool connected,
                         const std::string &name, void *ctx);
-    bool OnIncomingOpen(NqClientStream *s);
+    NqStreamIndex OnIncomingOpen(NqClientStream *s);
     void OnClose(NqClientStream *s);
 
     NqClientStream *FindOrCreateStream(
@@ -94,8 +95,12 @@ class NqClient : public QuicClientBase,
       auto *e = FindEntry(index);
       return e == nullptr ? empty_ : e->Name();
     }
+    inline NqStreamIndex NewIndex() { return index_factory_.New(); }
    protected:
-    Entry *FindEntry(NqStreamIndex index) const;
+    Entry *FindEntry(NqStreamIndex index);
+    inline const Entry *FindEntry(NqStreamIndex index) const { 
+      return const_cast<StreamManager *>(this)->FindEntry(index); 
+    }
     void OnOutgoingClose(NqClientStream *s);
     void OnIncomingClose(NqClientStream *s);    
   };
@@ -115,7 +120,7 @@ class NqClient : public QuicClientBase,
   inline StreamManager &stream_manager() { return stream_manager_; }
   inline const StreamManager &stream_manager() const { return stream_manager_; }
   inline NqClientLoop *client_loop() { return loop_; }
-  inline uint64_t session_serial() const { return session_serial_; }
+  inline const NqSerial &session_serial() const { return session_serial_; }
   inline NqSessionIndex session_index() const { 
     return NqConnSerialCodec::ClientSessionIndex(session_serial_); }
 
@@ -124,7 +129,10 @@ class NqClient : public QuicClientBase,
   nq_conn_t ToHandle();
   NqClientStream *FindOrCreateStream(NqStreamIndex index);
   void InitSerial();
-  inline void InvalidateSerial() { session_serial_ = 0; }
+  inline void InvalidateSerial() { 
+    std::unique_lock<std::mutex> lk(static_mutex());
+    session_serial_.Clear(); 
+  }
   inline void Destroy() { OnAlarm(); }
 
 
@@ -152,9 +160,6 @@ class NqClient : public QuicClientBase,
 
   // implements NqSession::Delegate
   void *Context() const override { return context_; }
-  void *StreamContext(uint64_t stream_serial) const override {
-    return stream_manager_.FindContext(NqStreamSerialCodec::ClientStreamIndex(stream_serial));
-  }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
@@ -171,7 +176,7 @@ class NqClient : public QuicClientBase,
   QuicCryptoStream *NewCryptoStream(NqSession *session) override;
   NqLoop *GetLoop() override;
   QuicConnection *Connection() override { return session()->connection(); }
-  uint64_t SessionSerial() const override { return session_serial(); }
+  const NqSerial &SessionSerial() const override { return session_serial(); }
 
 
   //implement custom allocator
@@ -185,7 +190,7 @@ class NqClient : public QuicClientBase,
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
   std::unique_ptr<QuicAlarm> alarm_;
   nq_closure_t on_close_, on_open_, on_finalize_;
-  uint64_t session_serial_;
+  NqSerial session_serial_;
   StreamManager stream_manager_;
   uint64_t next_reconnect_us_ts_;
   nq::atomic<ConnectState> connect_state_;

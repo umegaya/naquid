@@ -6,8 +6,8 @@
 #include <mutex>
 
 namespace nqtest {
-nq_stream_t Test::Conn::invalid_stream = { const_cast<char *>("invalid"), 0 };
-nq_rpc_t Test::Conn::invalid_rpc { const_cast<char *>("invalid"), 0 };
+nq_stream_t Test::Conn::invalid_stream = { {{0}}, const_cast<char *>("invalid") };
+nq_rpc_t Test::Conn::invalid_rpc { {{0}}, const_cast<char *>("invalid") };
 
 
 void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
@@ -26,7 +26,7 @@ void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **
     return; 
   }
   //ensure thread completely start up before next network event happens
-  TRACE("launch connection_id=%llx", c.s);
+  TRACE("launch connection_id=%llx|%llx", c.s.data[0], c.s.data[1]);
   tc->t->testproc_(*tc);
   tc->opened = true;
   tc->t->StartThread();
@@ -177,47 +177,48 @@ void Test::OnRpcNotify(void *arg, nq_rpc_t rpc, uint16_t type, const void *data,
 
 
 void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
-  auto hm = nq_conn_hdmap(tc.c);
-  auto ptc = &tc;
+  MODIFY_HDMAP(tc.c, ([&tc, &options](nq_hdmap_t hm) {
+    auto ptc = &tc;
 
-  nq_rpc_handler_t rh;
-  nq_closure_init(rh.on_rpc_open, on_rpc_open, &Test::OnRpcOpen, ptc);
-  nq_closure_init(rh.on_rpc_close, on_rpc_close, &Test::OnRpcClose, ptc);
-  nq_closure_init(rh.on_rpc_request, on_rpc_request, &Test::OnRpcRequest, ptc);
-  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, &Test::OnRpcNotify, ptc);
-  rh.use_large_msgid = false;
-  rh.timeout = options.rpc_timeout;
-  nq_hdmap_rpc_handler(hm, "rpc", rh);
-  //tc.AddStream(nq_conn_rpc(tc.c, "rpc"));
+    nq_rpc_handler_t rh;
+    nq_closure_init(rh.on_rpc_open, on_rpc_open, &Test::OnRpcOpen, ptc);
+    nq_closure_init(rh.on_rpc_close, on_rpc_close, &Test::OnRpcClose, ptc);
+    nq_closure_init(rh.on_rpc_request, on_rpc_request, &Test::OnRpcRequest, ptc);
+    nq_closure_init(rh.on_rpc_notify, on_rpc_notify, &Test::OnRpcNotify, ptc);
+    rh.use_large_msgid = false;
+    rh.timeout = options.rpc_timeout;
+    nq_hdmap_rpc_handler(hm, "rpc", rh);
+    //tc.AddStream(nq_conn_rpc(tc.c, "rpc"));
 
-  nq_stream_handler_t rsh;
-  nq_closure_init(rsh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
-  nq_closure_init(rsh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
-  nq_closure_init(rsh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
-  nq_closure_init(rsh.stream_reader, stream_reader, &Test::StreamReader, ptc);
-  nq_closure_init(rsh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
-  nq_hdmap_stream_handler(hm, "rst", rsh);
-  //tc.AddStream(nq_conn_stream(tc.c, "rst"));
+    nq_stream_handler_t rsh;
+    nq_closure_init(rsh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
+    nq_closure_init(rsh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
+    nq_closure_init(rsh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
+    nq_closure_init(rsh.stream_reader, stream_reader, &Test::StreamReader, ptc);
+    nq_closure_init(rsh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
+    nq_hdmap_stream_handler(hm, "rst", rsh);
+    //tc.AddStream(nq_conn_stream(tc.c, "rst"));
 
-  nq_stream_handler_t ssh;
-  nq_closure_init(ssh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
-  nq_closure_init(ssh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
-  nq_closure_init(ssh.on_stream_record, on_stream_record, &Test::OnStreamRecordSimple, ptc);
-  ssh.stream_reader = nq_closure_empty();
-  ssh.stream_writer = nq_closure_empty();
-  nq_hdmap_stream_handler(hm, "sst", ssh);
-  //tc.AddStream(nq_conn_stream(tc.c, "sst"));
+    nq_stream_handler_t ssh;
+    nq_closure_init(ssh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
+    nq_closure_init(ssh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
+    nq_closure_init(ssh.on_stream_record, on_stream_record, &Test::OnStreamRecordSimple, ptc);
+    ssh.stream_reader = nq_closure_empty();
+    ssh.stream_writer = nq_closure_empty();
+    nq_hdmap_stream_handler(hm, "sst", ssh);
+    //tc.AddStream(nq_conn_stream(tc.c, "sst"));
 
-  if (options.raw_mode) {
-    nq_stream_handler_t rmh;
-    nq_closure_init(rmh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
-    nq_closure_init(rmh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
-    nq_closure_init(rmh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
-    nq_closure_init(rmh.stream_reader, stream_reader, &Test::StreamReader, ptc);
-    nq_closure_init(rmh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
-    nq_hdmap_raw_handler(hm, rmh);
-    return;
-  }
+    if (options.raw_mode) {
+      nq_stream_handler_t rmh;
+      nq_closure_init(rmh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
+      nq_closure_init(rmh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
+      nq_closure_init(rmh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
+      nq_closure_init(rmh.stream_reader, stream_reader, &Test::StreamReader, ptc);
+      nq_closure_init(rmh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
+      nq_hdmap_raw_handler(hm, rmh);
+      return;
+    }
+  }));
 }
 
 

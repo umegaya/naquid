@@ -22,8 +22,7 @@ class NqStreamHandler;
 
 class NqStream : public QuicStream {
  protected:
-  void *stream_ptr_;
-  nq::atomic<uint64_t> stream_serial_;
+  NqSerial stream_serial_;
   std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name (including ternminate)
  private:
   std::unique_ptr<NqStreamHandler> handler_;
@@ -35,7 +34,7 @@ class NqStream : public QuicStream {
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority);
   ~NqStream() override {
-    ASSERT(stream_serial_ == 0); 
+    ASSERT(stream_serial_.IsEmpty()); 
   }
 
   NqLoop *GetLoop();
@@ -50,37 +49,40 @@ class NqStream : public QuicStream {
   bool OpenHandler(const std::string &name, bool update_buffer_with_name);
 
   void Disconnect();
-  nq_alarm_t NewAlarm();
 
   void OnDataAvailable() override;
   void OnClose() override;
+  virtual void *Context() = 0;
   virtual void **ContextBuffer() = 0;
   virtual NqBoxer *GetBoxer() = 0;
   virtual const std::string &Protocol() const = 0;
-  inline void InvalidateSerial() { stream_serial_ = 0; }
+  virtual std::mutex &StaticMutex() = 0;
+  inline void InvalidateSerial() { 
+    std::unique_lock<std::mutex> lk(StaticMutex());
+    stream_serial_.Clear(); 
+  }
 
   inline bool establish_side() const { return establish_side_; }
   inline bool proto_sent() const { return proto_sent_; }
   inline void set_proto_sent() { proto_sent_ = true; }
-  inline uint64_t stream_serial() const { return stream_serial_; }
-  NqSessionIndex session_index() const;
+  inline const NqSerial &stream_serial() const { return stream_serial_; }
+  //NqSessionIndex session_index() const;
 
   NqSession *nq_session();
   const NqSession *nq_session() const;
   bool set_protocol(const std::string &name);
-  nq_conn_t conn();
 
   //following code assumes nq_stream_t and nq_rpc_t has exactly same way to create and memory layout, 
   //which can be partially checked this static assertion.
   STATIC_ASSERT(sizeof(nq_stream_t) == sizeof(nq_rpc_t) && sizeof(nq_stream_t) == 16, "size difer");
-  STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 0, "offset of p differ");
-  STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 8, "offset of s differ");
+  STATIC_ASSERT(offsetof(nq_stream_t, p) == offsetof(nq_rpc_t, p) && offsetof(nq_stream_t, p) == 8, "offset of p differ");
+  STATIC_ASSERT(offsetof(nq_stream_t, s) == offsetof(nq_rpc_t, s) && offsetof(nq_stream_t, s) == 0, "offset of s differ");
   //FYI(iyatomi): make this virtual if nq_stream_t and nq_rpc_t need to have different memory layout
   inline void RunTask(nq_closure_t cb) {
     return nq_closure_call(cb, on_stream_task, ToHandle<nq_stream_t>());
   }
   template <class T> inline T *Handler() const { return static_cast<T *>(handler_.get()); }
-  template <class H> inline H ToHandle() { return { .p = stream_ptr_, .s = stream_serial_ }; }
+  template <class H> inline H ToHandle() { return MakeHandle<H, NqStream>(this, stream_serial_); }
 
  protected:
   friend class NqStreamHandler;
@@ -90,23 +92,23 @@ class NqStream : public QuicStream {
 };
 
 class NqClientStream : public NqStream {
-  NqStreamIndex stream_index_;
  public:
   NqClientStream(QuicStreamId id, 
            NqSession* nq_session, 
            bool establish_side, 
            SpdyPriority priority = kDefaultPriority) : 
-    NqStream(id, nq_session, establish_side, priority), stream_index_(0) {}
+    NqStream(id, nq_session, establish_side, priority) {}
 
-  inline void set_stream_index(NqStreamIndex idx) { stream_index_ = idx; }
-  inline NqStreamIndex stream_index() const { return stream_index_; }
+  void InitSerial(NqStreamIndex idx);
+  std::mutex &static_mutex();
+  NqBoxer *boxer();
 
-  void InitSerial();
-
-  NqBoxer *GetBoxer() override;
+  NqBoxer *GetBoxer() override { return boxer(); }
+  void *Context() override;
   void OnClose() override;
   void **ContextBuffer() override;
   const std::string &Protocol() const override;
+  std::mutex &StaticMutex() override { return static_mutex(); }
 };
 class NqServerStream : public NqStream {
   void *context_;
@@ -120,11 +122,15 @@ class NqServerStream : public NqStream {
   inline void *context() { return context_; }
 
   void InitSerial(NqStreamIndex idx);
+  std::mutex &static_mutex();
+  NqBoxer *boxer();
 
-  NqBoxer *GetBoxer() override;
+  NqBoxer *GetBoxer() override { return boxer(); }
   void OnClose() override;
+  void *Context() override { return context_; }
   void **ContextBuffer() override { return &context_; }
   const std::string &Protocol() const override { return buffer_; }
+  std::mutex &StaticMutex() override { return static_mutex(); }
 };
 
 

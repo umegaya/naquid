@@ -31,14 +31,14 @@ class NqDispatcher : public QuicDispatcher,
   typedef NqSessiontMap<NqServerSession, NqSessionIndex> ServerMap;
   typedef NqSessiontMap<NqAlarm, NqAlarmIndex> AlarmMap;
   typedef nq::Allocator<NqServerSession, NqStaticSection> SessionAllocator;
-  typedef nq::Allocator<NqServerStream> StreamAllocator;
+  typedef nq::Allocator<NqServerStream, NqStaticSection> StreamAllocator;
   typedef NqAlarm::Allocator AlarmAllocator;
   
   int port_, accept_per_loop_; 
   uint32_t index_, n_worker_;
   const NqServer &server_;
   std::unique_ptr<QuicCryptoServerConfig> crypto_config_;
-  InvokeQueue *invoke_queues_;
+  InvokeQueue *invoke_queues_; //only owns index_ th index. 
   NqServerLoop &loop_;
   NqPacketReader &reader_;
   QuicCompressedCertsCache cert_cache_;
@@ -124,8 +124,6 @@ class NqDispatcher : public QuicDispatcher,
   bool IsSessionLocked(NqSessionIndex idx) const override { return loop_.IsSessionLocked(idx); }
   void LockSession(NqSessionIndex idx) override { loop_.LockSession(idx); }
   void UnlockSession() override { loop_.UnlockSession(); }
-  NqSession::Delegate *FindConn(uint64_t serial, OpTarget target) override;
-  NqStream *FindStream(uint64_t serial, void *p) override;
   void RemoveAlarm(NqAlarmIndex index) override;
 
  protected:

@@ -5,6 +5,8 @@
 #include "core/nq_client.h"
 
 namespace net {
+nq::IdFactory<uint32_t> NqClientLoop::client_worker_index_factory_;
+
 void NqClientLoop::Poll() {
   processor_.Poll(this);
   NqLoop::Poll();
@@ -20,29 +22,10 @@ void NqClientLoop::Close() {
 NqAlarm *NqClientLoop::NewAlarm() {
   auto a = new(this) NqAlarm();
   auto idx = alarm_map_.Add(a);
-  a->InitSerial(NqAlarmSerialCodec::ClientEncode(idx));  
+  nq_serial_t s;
+  NqAlarmSerialCodec::ClientEncode(s, idx);
+  a->InitSerial(s);
   return a;
-}
-NqSession::Delegate *NqClientLoop::FindConn(uint64_t serial, NqBoxer::OpTarget target) {
-  switch (target) {
-  case Conn:
-    return client_map().Find(NqConnSerialCodec::ClientSessionIndex(serial));
-  case Stream:
-    return client_map().Find(NqStreamSerialCodec::ClientSessionIndex(serial));
-  default:
-    ASSERT(false);
-    return nullptr;
-  }
-}
-NqStream *NqClientLoop::FindStream(uint64_t serial, void *p) {
-  //note that following code executed even if p already freed. 
-  //so cannot call virtual function of NqStream correctly inside of this func.
-  auto c = static_cast<NqClient *>(reinterpret_cast<NqSession::Delegate *>(p));
-  if (c->session_index() != NqStreamSerialCodec::ClientSessionIndex(serial)) {
-    return nullptr;
-  }
-  auto idx = NqStreamSerialCodec::ClientStreamIndex(serial);
-  return c->FindOrCreateStream(idx);
 }
 void NqClientLoop::RemoveAlarm(NqAlarmIndex index) {
   alarm_map_.Remove(index);

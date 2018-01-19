@@ -245,6 +245,22 @@ class StreamTaskClosureCaller : public ClosureCallerBase {
     nq_stream_task(s, closure());
   }  
 };
+class ModifyHdmapClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (nq_hdmap_t hdmap)> cb_;
+ public:
+  ModifyHdmapClosureCaller(std::function<void (nq_hdmap_t hdmap)> cb) : cb_(cb) {}
+  ~ModifyHdmapClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_conn_modify_hdmap, &ModifyHdmapClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_hdmap_t hm) { 
+    auto pcc = (ModifyHdmapClosureCaller *)arg;
+    return pcc->cb_(hm);
+  }  
+};
 
 
 class Test {
@@ -341,8 +357,8 @@ class Test {
       auto cc = new ConnOpenStreamClosureCaller(cb);
       nq_conn_rpc(c, name.c_str(), cc);
     }
-    static inline SessionSerialType SessionSerial(nq_stream_t &s) { return s.s; }
-    static inline SessionSerialType SessionSerial(nq_rpc_t &rpc) { return rpc.s; }
+    static inline const SessionSerialType &SessionSerial(nq_stream_t &s) { return s.s.data[0]; }
+    static inline const SessionSerialType &SessionSerial(nq_rpc_t &rpc) { return rpc.s.data[0]; }
     void AddStream(nq_stream_t s) {
       auto sid = SessionSerial(s);
       if (streams.find(sid) == streams.end()) {
@@ -536,12 +552,16 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
   pcc->cb_ = callback; \
   conn.SetClosure(nqtest::Test::CallbackType::type, pcc); \
 }
-
 #define WATCH_STREAM(conn, stream, type, callback) { \
   TRACE("WATCH_STREAM: at %p %u %s(%u)", &conn, nqtest::Test::CallbackType::type, __FILE__, __LINE__); \
   auto *pcc = new nqtest::type##ClosureCaller(); \
   pcc->cb_ = callback; \
   conn.SetClosure(nqtest::Test::CallbackType::type, stream, pcc); \
+}
+#define MODIFY_HDMAP(conn, callback) { \
+  auto *pcc = new nqtest::ModifyHdmapClosureCaller(callback); \
+  nq_conn_modify_hdmap(conn, pcc->closure()); \
+  delete pcc; \
 }
 
 

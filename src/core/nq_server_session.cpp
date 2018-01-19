@@ -11,14 +11,11 @@ namespace net {
 NqServerSession::NqServerSession(QuicConnection *connection,
                                  const NqServer::PortConfig &port_config)
   : NqSession(connection, dispatcher(), this, port_config), //dispatcher implements QuicSession::Visitor interface
-  port_config_(port_config), own_handler_map_(), index_factory_(), context_(nullptr) {
+  port_config_(port_config), own_handler_map_(), index_factory_(0x7FFFFFFF), context_(nullptr) {
   init_crypto_stream();
 }
 nq_conn_t NqServerSession::ToHandle() { 
-  return {
-    .p = static_cast<NqSession::Delegate *>(this),
-    .s = session_serial_,
-  }; 
+  return MakeHandle<nq_conn_t, NqSession::Delegate>(static_cast<NqSession::Delegate *>(this), session_serial_);
 }
 std::mutex &NqServerSession::static_mutex() {
   return dispatcher()->session_allocator_body().Bss(this)->mutex();
@@ -36,13 +33,14 @@ NqStream *NqServerSession::FindStream(QuicStreamId id) {
   auto it = dynamic_streams().find(id);
   return it != dynamic_streams().end() ? static_cast<NqStream *>(it->second.get()) : nullptr;
 }
-NqStream *NqServerSession::FindStreamBySerial(uint64_t s, bool include_closed) {
+NqStream *NqServerSession::FindStreamBySerial(const nq_serial_t &s, bool include_closed) {
   //TODO(iyatomi): now assume not so much stream with one session. 
   //in that case, below code probably faster because of good memory locality. 
   //but better to handle so-many-stream per session case separately
   for (auto &kv : dynamic_streams()) {
     auto st = static_cast<NqStream *>(kv.second.get());
-    TRACE("FindStreamBySerial: %p(a), s = %llx, sts = %llx %p %p", this, s, st->stream_serial(), st, static_cast<NqServerStream *>(st)->context());
+    TRACE("FindStreamBySerial: %p(a), s = %s, sts = %s %p %p", 
+      this, NqSerial::Dump(s).c_str(), st->stream_serial().Dump().c_str(), st, static_cast<NqServerStream *>(st)->context());
     if (st->stream_serial() == s) {
       return st;
     }
@@ -51,15 +49,15 @@ NqStream *NqServerSession::FindStreamBySerial(uint64_t s, bool include_closed) {
     auto &closed_list = *closed_streams();
     for (auto &e : closed_list) {
       auto st = static_cast<NqStream *>(e.get());
-      TRACE("FindStreamBySerial: %p(c), s = %llx, sts = %llx %p", this, s, st->stream_serial(), st);
-      if (st->stream_serial() == s) {
+      TRACE("FindStreamBySerial: %p(c), s = %s, sts = %s %p", this, NqSerial::Dump(s).c_str(), st->stream_serial().Dump().c_str(), st);
+    if (st->stream_serial() == s) {
         return st;
       }
     }
     for (auto &kv : zombie_streams()) {
       auto st = static_cast<NqStream *>(kv.second.get());
-      TRACE("FindStreamBySerial: %p(z), s = %llx, sts = %llx %p", this, s, st->stream_serial(), st);
-      if (st->stream_serial() == s) {
+      TRACE("FindStreamBySerial: %p(z), s = %s, sts = %s %p", this, NqSerial::Dump(s).c_str(), st->stream_serial().Dump().c_str(), st);
+    if (st->stream_serial() == s) {
         return st;
       }      
     }
@@ -68,7 +66,7 @@ NqStream *NqServerSession::FindStreamBySerial(uint64_t s, bool include_closed) {
 }
 void NqServerSession::InitSerial() {
   auto session_index = dispatcher()->server_map().Add(this);
-  session_serial_ = NqConnSerialCodec::ServerEncode(session_index, connection_id(), dispatcher()->worker_num());
+  NqConnSerialCodec::ServerEncode(session_serial_, session_index);
 }
 
 
@@ -76,14 +74,6 @@ void NqServerSession::InitSerial() {
 //implements NqSession::Delegate
 NqLoop *NqServerSession::GetLoop() { 
   return dispatcher()->loop(); 
-}
-void *NqServerSession::StreamContext(uint64_t stream_serial) const {
-  auto s = const_cast<NqServerSession *>(this)->FindStreamBySerial(stream_serial, true);
-  if (s != nullptr) {
-    return static_cast<NqServerStream *>(s)->context();
-  } else {
-    return nullptr;
-  }
 }
 void NqServerSession::OnClose(QuicErrorCode error,
                      const std::string& error_details,
@@ -109,18 +99,18 @@ bool NqServerSession::IsClient() const {
 }
 QuicStream* NqServerSession::CreateIncomingDynamicStream(QuicStreamId id) {
   auto s = new(dispatcher()) NqServerStream(id, this, false);
-  s->InitSerial(index_factory().New());
+  s->InitSerial(index_factory_.New());
   ActivateStream(QuicWrapUnique(s));
   return s;
 }
 QuicStream* NqServerSession::CreateOutgoingDynamicStream() {
   auto s = new(dispatcher()) NqServerStream(GetNextOutgoingStreamId(), this, true);
-  s->InitSerial(index_factory().New());
+  s->InitSerial(index_factory_.New());
   ActivateStream(QuicWrapUnique(s)); //activate here. it needs to send packet normally in stream OnOpen handler
   return s;
 }
 void NqServerSession::InitStream(const std::string &name, void *ctx) {
-  boxer()->InvokeConn(session_serial_, NqBoxer::OpCode::OpenStream, this, name.c_str(), ctx);
+  boxer()->InvokeConn(session_serial_, this, NqBoxer::OpCode::OpenStream, name.c_str(), ctx);
 }
 void NqServerSession::OpenStream(const std::string &name, void *ctx) {
   auto s = reinterpret_cast<NqStream *>(CreateOutgoingDynamicStream());

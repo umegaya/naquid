@@ -38,7 +38,7 @@ NqClient::NqClient(QuicSocketAddress server_address,
   set_server_address(server_address);
 }
 NqClient::~NqClient() {
-  ASSERT(session_serial_ == 0);
+  ASSERT(session_serial_.IsEmpty());
   ResetSession();
 }
 void* NqClient::operator new(std::size_t sz) {
@@ -68,13 +68,10 @@ void NqClient::operator delete(void *p, NqClientLoop *l) noexcept {
 
 void NqClient::InitSerial() {
   auto session_index = loop_->client_map().Add(this);
-  session_serial_ = NqConnSerialCodec::ClientEncode(session_index);
+  NqConnSerialCodec::ClientEncode(session_serial_, session_index);
 }
 nq_conn_t NqClient::ToHandle() { 
-  return {
-    .p = static_cast<NqSession::Delegate *>(this),
-    .s = session_serial_,
-  };
+  return MakeHandle<nq_conn_t, NqSession::Delegate>(static_cast<NqSession::Delegate *>(this), session_serial_);
 }
 std::mutex &NqClient::static_mutex() {
   return loop_->client_allocator().Bss(this)->mutex();
@@ -241,22 +238,22 @@ void NqClient::ReconnectAlarm::OnAlarm() {
 
 //StreamManager
 NqClient::StreamManager::Entry *
-NqClient::StreamManager::FindEntry(NqStreamIndex index) const {
-  auto it = stream_map_.find(index);
-  return it != stream_map_.end() ? const_cast<Entry *>(&(it->second)) : nullptr;
+NqClient::StreamManager::FindEntry(NqStreamIndex index) {
+  auto it = entries_.find(index);
+  return it != entries_.end() ? const_cast<Entry *>(&(it->second)) : nullptr;
 }
 void NqClient::StreamManager::RecoverOutgoingStreams(NqClientSession *session) {
-  for (auto &kv : stream_map_) {
-    auto &e = kv.second;
+for (auto &kv : entries_) {
+    auto &e = kv.second; 
     TRACE("RecoverOutgoingStreams: %u %s %p", kv.first, e.name_.c_str(), e.handle_);
     if (e.name_.length() > 0) {
       auto s = e.Stream();
       if (s == nullptr) {
         s = static_cast<NqClientStream *>(session->CreateOutgoingDynamicStream());
-        s->set_stream_index(kv.first);
-        s->InitSerial();
+        s->InitSerial(kv.first);
         TRACE("RecoverOutgoingStreams: serial %llx", s->stream_serial());
       }
+      ASSERT(s != nullptr);
       e.SetStream(s);
       if (!s->OpenHandler(e.name_, true)) {
         e.ClearStream();
@@ -267,44 +264,42 @@ void NqClient::StreamManager::RecoverOutgoingStreams(NqClientSession *session) {
 }
 void NqClient::StreamManager::CleanupStreamsOnClose() {
   TRACE("CleanupStreamsOnClose");
-  stream_map_.clear(); //after that stream_map_.erase may called.
+  entries_.clear(); //after that entries_.erase may called.
 }
-bool NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
+NqStreamIndex NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
   ASSERT((s->id() % 2) == 0); //must be incoming stream from server (server outgoing stream)
-  auto idx = index_seed_.New();
-  stream_map_.emplace(idx, Entry(s));
-  s->set_stream_index(idx);
-  return true;
+  auto idx = index_factory_.New();
+  entries_.emplace(idx, Entry(s));
+  return idx;
 }
 void NqClient::StreamManager::OnIncomingClose(NqClientStream *s) {
-  stream_map_.erase(s->stream_index());
+  entries_.erase(NqStreamSerialCodec::ClientStreamIndex(s->stream_serial()));
 }
 
 bool NqClient::StreamManager::OnOutgoingOpen(NqClient *client, bool connected,
                                             const std::string &name, void *ctx) {
-  auto idx = index_seed_.New();
-  auto r = stream_map_.emplace(idx, Entry(nullptr, name));
+  auto idx = index_factory_.New();
+  auto r = entries_.emplace(idx, Entry(nullptr, name));
   if (!r.second) {
     return false;
   } else {
     r.first->second.context_ = ctx;
     if (connected) {
       //when connected means RecoverOutgoingStreams is not called automatically in NqClient::OnOpen.
-      client->boxer()->InvokeConn(client->session_serial_, NqBoxer::OpCode::OpenStream, client, name.c_str(), ctx);
+      client->boxer()->InvokeConn(client->session_serial_, client, NqBoxer::OpCode::OpenStream, name.c_str(), ctx);
     }
     return true;
   }
 }
 void NqClient::StreamManager::OnOutgoingClose(NqClientStream *s) {
-  stream_map_.erase(s->stream_index());
+  OnIncomingClose(s);
 }
 NqClientStream *NqClient::StreamManager::FindOrCreateStream(
       NqClientSession *session, 
       NqStreamIndex stream_index, 
       bool connected) {
-  auto it = stream_map_.find(stream_index);
-  if (it != stream_map_.end()) {
-    auto &e = it->second;
+  auto e = FindEntry(stream_index);
+  if (e != nullptr) {
     /*if (e.name_.length() > 0) {
       auto s = e.Stream();
       if (s == nullptr && connected) {
@@ -316,7 +311,7 @@ NqClientStream *NqClient::StreamManager::FindOrCreateStream(
         }
       }
     }*/
-    return e.Stream();
+    return e->Stream();
   }
   return nullptr;
 }

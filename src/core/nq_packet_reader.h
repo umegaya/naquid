@@ -16,7 +16,7 @@
 #include "basis/endian.h"
 
 #if defined(__linux__)
-#define MMSG_MORE 1
+#define MMSG_MORE 0
 #else
 #define MMSG_MORE 0
 #endif

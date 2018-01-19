@@ -117,48 +117,16 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
 
 //implements NqBoxer
 void NqDispatcher::Enqueue(Op *op) {
-  int windex;
-  switch (op->target_) {
-  case NqBoxer::Conn:
-    windex = NqConnSerialCodec::ServerWorkerIndex(op->serial_);
-    break;
-  case NqBoxer::Stream:
-    windex = NqStreamSerialCodec::ServerWorkerIndex(op->serial_);
-    break;
-  case NqBoxer::Alarm:
-    windex = NqAlarmSerialCodec::ServerWorkerIndex(op->serial_);
-    break;
-  default:
-    ASSERT(false);
-    return;
-  }
-  invoke_queues_[windex].enqueue(op);
+  //TODO(iyatomi): NqDispatcher owns invoke_queue
+  invoke_queues_[index_].enqueue(op);
 }
 NqAlarm *NqDispatcher::NewAlarm() {
   auto a = new(this) NqAlarm();
   auto idx = alarm_map_.Add(a);
-  a->InitSerial(NqAlarmSerialCodec::ServerEncode(idx, worker_index()));
+  nq_serial_t s;
+  NqAlarmSerialCodec::ServerEncode(s, idx);
+  a->InitSerial(s);
   return a;
-}
-NqSession::Delegate *NqDispatcher::FindConn(uint64_t serial, OpTarget target) {
-  switch (target) {
-  case Conn:
-    return server_map().Find(NqConnSerialCodec::ServerSessionIndex(serial));
-  case Stream:
-    return server_map().Find(NqStreamSerialCodec::ServerSessionIndex(serial));
-  default:
-    ASSERT(false);
-    return nullptr;
-  }
-}
-NqStream *NqDispatcher::FindStream(uint64_t serial, void *p) {
-  //note that following code executed even if p already freed. 
-  //so cannot call virtual function of NqStream correctly inside of this func.
-  auto s = static_cast<NqServerSession *>(reinterpret_cast<NqSession::Delegate *>(p));
-  if (s->session_index() != NqStreamSerialCodec::ServerSessionIndex(serial)) {
-    return nullptr;
-  }
-  return s->FindStreamBySerial(serial);
 }
 void NqDispatcher::RemoveAlarm(NqAlarmIndex index) {
   alarm_map_.Remove(index);

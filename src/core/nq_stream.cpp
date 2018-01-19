@@ -27,14 +27,6 @@ NqSession *NqStream::nq_session() {
 const NqSession *NqStream::nq_session() const { 
   return static_cast<const NqSession *>(session()); 
 }
-NqSessionIndex NqStream::session_index() const { 
-  return NqStreamSerialCodec::IsClient(stream_serial_) ? 
-    NqStreamSerialCodec::ClientSessionIndex(stream_serial_) : 
-    NqStreamSerialCodec::ServerSessionIndex(stream_serial_); 
-}
-nq_conn_t NqStream::conn() { 
-  return nq_session()->conn(); 
-}
 bool NqStream::TryOpenRawHandler(bool *p_on_open_result) {
   auto rh = nq_session()->handler_map()->RawHandler();
   if (rh != nullptr) {
@@ -76,14 +68,6 @@ bool NqStream::OpenHandler(const std::string &name, bool update_buffer_with_name
 NqLoop *NqStream::GetLoop() { 
   return nq_session()->delegate()->GetLoop(); 
 }
-nq_alarm_t NqStream::NewAlarm() {
-  NqAlarm *a = GetBoxer()->NewAlarm();
-  TRACE("NqStream::NewAlram %p", a);
-  return {
-    .p = a,
-    .s = a->alarm_serial(),
-  };
-}
 NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
   auto he = nq_session()->handler_map()->Find(name);
   if (he == nullptr) {
@@ -96,7 +80,7 @@ NqStreamHandler *NqStream::CreateStreamHandler(const nq::HandlerMap::HandlerEntr
   NqStreamHandler *s;
   switch (he->type) {
   case nq::HandlerMap::FACTORY: {
-    s = (NqStreamHandler *)nq_closure_call(he->factory, create_stream, nq_session()->conn());
+    s = (NqStreamHandler *)nq_closure_call(he->factory, create_stream, nq_session()->ToHandle());
   } break;
   case nq::HandlerMap::STREAM: {
     if (nq_closure_is_empty(he->stream.stream_reader)) {
@@ -127,7 +111,7 @@ void NqStream::Disconnect() {
   nq_session()->CloseStream(id());
 }
 void NqStream::OnClose() {
-  TRACE("NqStream::OnClose %p, %llx(%lu)", this, stream_serial_.load(), id());
+  TRACE("NqStream::OnClose %p, %llx(%lu)", this, stream_serial_.Dump().c_str(), id());
   if (handler_ != nullptr) {
     handler_->OnClose();
   }
@@ -197,19 +181,14 @@ void NqStream::OnDataAvailable() {
 
 
 
-NqBoxer *NqClientStream::GetBoxer() {
+NqBoxer *NqClientStream::boxer() {
   return static_cast<NqBoxer *>(static_cast<NqClientLoop *>(stream_allocator()));
 }
-void NqClientStream::InitSerial() { 
-  stream_ptr_ = nq_session()->delegate();
+void NqClientStream::InitSerial(NqStreamIndex idx) { 
   auto session_serial = nq_session()->delegate()->SessionSerial();
-  ASSERT(NqConnSerialCodec::IsClient(session_serial));
-  stream_serial_ =  
-    NqStreamSerialCodec::ClientEncode(
-      NqConnSerialCodec::ClientSessionIndex(session_serial), 
-      stream_index_ //need to give stable stream index instead of stream_id, which will change on reconnection.
-    ); 
-  TRACE("NqClientStream: serial = %llx", stream_serial_.load());
+  ASSERT(NqSerial::IsClient(session_serial));
+  NqStreamSerialCodec::ClientEncode(stream_serial_, idx); 
+  TRACE("NqClientStream: serial = %s", stream_serial_.Dump().c_str());
 }
 void NqClientStream::OnClose() {
   ASSERT(nq_session()->delegate()->IsClient());
@@ -226,33 +205,42 @@ void **NqClientStream::ContextBuffer() {
   return c->stream_manager().FindContextBuffer(
     NqStreamSerialCodec::ClientStreamIndex(serial));
 }
+void *NqClientStream::Context() {
+  ASSERT(nq_session()->delegate()->IsClient());
+  auto c = static_cast<NqClient *>(nq_session()->delegate());  
+  auto serial = stream_serial();
+  return c->stream_manager().FindContext(
+    NqStreamSerialCodec::ClientStreamIndex(serial));
+}
 const std::string &NqClientStream::Protocol() const {
   auto c = static_cast<const NqClient *>(nq_session()->delegate());  
   return c->stream_manager().FindStreamName(
     NqStreamSerialCodec::ClientStreamIndex(stream_serial()));
 }
+std::mutex &NqClientStream::static_mutex() {
+  auto cl = static_cast<NqClientLoop *>(stream_allocator());  
+  return cl->stream_allocator().Bss(this)->mutex();
+}
 
 
 
-
-NqBoxer *NqServerStream::GetBoxer() {
+NqBoxer *NqServerStream::boxer() {
   return static_cast<NqBoxer *>(static_cast<NqDispatcher *>(stream_allocator()));
 }
 void NqServerStream::InitSerial(NqStreamIndex idx) {
-  stream_ptr_ = nq_session()->delegate();
   auto session_serial = nq_session()->delegate()->SessionSerial();
-  ASSERT(!NqConnSerialCodec::IsClient(session_serial));
-  stream_serial_ = NqStreamSerialCodec::ServerEncode(
-    NqConnSerialCodec::ServerSessionIndex(session_serial), 
-    idx, 
-    NqConnSerialCodec::ServerWorkerIndex(session_serial)
-  );   
-  TRACE("NqServerStream: serial = %llx", stream_serial_.load());
+  ASSERT(!NqSerial::IsClient(session_serial));
+  NqStreamSerialCodec::ServerEncode(stream_serial_, idx);
+  TRACE("NqServerStream: serial = %llx", stream_serial_.Dump().c_str());
 }
 void NqServerStream::OnClose() {
   ASSERT(!nq_session()->delegate()->IsClient());
   NqStream::OnClose();
   InvalidateSerial();
+}
+std::mutex &NqServerStream::static_mutex() {
+  auto cl = static_cast<NqDispatcher *>(stream_allocator());  
+  return cl->stream_allocator().Bss(this)->mutex();
 }
 
 
