@@ -16,7 +16,7 @@
 #include "basis/endian.h"
 
 #if defined(__linux__)
-#define MMSG_MORE 0
+#define MMSG_MORE 1
 #else
 #define MMSG_MORE 0
 #endif
@@ -143,6 +143,7 @@ class NqPacketReader {
   // call.
   PacketData packets_[kNumPacketsPerReadMmsgCall];
   mmsghdr mmsg_hdr_[kNumPacketsPerReadMmsgCall];
+  int last_packets_read_;
 #endif
 
   DISALLOW_COPY_AND_ASSIGN(NqPacketReader);

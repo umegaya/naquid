@@ -64,6 +64,7 @@ void NqPacketReader::Initialize() {
     hdr->msg_control = packets_[i].cbuf;
     hdr->msg_controllen = QuicSocketUtils::kSpaceForCmsg;
   }
+  last_packets_read_ = 0;
 #endif
 }
 bool NqPacketReader::Read(
@@ -87,26 +88,25 @@ bool NqPacketReader::ReadPacketsMulti(
     QuicPacketCount* packets_dropped) {
 #if MMSG_MORE
   // Re-set the length fields in case recvmmsg has changed them.
-  for (int i = 0; i < kNumPacketsPerReadMmsgCall; ++i) {
+  for (int i = 0; i < last_packets_read_; ++i) {
     DCHECK_EQ(kMaxPacketSize, packets_[i].iov.iov_len);
-    if (packets_[i].buf == nullptr) { //if packet send to queue or consumed, assign new one.
-      auto buf = NewBuffer();
-      packets_[i].buf = buf;
-      packets_[i].iov.iov_base = buf;
-    }
+    auto buf = NewBuffer();
+    packets_[i].buf = buf;
+    packets_[i].iov.iov_base = buf;
     msghdr* hdr = &mmsg_hdr_[i].msg_hdr;
     hdr->msg_namelen = sizeof(sockaddr_storage);
     DCHECK_EQ(static_cast<size_t>(1), hdr->msg_iovlen);
     hdr->msg_controllen = QuicSocketUtils::kSpaceForCmsg;
   }
 
-  int packets_read = recvmmsg(fd, mmsg_hdr_, kNumPacketsPerReadMmsgCall, 0, nullptr);
-  if (packets_read <= 0) {
+  last_packets_read_ = recvmmsg(fd, mmsg_hdr_, kNumPacketsPerReadMmsgCall, 0, nullptr);
+  if (last_packets_read_ <= 0) {
     return false;  // recvmmsg failed
   }
+  //printf("last_packets_read_ %d\n", last_packets_read_);
 
   QuicWallTime fallback_walltimestamp = QuicWallTime::Zero();
-  for (int i = 0; i < packets_read; ++i) {
+  for (int i = 0; i < last_packets_read_; ++i) {
     if (mmsg_hdr_[i].msg_len == 0) {
       continue;
     }
@@ -143,7 +143,6 @@ bool NqPacketReader::ReadPacketsMulti(
                               has_ttl, packets_[i].raw_address, server_ip, port);
     packet->set_port(port);
     delegate->OnRecv(packet);
-    packets_[i].buf = nullptr;
   }
 
   if (packets_dropped != nullptr) {
@@ -152,7 +151,7 @@ bool NqPacketReader::ReadPacketsMulti(
   }
 
   // We may not have read all of the packets available on the socket.
-  return packets_read == kNumPacketsPerReadMmsgCall;
+  return last_packets_read_ == kNumPacketsPerReadMmsgCall;
 #else
   QUIC_LOG(FATAL) << "Unsupported";
   return false;

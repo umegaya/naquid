@@ -11,7 +11,7 @@
 - [x] conn: changing to batch send by default, with preparing new API to flush batch buffer
 - [x] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
 - [x] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
-- [ ] conn: enable MMSG_MORE for linux
+- [x] conn: enable MMSG_MORE for linux
 - [ ] conn: handle connectivity change (if not handled)
 - [x] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
 - [x] API: use direct pointer to access conn/stream
