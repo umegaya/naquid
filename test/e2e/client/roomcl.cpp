@@ -10,7 +10,7 @@
 
 using namespace nqtest;
 
-#define N_CLIENT (1)
+#define N_CLIENT (10)
 #define N_RECV (10)
 
 /* static variables */
@@ -82,8 +82,8 @@ void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq
   }
 }
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {
-  TRACE("rpc notif: %u", type);
   closure_ctx *c = (closure_ctx *)nq_rpc_ctx(rpc);
+  TRACE("rpc notif: %llu %u", c->id, type);
   switch (type) {
     case RpcType::BcastNotify:
       {
@@ -91,8 +91,12 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
         uint64_t id = nq::Endian::NetbytesToHost<uint64_t>(tmp);
         uint64_t acked_max = nq::Endian::NetbytesToHost<uint64_t>(tmp + sizeof(uint64_t));
         ASSERT(id == c->id);
+        if (c->acked_max >= acked_max) {
+          TRACE("%llu: old acked %llu ignored (now: %llu)\n", c->id, c->acked_max, acked_max);
+          return;
+        }
         ASSERT((c->acked_max + 1) == acked_max);
-        TRACE("acked %llu => %llu\n", c->acked_max, acked_max);
+        TRACE("%llu: acked %llu => %llu\n", c->id, c->acked_max, acked_max);
         c->acked_max = acked_max;
         char buffer[sizeof(uint64_t) + sizeof(uint64_t) + 1];
         nq::Endian::HostToNetbytes(c->id, buffer);

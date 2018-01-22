@@ -354,7 +354,7 @@ NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get context, which is set at on_conn_open
 NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t.
-static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && c1.s.data[1] == c2.s.data[1]; }
+static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
 
 
 
@@ -384,7 +384,7 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
 //schedule execution of closure which is given to cb, will called with given s.
 NQAPI_THREADSAFE void nq_stream_task(nq_stream_t s, nq_closure_t cb);
 //check equality of nq_stream_t.
-static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s.data[0] == c2.s.data[0] && c1.s.data[1] == c2.s.data[1]; }
+static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] || c1.p == c2.p); }
 //get stream id. this may change as you re-created stream on reconnection. 
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
@@ -432,7 +432,7 @@ NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *d
 //schedule execution of closure which is given to cb, will called with given rpc.
 NQAPI_THREADSAFE void nq_rpc_task(nq_rpc_t rpc, nq_closure_t cb);
 //check equality of nq_rpc_t.
-static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s.data[0] == c2.s.data[0] && c1.s.data[1] == c2.s.data[1]; }
+static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] || c1.p == c2.p); }
 //get rpc id. this may change as you re-created rpc on reconnection.
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc);
