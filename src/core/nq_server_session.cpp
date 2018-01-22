@@ -11,7 +11,7 @@ namespace net {
 NqServerSession::NqServerSession(QuicConnection *connection,
                                  const NqServer::PortConfig &port_config)
   : NqSession(connection, dispatcher(), this, port_config), //dispatcher implements QuicSession::Visitor interface
-  port_config_(port_config), own_handler_map_(), index_factory_(0x7FFFFFFF), context_(nullptr) {
+  port_config_(port_config), own_handler_map_(), context_(nullptr) {
   init_crypto_stream();
 }
 nq_conn_t NqServerSession::ToHandle() { 
@@ -68,6 +68,9 @@ void NqServerSession::InitSerial() {
   auto session_index = dispatcher()->server_map().Add(this);
   NqConnSerialCodec::ServerEncode(session_serial_, session_index);
 }
+NqStreamIndex NqServerSession::NewStreamIndex() { 
+  return dispatcher()->stream_index_factory().New(); 
+}
 
 
 
@@ -99,13 +102,13 @@ bool NqServerSession::IsClient() const {
 }
 QuicStream* NqServerSession::CreateIncomingDynamicStream(QuicStreamId id) {
   auto s = new(dispatcher()) NqServerStream(id, this, false);
-  s->InitSerial(index_factory_.New());
+  s->InitSerial(NewStreamIndex());
   ActivateStream(QuicWrapUnique(s));
   return s;
 }
 QuicStream* NqServerSession::CreateOutgoingDynamicStream() {
   auto s = new(dispatcher()) NqServerStream(GetNextOutgoingStreamId(), this, true);
-  s->InitSerial(index_factory_.New());
+  s->InitSerial(NewStreamIndex());
   ActivateStream(QuicWrapUnique(s)); //activate here. it needs to send packet normally in stream OnOpen handler
   return s;
 }

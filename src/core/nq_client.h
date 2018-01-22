@@ -60,16 +60,14 @@ class NqClient : public QuicClientBase,
     };
 
     using StreamMap = QuicSmallMap<NqStreamIndex, Entry, 10>;
-    using StreamVector = std::vector<Entry>;
 
     StreamMap entries_;
-    nq::IdFactoryNoAtomic<NqStreamIndex> index_factory_;
    public:
-    StreamManager() : entries_(), index_factory_(0x7FFFFFFF) {}
+    StreamManager() : entries_() {}
     
     bool OnOutgoingOpen(NqClient *client, bool connected,
                         const std::string &name, void *ctx);
-    NqStreamIndex OnIncomingOpen(NqClientStream *s);
+    NqStreamIndex OnIncomingOpen(NqClient *client, NqClientStream *s);
     void OnClose(NqClientStream *s);
 
     NqClientStream *FindOrCreateStream(
@@ -95,7 +93,6 @@ class NqClient : public QuicClientBase,
       auto *e = FindEntry(index);
       return e == nullptr ? empty_ : e->Name();
     }
-    inline NqStreamIndex NewIndex() { return index_factory_.New(); }
    protected:
     Entry *FindEntry(NqStreamIndex index);
     inline const Entry *FindEntry(NqStreamIndex index) const { 
@@ -129,6 +126,7 @@ class NqClient : public QuicClientBase,
   
   nq_conn_t ToHandle();
   NqClientStream *FindOrCreateStream(NqStreamIndex index);
+  NqStreamIndex NewStreamIndex();
   void InitSerial();
   void ScheduleDestroy();
   void OnFinalize();

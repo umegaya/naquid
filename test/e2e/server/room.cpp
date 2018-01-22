@@ -60,6 +60,7 @@ void room_bcast(nq_rpc_t replier, nq_msgid_t msgid, const void *ptr, nq_size_t s
 		nq::Endian::HostToNetbytes(kv.first, buffer);
 		nq::Endian::HostToNetbytes(kv.second->acked_max_seq_id + 1, buffer + sizeof(uint64_t));
 		nq_rpc_notify(kv.second->conn, RpcType::BcastNotify, buffer, sizeof(buffer));
+		//TRACE("sent for %llu serial %llx|%p %llu\n", kv.first, kv.second->conn.s.data[0], kv.second->conn.p, kv.second->acked_max_seq_id + 1);
 	}
 	nq_rpc_reply(replier, msgid, "", 0);
 }
@@ -75,7 +76,7 @@ void room_bcast_reply(nq_rpc_t replier, nq_msgid_t msgid, const void *ptr, nq_si
 		it->second->acked_max_seq_id = acked_seq_id;
 	}
 	if (!client_close) {
-		nq_rpc_close(replier);
+		nq_conn_close(nq_rpc_conn(replier));
 	} else {
 		nq_rpc_reply(replier, msgid, "", 0);
 	}

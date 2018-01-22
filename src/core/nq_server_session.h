@@ -18,6 +18,7 @@ class NqServerSession : public NqSession,
 
   nq_conn_t ToHandle();
   NqStream *FindStream(QuicStreamId id);
+  NqStreamIndex NewStreamIndex();
   //if you set included closed to true, be careful to use returned value, 
   //this pointer soon will be invalid.
   NqStream *FindStreamBySerial(const nq_serial_t &s, bool include_closed = false);
@@ -25,7 +26,7 @@ class NqServerSession : public NqSession,
   inline void InvalidateSerial() { 
     std::unique_lock<std::mutex> lk(static_mutex());
     session_serial_.Clear(); 
-  }  
+  }
 
   std::mutex &static_mutex();
   NqBoxer *boxer();
@@ -33,7 +34,6 @@ class NqServerSession : public NqSession,
   inline const NqSerial &session_serial() const { return session_serial_; }
   inline NqSessionIndex session_index() const { 
     return NqConnSerialCodec::ServerSessionIndex(session_serial_); }
-  inline nq::IdFactory<NqStreamIndex> &index_factory() { return index_factory_; }
 
 
   //implements QuicSession
@@ -64,7 +64,6 @@ class NqServerSession : public NqSession,
  private:
   const NqServer::PortConfig &port_config_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
-  nq::IdFactoryNoAtomic<NqStreamIndex> index_factory_;
   NqSerial session_serial_;
   void *context_;
 };

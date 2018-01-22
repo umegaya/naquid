@@ -48,6 +48,7 @@ class NqDispatcher : public QuicDispatcher,
   SessionAllocator session_allocator_;
   StreamAllocator stream_allocator_;
   AlarmAllocator alarm_allocator_;
+  nq::IdFactory<uint32_t> stream_index_factory_;
 
  public:
   NqDispatcher(int port, const NqServerConfig& config, 
@@ -84,7 +85,9 @@ class NqDispatcher : public QuicDispatcher,
   inline int worker_index() const { return index_; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
   inline StreamAllocator &stream_allocator() { return stream_allocator_; }
+  //avoid confusing with QuicSession::session_allocator
   inline SessionAllocator &session_allocator_body() { return session_allocator_; }
+  inline nq::IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
 
   //implements QuicStreamAllocator
   void *Alloc(size_t sz) override { return stream_allocator_.Alloc(sz); }

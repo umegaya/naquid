@@ -24,8 +24,8 @@ extern "C" {
 //indicate this call only safe when invoked with nq_conn/rpc/stream_t which passed to
 //functions of nq_closure_t. 
 #define NQAPI_CLOSURECALL extern
-//for external variable
-#define NQAPI_EXTERN extern
+//inline function
+#define NQAPI_INLINE static inline
 
 
 
@@ -86,7 +86,7 @@ typedef enum {
   NQ_ENOTSUPPORT = -4,
   NQ_EGOAWAY = -5,
   NQ_EQUIC = -6,  //quic library error
-  NQ_EUSER = -7,  //for rpc, user calls raise to reply
+  NQ_EUSER = -7,  //for rpc, user calls nq_rpc_error to reply
 } nq_error_t;
 //quic library error
 typedef int nq_quic_error_t;
@@ -220,14 +220,13 @@ NQAPI_THREADSAFE bool nq_closure_is_empty(nq_closure_t clsr);
 
 NQAPI_THREADSAFE nq_closure_t nq_closure_empty();
 
-NQAPI_EXTERN void *(nq_closure_noop)(...);
-
 #define nq_closure_init(__pclsr, __type, __cb, __arg) { \
   (__pclsr).arg = (void *)(__arg); \
   (__pclsr).__type = (__cb); \
 }
 
 #define nq_closure_call(__pclsr, __type, ...) ((__pclsr).__type((__pclsr).arg, __VA_ARGS__))
+
 
 
 // --------------------------
@@ -247,7 +246,7 @@ typedef struct {
 } nq_clconf_t;
 
 // create client object which have max_nfd of connection. 
-NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint);
+NQAPI_BOOTSTRAP nq_client_t nq_client_create(int max_nfd, int max_stream_hint);
 // do actual network IO. need to call periodically
 NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.
@@ -287,7 +286,7 @@ typedef struct {
 } nq_svconf_t;
 
 //create server which has n_worker of workers
-NQAPI_THREADSAFE nq_server_t nq_server_create(int n_worker);
+NQAPI_BOOTSTRAP nq_server_t nq_server_create(int n_worker);
 //listen and returns handler map associated with it. 
 NQAPI_BOOTSTRAP nq_hdmap_t nq_server_listen(nq_server_t sv, const nq_addr_t *addr, const nq_svconf_t *config);
 //if block is true, nq_server_start blocks until some other thread calls nq_server_join. 
@@ -316,7 +315,6 @@ typedef struct {
 } nq_rpc_handler_t;
 
 //setup original stream protocol (client), with 3 pattern
-// TODO(iyatomi): make it NQAPI_THREADSAFE
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler);
 
 NQAPI_BOOTSTRAP bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc_handler_t handler);
@@ -354,7 +352,7 @@ NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 //get context, which is set at on_conn_open
 NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t.
-static inline bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
+NQAPI_INLINE bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
 
 
 
@@ -384,7 +382,7 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
 //schedule execution of closure which is given to cb, will called with given s.
 NQAPI_THREADSAFE void nq_stream_task(nq_stream_t s, nq_closure_t cb);
 //check equality of nq_stream_t.
-static inline bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] || c1.p == c2.p); }
+NQAPI_INLINE bool nq_stream_equal(nq_stream_t c1, nq_stream_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
 //get stream id. this may change as you re-created stream on reconnection. 
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_stream_sid(nq_stream_t s);
@@ -432,7 +430,7 @@ NQAPI_THREADSAFE void nq_rpc_error(nq_rpc_t rpc, nq_msgid_t msgid, const void *d
 //schedule execution of closure which is given to cb, will called with given rpc.
 NQAPI_THREADSAFE void nq_rpc_task(nq_rpc_t rpc, nq_closure_t cb);
 //check equality of nq_rpc_t.
-static inline bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] || c1.p == c2.p); }
+NQAPI_INLINE bool nq_rpc_equal(nq_rpc_t c1, nq_rpc_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
 //get rpc id. this may change as you re-created rpc on reconnection.
 //useful if you need to give special meaning to specified stream_id, like http2 over quic
 NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc);
@@ -446,21 +444,21 @@ NQAPI_CLOSURECALL void *nq_rpc_ctx(nq_rpc_t s);
 // time API
 //
 // --------------------------
-static inline nq_time_t nq_time_sec(uint64_t n) { return ((n) * 1000 * 1000 * 1000); }
+NQAPI_INLINE nq_time_t nq_time_sec(uint64_t n) { return ((n) * 1000 * 1000 * 1000); }
 
-static inline nq_time_t nq_time_msec(uint64_t n) { return ((n) * 1000 * 1000); }
+NQAPI_INLINE nq_time_t nq_time_msec(uint64_t n) { return ((n) * 1000 * 1000); }
 
-static inline nq_time_t nq_time_usec(uint64_t n) { return ((n) * 1000); }
+NQAPI_INLINE nq_time_t nq_time_usec(uint64_t n) { return ((n) * 1000); }
 
-static inline nq_time_t nq_time_nsec(uint64_t n) { return (n); }
+NQAPI_INLINE nq_time_t nq_time_nsec(uint64_t n) { return (n); }
 
 NQAPI_THREADSAFE nq_time_t nq_time_now();
 
 NQAPI_THREADSAFE nq_unix_time_t nq_time_unix();
-
-NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d); //ignore EINTR
-
-NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d); //break with EINTR
+//ignore EINTR
+NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d);
+//break with EINTR
+NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d);
 
 
 
@@ -495,7 +493,7 @@ typedef struct {
   const char *id;
 
   //if set to true, you need to call nq_log_flush() periodically to actually output logs.
-  //also useful for some environement like Unity Editor, which cannot call logging API from non-main thread.
+  //useful for some environement like Unity Editor, which cannot call logging API from non-main thread.
   //https://fogbugz.unity3d.com/default.asp?949512_dab6v5ranqbebqr5
   bool manual_flush;
 
@@ -536,7 +534,7 @@ NQAPI_BOOTSTRAP void nq_log_config(const nq_logconf_t *conf);
 
 NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *params, int n_params);
 
-static inline void nq_msg(nq_loglv_t lv, const char *msg) { nq_log(lv, msg, NULL, 0); }
+NQAPI_INLINE void nq_msg(nq_loglv_t lv, const char *msg) { nq_log(lv, msg, NULL, 0); }
 //flush cached log. only enable if you configure manual_flush to true. 
 //recommend to call from only one thread. otherwise log output order may change from actual order.
 NQAPI_THREADSAFE void nq_log_flush(); 

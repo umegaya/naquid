@@ -69,6 +69,9 @@ void NqClient::InitSerial() {
   auto session_index = loop_->client_map().Add(this);
   NqConnSerialCodec::ClientEncode(session_serial_, session_index);
 }
+NqStreamIndex NqClient::NewStreamIndex() {
+  return client_loop()->stream_index_factory().New(); 
+}
 void NqClient::OnFinalize() {
   if (!nq_closure_is_empty(on_finalize_)) {
     nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
@@ -283,9 +286,9 @@ void NqClient::StreamManager::CleanupStreamsOnClose() {
   TRACE("CleanupStreamsOnClose");
   entries_.clear(); //after that entries_.erase may called.
 }
-NqStreamIndex NqClient::StreamManager::OnIncomingOpen(NqClientStream *s) {
+NqStreamIndex NqClient::StreamManager::OnIncomingOpen(NqClient *client, NqClientStream *s) {
   ASSERT((s->id() % 2) == 0); //must be incoming stream from server (server outgoing stream)
-  auto idx = index_factory_.New();
+  auto idx = client->NewStreamIndex();
   entries_.emplace(idx, Entry(s));
   return idx;
 }
@@ -295,7 +298,7 @@ void NqClient::StreamManager::OnIncomingClose(NqClientStream *s) {
 
 bool NqClient::StreamManager::OnOutgoingOpen(NqClient *client, bool connected,
                                             const std::string &name, void *ctx) {
-  auto idx = index_factory_.New();
+  auto idx = client->NewStreamIndex();
   auto r = entries_.emplace(idx, Entry(nullptr, name));
   if (!r.second) {
     return false;

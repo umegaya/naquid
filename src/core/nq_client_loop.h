@@ -34,12 +34,14 @@ class NqClientLoop : public NqLoop,
   ClientAllocator client_allocator_;
   StreamAllocator stream_allocator_;
   AlarmAllocator alarm_allocator_;
+  nq::IdFactory<uint32_t> stream_index_factory_;
   uint32_t worker_index_;
 
  public:
   NqClientLoop(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
     processor_(), versions_(net::AllSupportedVersions()),
-    client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint) {
+    client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint),
+    stream_index_factory_(0x7FFFFFFF) {
     worker_index_ = client_worker_index_factory_.New();
     set_main_thread();
   }
@@ -61,6 +63,7 @@ class NqClientLoop : public NqLoop,
   inline ClientMap &client_map() { return client_map_; }
   inline ClientAllocator &client_allocator() { return client_allocator_; }
   inline StreamAllocator &stream_allocator() { return stream_allocator_; }
+  inline nq::IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
   inline int worker_index() const { return worker_index_; }
 
   static inline NqClientLoop *FromHandle(nq_client_t cl) { return (NqClientLoop *)cl; }

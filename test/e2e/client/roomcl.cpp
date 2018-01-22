@@ -5,6 +5,7 @@
 #include <inttypes.h>
 
 #include <basis/endian.h>
+#include <basis/convert.h>
 
 #include "rpctypes.h"
 
@@ -23,12 +24,17 @@ struct closure_ctx {
   uint64_t acked_max;
   uint8_t state;
 };
-nq_conn_t g_cs[N_CLIENT];
-nq_rpc_t g_rpcs[N_CLIENT];
-closure_ctx g_ctxs[N_CLIENT];
-nq_closure_t g_reps[N_CLIENT];
+nq_conn_t *g_cs;
+nq_rpc_t *g_rpcs;
+closure_ctx *g_ctxs;
+nq_closure_t *g_reps;
 nq::atomic<uint64_t> g_fin(0);
 bool g_alive = true;
+
+/* setting static variable */
+int g_disconnect_type = 1; //0 client/server random, 1 client close, 2 server close
+int g_client_num = N_CLIENT;
+int g_recv_num = N_RECV;
 
 
 /* conn callback */
@@ -46,7 +52,7 @@ nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *d
 void on_conn_finalize(void *arg, nq_conn_t, void *) {
   TRACE("conn fin for %p", arg);
   g_fin++;
-  if (g_fin >= N_CLIENT) {
+  if (g_fin >= g_client_num) {
     g_alive = false;
   }  
 }
@@ -83,16 +89,16 @@ void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq
 }
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {
   closure_ctx *c = (closure_ctx *)nq_rpc_ctx(rpc);
-  TRACE("rpc notif: %llu %u", c->id, type);
   switch (type) {
     case RpcType::BcastNotify:
       {
         const char *tmp = (const char *)data;
         uint64_t id = nq::Endian::NetbytesToHost<uint64_t>(tmp);
         uint64_t acked_max = nq::Endian::NetbytesToHost<uint64_t>(tmp + sizeof(uint64_t));
+        TRACE("rpc notif bcast: %llu %llu %llu", c->id, id, acked_max);
         ASSERT(id == c->id);
         if (c->acked_max >= acked_max) {
-          TRACE("%llu: old acked %llu ignored (now: %llu)\n", c->id, c->acked_max, acked_max);
+          //TRACE("%llu: old acked %llu ignored (now: %llu)\n", c->id, c->acked_max, acked_max);
           return;
         }
         ASSERT((c->acked_max + 1) == acked_max);
@@ -101,11 +107,23 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
         char buffer[sizeof(uint64_t) + sizeof(uint64_t) + 1];
         nq::Endian::HostToNetbytes(c->id, buffer);
         nq::Endian::HostToNetbytes(c->acked_max, buffer + sizeof(uint64_t));
-        if (c->acked_max == N_RECV) {
+        if (c->acked_max == g_recv_num) {
           buffer[sizeof(buffer) - 1] = 1;
           nq_conn_close(nq_rpc_conn(rpc));
         } else {
-          buffer[sizeof(buffer) - 1] = 1;//rand() % 2;
+          char dc_type = 0;
+          switch (g_disconnect_type) {
+            case 0: 
+              dc_type = rand() % 2;
+              break;
+            case 1:
+              dc_type = 1;
+              break;
+            case 2:
+              dc_type = 0;
+              break; 
+          }
+          buffer[sizeof(buffer) - 1] = dc_type;
           nq_rpc_call(rpc, RpcType::BcastReply, buffer, sizeof(buffer), g_reps[c->id - 1]);
           if (buffer[sizeof(buffer) - 1] == 1) {
             nq_conn_reset(nq_rpc_conn(rpc));
@@ -127,7 +145,22 @@ void on_rpc_validate(void *p, nq_rpc_t rpc, const char *error) {
 
 /* main */
 int main(int argc, char *argv[]){
-  nq_client_t cl = nq_client_create(N_CLIENT, N_CLIENT * 4); //N_CLIENT connection client
+  if (argc > 1) {
+    g_disconnect_type = nq::convert::Do(argv[1], g_disconnect_type);
+    if (argc > 2) {
+      g_client_num = nq::convert::Do(argv[2], g_client_num);
+      if (argc > 3) {
+        g_recv_num = nq::convert::Do(argv[3], g_recv_num);
+      }
+    }
+  }
+
+  g_cs = new nq_conn_t[g_client_num];
+  g_rpcs = new nq_rpc_t[g_client_num];
+  g_ctxs = new closure_ctx[g_client_num];
+  g_reps = new nq_closure_t[g_client_num];
+
+  nq_client_t cl = nq_client_create(g_client_num, g_client_num * 4); //g_client_num connection client
 
   srand(nq_time_unix());
 
@@ -153,7 +186,7 @@ int main(int argc, char *argv[]){
 
   nq_closure_t on_validate;
   nq_closure_init(on_validate, on_rpc_validate, on_rpc_validate, nullptr);
-  for (int i = 0; i < N_CLIENT; i++) {
+  for (int i = 0; i < g_client_num; i++) {
     //reinitialize closure, with giving client index as arg
     nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, (void *)(intptr_t)i);
     nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, (void *)(intptr_t)i);
