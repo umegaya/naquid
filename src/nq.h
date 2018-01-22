@@ -373,7 +373,7 @@ NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s);
 //check stream is valid. note that if (nq_stream_is_valid(...)) does not assure any safety of following operation.
 //you should give cb parameter with filling nq_on_stream_validate member, to operate this stream safety on validation success.
 //you can pass nq_closure_empty() for nq_conn_is_valid, if you dont need to callback.
-NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s, nq_closure_t *pcb);
+NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s, nq_closure_t cb);
 //check stream is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
 //if p_valid returns true, means stream is incoming.
 NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid);
@@ -413,7 +413,7 @@ NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc);
 //check rpc is valid. note that if (nq_rpc_is_valid(...)) does not assure any safety of following operation.
 //you should give cb parameter with filling nq_on_rpc_validate member, to operate this rpc safety on validation success.
 //you can pass nq_closure_empty() for nq_conn_is_valid, if you dont need to callback.
-NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc, nq_closure_t *pcb);
+NQAPI_THREADSAFE bool nq_rpc_is_valid(nq_rpc_t rpc, nq_closure_t cb);
 //check rpc is outgoing. otherwise incoming. optionally you can get stream is valid, via p_valid. 
 //if p_valid returns true, means stream is incoming.
 NQAPI_THREADSAFE bool nq_rpc_outgoing(nq_rpc_t s, bool *p_valid);

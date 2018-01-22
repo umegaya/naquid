@@ -9,8 +9,12 @@ namespace nqtest {
     Sleep = 5,
     Close = 6,
     SetupReject = 7,
+    Bcast = 8,
+    BcastJoin = 9,
+    BcastReply = 10,
 
     ServerRequest = 10000,
+    BcastNotify = 10001,
 
     TextNotification = 0x7FFF, //to test 2 bytes type code
   };

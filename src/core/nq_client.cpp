@@ -39,7 +39,6 @@ NqClient::NqClient(QuicSocketAddress server_address,
 }
 NqClient::~NqClient() {
   ASSERT(session_serial_.IsEmpty());
-  ResetSession();
 }
 void* NqClient::operator new(std::size_t sz) {
   ASSERT(false);
@@ -70,6 +69,18 @@ void NqClient::InitSerial() {
   auto session_index = loop_->client_map().Add(this);
   NqConnSerialCodec::ClientEncode(session_serial_, session_index);
 }
+void NqClient::OnFinalize() {
+  if (!nq_closure_is_empty(on_finalize_)) {
+    nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
+  }
+}
+void NqClient::ScheduleDestroy() {
+  OnFinalize();
+  alarm_.reset(alarm_factory()->CreateAlarm(this));
+  alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
+  loop_->RemoveClient(this);
+  InvalidateSerial();
+}
 nq_conn_t NqClient::ToHandle() { 
   return MakeHandle<nq_conn_t, NqSession::Delegate>(static_cast<NqSession::Delegate *>(this), session_serial_);
 }
@@ -99,12 +110,8 @@ void NqClient::InitializeSession() {
 
 // implements QuicAlarm::Delegate
 void NqClient::OnAlarm() { 
-  if (!nq_closure_is_empty(on_finalize_)) {
-    nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
-  }
-  loop_->RemoveClient(this); 
+  ASSERT(session_serial_.IsEmpty());
   alarm_.release(); //release QuicAlarm which should contain *this* pointer, to prevent double free.
-  InvalidateSerial();
   delete this;
 }
 
@@ -140,9 +147,7 @@ void NqClient::OnClose(QuicErrorCode error,
                                               error_details.c_str(), 
                                               close_by_peer_or_self == ConnectionCloseSource::FROM_PEER));
   if (destroyed()) {
-    alarm_.reset(alarm_factory()->CreateAlarm(this));
-    alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
-    InvalidateSerial();
+    ScheduleDestroy();
     //cannot touch this client memory afterward. alarm invocation automatically delete the object,
     //via auto free of pointer which holds in QuicArenaScopedPtr<QuicAlarm::Delegate> of QuicAlarm.
   } else if (next_connect_us > 0 || connect_state_ == RECONNECTING) {
@@ -170,8 +175,7 @@ void NqClient::Disconnect() {
     QuicClientBase::Disconnect(); 
   } else if (connect_state_ == DISCONNECT || connect_state_ == RECONNECTING) {
     connect_state_ = FINALIZED;
-    alarm_.reset(alarm_factory()->CreateAlarm(this));
-    alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
+    ScheduleDestroy();
   } else {
     //finalize do nothing, because this client already scheduled to destroy.
     ASSERT(alarm_ != nullptr);
@@ -240,7 +244,20 @@ void NqClient::ReconnectAlarm::OnAlarm() {
 NqClient::StreamManager::Entry *
 NqClient::StreamManager::FindEntry(NqStreamIndex index) {
   auto it = entries_.find(index);
+#if defined(DEBUG)
+  if (it != entries_.end()) {
+    TRACE("FindEntry found for %u\n", index);
+    return const_cast<Entry *>(&(it->second));
+  } else {
+    TRACE("FindEntry NOT found for %u(%lu)\n", index, entries_.size());
+    for (auto &kv : entries_) {
+      TRACE("entry %u %p %p\n", kv.first, kv.second.handle_, kv.second.context_);
+    } 
+    return nullptr;
+  }
+#else
   return it != entries_.end() ? const_cast<Entry *>(&(it->second)) : nullptr;
+#endif
 }
 void NqClient::StreamManager::RecoverOutgoingStreams(NqClientSession *session) {
 for (auto &kv : entries_) {

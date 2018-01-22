@@ -21,6 +21,9 @@ file(GLOB_RECURSE bench_src [
 	"./bench.cpp" 
 ])
 
+file(GLOB_RECURSE roomcl_src [
+	"./roomcl.cpp" 
+])
 
 if (${TEST_OS} STREQUAL "osx")
 	find_library(core_foundation CoreFoundation)
@@ -42,3 +45,6 @@ target_link_libraries(client nq ${platform_libs})
 
 add_executable(bench ${bench_src})
 target_link_libraries(bench nq ${platform_libs})
+
+add_executable(roomcl ${roomcl_src})
+target_link_libraries(roomcl nq ${platform_libs})

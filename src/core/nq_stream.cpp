@@ -111,7 +111,7 @@ void NqStream::Disconnect() {
   nq_session()->CloseStream(id());
 }
 void NqStream::OnClose() {
-  TRACE("NqStream::OnClose %p, %llx(%lu)", this, stream_serial_.Dump().c_str(), id());
+  TRACE("NqStream::OnClose %p, %p, %s(%lu)", this, Context(), stream_serial_.Dump().c_str(), id());
   if (handler_ != nullptr) {
     handler_->OnClose();
   }
@@ -192,10 +192,10 @@ void NqClientStream::InitSerial(NqStreamIndex idx) {
 }
 void NqClientStream::OnClose() {
   ASSERT(nq_session()->delegate()->IsClient());
-  //to initiate new stream creation by sending packet, remove session pointer first
+  NqStream::OnClose();
+  //remove stream entry after handler_->OnClose called. otherwise callback cannot get context_
   auto c = static_cast<NqClient *>(nq_session()->delegate());
   c->stream_manager().OnClose(this);
-  NqStream::OnClose();
   InvalidateSerial();
 }
 void **NqClientStream::ContextBuffer() {
@@ -231,7 +231,7 @@ void NqServerStream::InitSerial(NqStreamIndex idx) {
   auto session_serial = nq_session()->delegate()->SessionSerial();
   ASSERT(!NqSerial::IsClient(session_serial));
   NqStreamSerialCodec::ServerEncode(stream_serial_, idx);
-  TRACE("NqServerStream: serial = %llx", stream_serial_.Dump().c_str());
+  TRACE("NqServerStream: serial = %s", stream_serial_.Dump().c_str());
 }
 void NqServerStream::OnClose() {
   ASSERT(!nq_session()->delegate()->IsClient());

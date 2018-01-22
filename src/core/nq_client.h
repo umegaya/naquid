@@ -123,18 +123,22 @@ class NqClient : public QuicClientBase,
   inline const NqSerial &session_serial() const { return session_serial_; }
   inline NqSessionIndex session_index() const { 
     return NqConnSerialCodec::ClientSessionIndex(session_serial_); }
-
+  
   std::mutex &static_mutex();
   NqBoxer *boxer();
+  
   nq_conn_t ToHandle();
   NqClientStream *FindOrCreateStream(NqStreamIndex index);
   void InitSerial();
+  void ScheduleDestroy();
+  void OnFinalize();
+  
+  inline void Destroy() { OnFinalize(); OnAlarm(); }
   inline void InvalidateSerial() { 
     std::unique_lock<std::mutex> lk(static_mutex());
     session_serial_.Clear(); 
   }
-  inline void Destroy() { OnAlarm(); }
-
+  
 
   // implements QuicClientBase. TODO(umegaya): these are really not needed?
   int GetNumSentClientHellosFromSession() override { return 0; }

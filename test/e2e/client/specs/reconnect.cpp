@@ -91,13 +91,7 @@ void test_reconnect_client(Test::Conn &conn) {
 			TRACE("ConnFinalize %u %p %p", close_counter, nq_conn_ctx(c), ctx_ptr);
 			//nq_conn_ctx should return nullptr because connection is no more valid.
 			//instead of this, variable ctx should have the value which is attached with this conn
-			const char *reason;
-			nq_closure_t check_closure;
-			nq_closure_init(check_closure, on_rpc_validate, on_rpc_validate, &reason);
-			if (nq_conn_is_valid(c, check_closure)) {
-				done3(false);
-				return;
-			} else if (strcmp(reason, "deallocated handle") != 0) {
+			if (!nq_conn_is_valid(c, nq_closure_empty())) {
 				done3(false);
 				return;
 			}
@@ -142,10 +136,23 @@ void test_reconnect_server(Test::Conn &conn) {
 	WATCH_CONN(conn, ConnOpenStream, ([&conn, done](nq_rpc_t rpc, void **){
 		TRACE("test_reconnect_server ConnOpenStream %d %d %d %d", close_counter, open_counter, stream_close_counter, stream_open_counter);
 		for (int i = 0; i < stream_open_counter; i++) {
-			TRACE("test_reconnect_server check for %d %s %llx|%llx, %llx|%llx", i, nq_rpc_equal(rpc, rpcs[i]) ? "eq" : "ne", 
+			TRACE("test_reconnect_server check for %d %s %s %llx|%llx, %llx|%llx", i, nq_rpc_equal(rpc, rpcs[i]) ? "eq" : "ne", 
+				nq_rpc_is_valid(rpcs[i], nq_closure_empty()) ? "v" : "ng", 
 				rpc.s.data[0], rpc.s.data[1], 
 				rpcs[i].s.data[0], rpcs[i].s.data[1]);
+
+			const char *reason;
+			nq_closure_t check_closure;
+			nq_closure_init(check_closure, on_rpc_validate, on_rpc_validate, &reason);
+
 			if (nq_rpc_equal(rpc, rpcs[i])) {
+				done(false);
+				return false;
+			} else if (nq_rpc_is_valid(rpcs[i], check_closure)) {
+				done(false);
+				return false;
+			} else if (strcmp(reason, "outdated handle") != 0) {
+
 				done(false);
 				return false;
 			}

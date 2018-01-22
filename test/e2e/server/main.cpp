@@ -1,7 +1,8 @@
 #include "common.h"
+#include "room.h"
 
-#include "basis/header_codec.h"
-#include "basis/convert.h"
+#include <basis/header_codec.h>
+#include <basis/convert.h>
 #include <memory.h>
 
 using namespace nqtest;
@@ -222,6 +223,16 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
       {
         g_reject = 2;
         nq_rpc_reply(rpc, msgid, data, len);
+      }
+      break;
+    case RpcType::Bcast:
+      {
+
+      }
+      break;
+    case RpcType::BcastReply:
+      {
+
       }
       break;
   }

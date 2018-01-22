@@ -14,6 +14,11 @@ file(GLOB_RECURSE src [
 	"./main.cpp" 
 ])
 
+file(GLOB_RECURSE roomsv_src [
+	"./roomsv.cpp"
+	"./room.cpp"
+])
+
 if (${TEST_OS} STREQUAL "osx")
 	find_library(core_foundation CoreFoundation)
 	find_library(cocoa Cocoa)
@@ -31,3 +36,6 @@ link_directories(${platform_lib_paths})
 
 add_executable(server ${src})
 target_link_libraries(server nq ${platform_libs})
+
+add_executable(roomsv ${roomsv_src})
+target_link_libraries(roomsv nq ${platform_libs})

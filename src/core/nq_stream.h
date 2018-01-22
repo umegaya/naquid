@@ -136,23 +136,27 @@ class NqServerStream : public NqStream {
 
 
 class NqStreamHandler {
-protected:
+ protected:
   NqStream *stream_;
   nq_closure_t on_open_, on_close_;
-public:
+ public:
   NqStreamHandler(NqStream *stream) : stream_(stream) {}
   virtual ~NqStreamHandler() {}
   
   //interface
   virtual void OnRecv(const void *p, nq_size_t len) = 0;
   virtual void Send(const void *p, nq_size_t len) = 0;  
+  virtual void Cleanup() = 0;
 
   //operation
   //it has same assumption and restriction as NqStream::RunTask
   inline bool OnOpen() { 
     return nq_closure_call(on_open_, on_stream_open, stream_->ToHandle<nq_stream_t>(), stream_->ContextBuffer());
   }
-  inline void OnClose() { nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); }
+  inline void OnClose() { 
+    nq_closure_call(on_close_, on_stream_close, stream_->ToHandle<nq_stream_t>()); 
+    Cleanup();
+  }
   inline void SetLifeCycleCallback(nq_closure_t on_open, nq_closure_t on_close) {
     on_open_ = on_open;
     on_close_ = on_close;
@@ -180,6 +184,7 @@ class NqSimpleStreamHandler : public NqStreamHandler {
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override;
+  void Cleanup() override {}
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqSimpleStreamHandler);
@@ -202,6 +207,7 @@ class NqRawStreamHandler : public NqStreamHandler {
       WriteBytes(static_cast<char *>(buf), size);
     }
   }
+  void Cleanup() override {}
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqRawStreamHandler);
@@ -253,7 +259,9 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     if (default_timeout_ts_ == 0) { default_timeout_ts_ = nq_time_sec(30); }
   }
 
-  ~NqSimpleRPCStreamHandler() {
+  ~NqSimpleRPCStreamHandler() {}
+
+  void Cleanup() override {
     for (auto &kv : req_map_) {
       kv.second->GoAway();
       kv.second->Destroy(loop_);
