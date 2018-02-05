@@ -28,8 +28,8 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
   thread_id_(worker.thread_id()), server_map_(), alarm_map_(), 
   session_allocator_(config.server().max_session_hint), stream_allocator_(config.server().max_stream_hint),
-  alarm_allocator_(config.server().max_session_hint), stream_index_factory_(0x7FFFFFFF) {
-  invoke_queues_ = const_cast<NqServer &>(server_).InvokeQueuesFromPort(port);
+  alarm_allocator_(config.server().max_session_hint) {
+  invoke_queues_ = server_.InvokeQueuesFromPort(port);
   ASSERT(invoke_queues_ != nullptr);
   SetFromConfig(config);
 }
@@ -72,14 +72,13 @@ void NqDispatcher::OnRecv(NqPacket *packet) {
   if (conn_id == 0) { 
     return; 
   }
-  //fprintf(stderr, "conn_id = %llu @ %d\n", conn_id, index_);
   auto idx = conn_id % n_worker_;
+  //TRACE("conn_id = %llu @ %d %llu\n", conn_id, index_, idx);
   if (index_ == idx) {
     //TODO(iyatomi): if idx is same as current index, directly process packet here
     Process(packet);
   } else {
-    //otherwise send other queue (sorry const_cast!)
-    const_cast<NqServer &>(server_).Q4(idx).enqueue(packet);
+    server_.Q4(idx).enqueue(packet);
   }
 }
 

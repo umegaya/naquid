@@ -37,10 +37,12 @@ class NqServer {
   std::mutex mutex_;
   std::condition_variable cond_;
   std::thread shutdown_thread_;
+  nq::IdFactory<uint32_t> stream_index_factory_;
 
  public:
 	NqServer(uint32_t n_worker) : 
-    alive_(true), n_worker_(n_worker), worker_queue_(nullptr), invoke_queues_list_() {}
+    alive_(true), n_worker_(n_worker), worker_queue_(nullptr), invoke_queues_list_(), 
+    stream_index_factory_(0x7FFFFFFF) {}
   ~NqServer() {}
   nq::HandlerMap *Open(const nq_addr_t *addr, const nq_svconf_t *conf) {
     if (port_configs_.find(addr->port) != port_configs_.end()) {
@@ -105,6 +107,7 @@ class NqServer {
   }
   inline const std::map<int, PortConfig> &port_configs() const { return port_configs_; }
   inline nq_server_t ToHandle() { return (nq_server_t)this; }
+  inline nq::IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
   static inline NqServer *FromHandle(nq_server_t sv) { return (NqServer *)sv; }
 
  protected:

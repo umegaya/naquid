@@ -36,7 +36,7 @@ class NqDispatcher : public QuicDispatcher,
   
   int port_, accept_per_loop_; 
   uint32_t index_, n_worker_;
-  const NqServer &server_;
+  NqServer &server_;
   std::unique_ptr<QuicCryptoServerConfig> crypto_config_;
   InvokeQueue *invoke_queues_; //only owns index_ th index. 
   NqServerLoop &loop_;
@@ -48,7 +48,6 @@ class NqDispatcher : public QuicDispatcher,
   SessionAllocator session_allocator_;
   StreamAllocator stream_allocator_;
   AlarmAllocator alarm_allocator_;
-  nq::IdFactory<uint32_t> stream_index_factory_;
 
  public:
   NqDispatcher(int port, const NqServerConfig& config, 
@@ -58,6 +57,7 @@ class NqDispatcher : public QuicDispatcher,
     {
       //get NqServerSession's mutex, which is corresponding to this packet's connection id
 #if !defined(USE_DIRECT_WRITE)
+      //TRACE("packet from %s(%u=>%u)%u", p->client_address().ToString().c_str(), p->reader_index(), index_, p->length());
       ProcessPacket(p->server_address(), p->client_address(), *p);        
 #else
       auto cid = p->ConnectionId();
@@ -87,7 +87,7 @@ class NqDispatcher : public QuicDispatcher,
   inline StreamAllocator &stream_allocator() { return stream_allocator_; }
   //avoid confusing with QuicSession::session_allocator
   inline SessionAllocator &session_allocator_body() { return session_allocator_; }
-  inline nq::IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
+  inline nq::IdFactory<uint32_t> &stream_index_factory() { return server_.stream_index_factory(); }
 
   //implements QuicStreamAllocator
   void *Alloc(size_t sz) override { return stream_allocator_.Alloc(sz); }

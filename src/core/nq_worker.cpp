@@ -38,7 +38,6 @@ void NqWorker::Run(PacketQueue &pq) {
     //consume queue
     while (pq.try_dequeue(p)) {
       //pass packet to corresponding session
-      TRACE("process packet at %d", index_);
       Process(p);
     }
     //wait and process incoming event

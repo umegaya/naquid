@@ -265,7 +265,7 @@ WriteResult QuicSocketUtils::WritePacket(
     size_t buf_len,
     const QuicIpAddress& self_address,
     const QuicSocketAddress& peer_address) {
-  //TRACE("Write %zu bytes to %d", buf_len, fd);
+  //TRACE("Write %zu bytes to %d from %s", buf_len, fd, self_address.ToString().c_str());
   sockaddr_storage raw_address = peer_address.generic_address();
   iovec iov = {const_cast<char*>(buffer), buf_len};
 
@@ -301,7 +301,7 @@ WriteResult QuicSocketUtils::WritePacket(
   if (rc >= 0) {
     return WriteResult(WRITE_STATUS_OK, rc);
   }
-  fprintf(stderr, "fail to send: errno %d %d(%s)\n", fd, errno, (errno == EAGAIN || errno == EWOULDBLOCK) ? "blocked" : "error");
+  fprintf(stderr, "%d: fail to send: %s(%s)\n", fd, strerror(errno), (errno == EAGAIN || errno == EWOULDBLOCK) ? "blocked" : "error");
   return WriteResult((errno == EAGAIN || errno == EWOULDBLOCK)
                          ? WRITE_STATUS_BLOCKED
                          : WRITE_STATUS_ERROR,

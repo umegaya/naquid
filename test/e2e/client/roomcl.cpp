@@ -11,13 +11,16 @@
 
 using namespace nqtest;
 
-#define N_CLIENT (10)
+#define N_CLIENT (16)
 #define N_RECV (10)
 
 /* static variables */
 enum {
   RPC_STATE_INIT,
   RPC_STATE_BCAST,
+  RPC_STATE_CLOSE_BY_CLIENT,
+  RPC_STATE_CLOSE_BY_SERVER,
+  RPC_STATE_FINISH,
 };
 struct closure_ctx {
   uint64_t id;
@@ -40,17 +43,17 @@ int g_recv_num = N_RECV;
 /* conn callback */
 void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
   if (hsev == NQ_HS_DONE) {
-    TRACE("conn open for %p", arg);
+    TRACE("conn open for %p %llx", arg, c.s.data[0]);
     intptr_t i = (intptr_t)arg;
     nq_conn_rpc(g_cs[i], "rpc", g_ctxs + i);
   }
 }
 nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *detail, bool) {
-  TRACE("conn close for %p", arg);
+  TRACE("conn close for %p %llx", arg, c.s.data[0]);
   return nq_time_msec(10);
 }
-void on_conn_finalize(void *arg, nq_conn_t, void *) {
-  TRACE("conn fin for %p", arg);
+void on_conn_finalize(void *arg, nq_conn_t c, void *) {
+  TRACE("conn fin for %p %llx", arg, c.s.data[0]);
   g_fin++;
   if (g_fin >= g_client_num) {
     g_alive = false;
@@ -72,18 +75,34 @@ void on_rpc_close(void *p, nq_rpc_t rpc) {
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
 }
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq_size_t len) {
+  if (result < 0) {
+    ASSERT(result == NQ_EGOAWAY);
+    return;
+  }
   closure_ctx *c = (closure_ctx *)nq_rpc_ctx(rpc);
-  TRACE("on_rpc_reply %llu %p state %u", c->id, c, c->state);
+  TRACE("on_rpc_reply %llu %p state %u %llu", c->id, c, c->state, c->acked_max);
   switch (c->state) {
   case RPC_STATE_INIT: {
-    c->acked_max = nq::Endian::NetbytesToHost<uint64_t>(data);
+    uint64_t acked_max = nq::Endian::NetbytesToHost<uint64_t>(data);
+    ASSERT(c->acked_max <= acked_max);
+    c->acked_max = acked_max;
     char buffer[sizeof(uint64_t)];
     nq::Endian::HostToNetbytes(c->id, buffer);
-    nq_rpc_call(rpc, RpcType::Bcast, buffer, sizeof(buffer), g_reps[c->id - 1]);
+    nq_rpc_notify(rpc, RpcType::Bcast, buffer, sizeof(buffer));
     c->state = RPC_STATE_BCAST;
   } break;
   case RPC_STATE_BCAST: {
-    //ignore
+    ASSERT(false);
+  } break;
+  case RPC_STATE_CLOSE_BY_CLIENT: {
+    TRACE("on_rpc_reply %llu close conn", c->id);
+    nq_conn_reset(nq_rpc_conn(rpc));
+  } break;
+  case RPC_STATE_CLOSE_BY_SERVER: {
+    //may not come
+  } break;
+  case RPC_STATE_FINISH: {
+    nq_conn_close(nq_rpc_conn(rpc));
   } break;
   }
 }
@@ -95,21 +114,28 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
         const char *tmp = (const char *)data;
         uint64_t id = nq::Endian::NetbytesToHost<uint64_t>(tmp);
         uint64_t acked_max = nq::Endian::NetbytesToHost<uint64_t>(tmp + sizeof(uint64_t));
-        TRACE("rpc notif bcast: %llu %llu %llu", c->id, id, acked_max);
+        TRACE("rpc notif bcast(%p): %llu %llu %llu %llu", c, c->id, id, acked_max, c->acked_max);
         ASSERT(id == c->id);
         if (c->acked_max >= acked_max) {
           //TRACE("%llu: old acked %llu ignored (now: %llu)\n", c->id, c->acked_max, acked_max);
           return;
         }
         ASSERT((c->acked_max + 1) == acked_max);
-        TRACE("%llu: acked %llu => %llu\n", c->id, c->acked_max, acked_max);
+        if (c->state != RPC_STATE_BCAST) {
+          TRACE("%llu: already reply or bcast not finished yet (%u)", c->id, c->state);
+          //should not come RPC_STATE_INIT state because should not join room yet.
+          ASSERT(c->state == RPC_STATE_CLOSE_BY_SERVER || c->state == RPC_STATE_CLOSE_BY_CLIENT || c->state == RPC_STATE_FINISH);
+          return;
+        }
+        TRACE("%llu(%d/%p): acked %llu => %llu (%u)\n", c->id, nq_conn_fd(nq_rpc_conn(rpc)), c, c->acked_max, acked_max, c->state);
         c->acked_max = acked_max;
         char buffer[sizeof(uint64_t) + sizeof(uint64_t) + 1];
         nq::Endian::HostToNetbytes(c->id, buffer);
         nq::Endian::HostToNetbytes(c->acked_max, buffer + sizeof(uint64_t));
         if (c->acked_max == g_recv_num) {
           buffer[sizeof(buffer) - 1] = 1;
-          nq_conn_close(nq_rpc_conn(rpc));
+          c->state = RPC_STATE_FINISH;
+          nq_rpc_call(rpc, RpcType::BcastReply, buffer, sizeof(buffer), g_reps[c->id - 1]);
         } else {
           char dc_type = 0;
           switch (g_disconnect_type) {
@@ -126,7 +152,10 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
           buffer[sizeof(buffer) - 1] = dc_type;
           nq_rpc_call(rpc, RpcType::BcastReply, buffer, sizeof(buffer), g_reps[c->id - 1]);
           if (buffer[sizeof(buffer) - 1] == 1) {
-            nq_conn_reset(nq_rpc_conn(rpc));
+            TRACE("%llu: send close by client (ack:%u)", c->id, c->acked_max);
+            c->state = RPC_STATE_CLOSE_BY_CLIENT;
+          } else {
+            c->state = RPC_STATE_CLOSE_BY_SERVER;            
           }
         }
       }

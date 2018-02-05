@@ -2,17 +2,18 @@
 
 #include <basis/defs.h>
 #include <basis/convert.h>
+#include <basis/endian.h>
 
 using namespace nqtest;
 
-static const int kThreads = 1;  //1 thread server
+static const int kThreads = 4;  //4 thread server
 
 /* conn callbacks */
 void on_conn_open(void *, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  TRACE("on_conn_open event:%d", hsev);
+  TRACE("on_conn_open event:%llx|%p %d", c.s.data[0], c.p, hsev);
 }
 void on_conn_close(void *, nq_conn_t c, nq_quic_error_t r, const char *detail, bool) {
-  TRACE("on_conn_close reason:%s %s", detail, nq_quic_error_str(r));
+  TRACE("on_conn_close reason:%llx|%p %s", c.s.data[0], c.p, nq_quic_error_str(r));
   free(nq_conn_ctx(c));
 }
 
@@ -27,7 +28,6 @@ void on_rpc_close(void *p, nq_rpc_t rpc) {
 }
 
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
-  TRACE("rpc req: %u", type);
   switch (type) {
     case RpcType::Ping:
     case RpcType::Raise:
@@ -40,16 +40,13 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
       break;
     case RpcType::BcastJoin:
       {
+  TRACE("rpc join: %llu", nq::Endian::NetbytesToHost<uint64_t>(data));
         room_enter(rpc, msgid, data, len);
-      }
-      break;
-    case RpcType::Bcast:
-      {
-        room_bcast(rpc, msgid, data, len);
       }
       break;
     case RpcType::BcastReply:
       {
+  TRACE("rpc bcast reply: %llu", nq::Endian::NetbytesToHost<uint64_t>(data));
         room_bcast_reply(rpc, msgid, data, len);
       }
       break;
@@ -62,7 +59,14 @@ void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq
 
 }
 void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_size_t len) {
-  ASSERT(false);
+  switch (type) {
+    case RpcType::Bcast:
+      room_bcast(rpc, data, len);
+      break;
+    default:
+      ASSERT(false);
+      break;
+}
 }
 
 

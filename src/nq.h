@@ -353,7 +353,7 @@ NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t.
 NQAPI_INLINE bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
-
+NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn);
 
 
 // --------------------------

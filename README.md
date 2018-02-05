@@ -30,7 +30,7 @@
   - stop accepting connection and wait until all request in the worker queue consumed
 - [ ] client: remove stub alarm and connection helper interface
   - override NqLoop operator new/delete to avoid freeing with unique_ptr of QuicClientBase
-- [ ] test: high frequent reconnection test
+- [x] test: high frequent reconnection test
 - [x] test: server side stream initiation
 - [x] test: stream disconnection using on open callback 
 - [x] test: client conn reconnection or finalization using on open callback
@@ -65,6 +65,10 @@
     - server: passive
       - server connection object is the exactly same life cycle with connection itself
       - disconnect == every resouce related with the connection is deleted. 
+    - caution about connection close (public reset) for multi-threading server
+      - because packet order may not keep between client and server, its possible that connection close frame "overtake" unreceived stream frame. 
+      - we cannot assure that all sent stream frame received before trailing close frame. 
+      - if some packet "must" received before closing connection, need to confirm with reply (nq_rpc_t) or stream ack (nq_stream_t). 
 - stream type
   - rpc
   - stream

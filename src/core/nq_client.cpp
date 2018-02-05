@@ -249,7 +249,6 @@ NqClient::StreamManager::FindEntry(NqStreamIndex index) {
   auto it = entries_.find(index);
 #if defined(DEBUG)
   if (it != entries_.end()) {
-    TRACE("FindEntry found for %u\n", index);
     return const_cast<Entry *>(&(it->second));
   } else {
     TRACE("FindEntry NOT found for %u(%lu)\n", index, entries_.size());
@@ -283,7 +282,6 @@ for (auto &kv : entries_) {
   }
 }
 void NqClient::StreamManager::CleanupStreamsOnClose() {
-  TRACE("CleanupStreamsOnClose");
   entries_.clear(); //after that entries_.erase may called.
 }
 NqStreamIndex NqClient::StreamManager::OnIncomingOpen(NqClient *client, NqClientStream *s) {

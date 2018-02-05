@@ -16,7 +16,6 @@
 namespace net {
 
 class NqSession;
-class NqClientSession;
 class NqBoxer;
 class NqStreamHandler;
 

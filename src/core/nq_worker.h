@@ -14,7 +14,7 @@ class NqServer;
 class NqDispatcher;
 class NqWorker {
   uint32_t index_;
-  const NqServer &server_;
+  NqServer &server_;
   NqServerLoop loop_;
   NqPacketReader reader_;
   std::thread thread_;
@@ -25,7 +25,7 @@ class NqWorker {
  public:
   typedef moodycamel::ConcurrentQueue<NqPacket*> PacketQueue;
   typedef NqBoxer::Processor InvokeQueue;
-  NqWorker(uint32_t index, const NqServer &server) : 
+  NqWorker(uint32_t index, NqServer &server) : 
     index_(index), server_(server), loop_(), reader_(), 
     thread_(), dispatchers_(), overflow_supported_(false) {}
   void Start(PacketQueue &pq) {
@@ -45,6 +45,7 @@ class NqWorker {
   inline NqPacketReader &reader() { return reader_; }
   inline NqServerLoop &loop() { return loop_; }
   inline uint32_t index() { return index_; }
+  inline NqServer &server() { return server_; }
   inline std::thread::id thread_id() const { return thread_.get_id(); }
 
  protected:

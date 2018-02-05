@@ -111,7 +111,7 @@ void NqStream::Disconnect() {
   nq_session()->CloseStream(id());
 }
 void NqStream::OnClose() {
-  TRACE("NqStream::OnClose %p, %p, %s(%lu)", this, Context(), stream_serial_.Dump().c_str(), id());
+  TRACE("NqStream::OnClose %p, %p, %s(%lu)", this, nq_session()->delegate(), stream_serial_.Dump().c_str(), id());
   if (handler_ != nullptr) {
     handler_->OnClose();
   }
@@ -231,7 +231,6 @@ void NqServerStream::InitSerial(NqStreamIndex idx) {
   auto session_serial = nq_session()->delegate()->SessionSerial();
   ASSERT(!NqSerial::IsClient(session_serial));
   NqStreamSerialCodec::ServerEncode(stream_serial_, idx);
-  TRACE("NqServerStream: serial = %s", stream_serial_.Dump().c_str());
 }
 void NqServerStream::OnClose() {
   ASSERT(!nq_session()->delegate()->IsClient());
@@ -296,7 +295,7 @@ void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, n
   req->Start(loop_, now + timeout_duration_ts);
 }
 void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
-  //fprintf(stderr, "stream %llx handler OnRecv %u bytes\n", stream_->stream_serial(), len);
+  //TRACE("stream %llx handler OnRecv %u bytes", stream_->nq_session()->delegate()->SessionSerial().data[0], len);
   //greedy read and called back
   parse_buffer_.append(ToCStr(p), len);
   //prepare tmp variables
@@ -312,10 +311,10 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
     if (tmp_ofs == 0) { break; }
     read_ofs += tmp_ofs;
     if ((read_ofs + reclen) > plen) {
-      //fprintf(stderr, "short of buffer %u %zu %zu\n", reclen, read_ofs, plen);
+      TRACE("short of buffer %u %zu %zu\n", reclen, read_ofs, plen);
       break;
     }
-    //TRACE("msgid, type = %u %d", msgid, type);
+    //TRACE("sid = %llx, msgid, type = %u %d", stream_->nq_session()->delegate()->SessionSerial(), msgid, type_tmp);
     /*
       type > 0 && msgid != 0 => request
       type <= 0 && msgid != 0 => reply
