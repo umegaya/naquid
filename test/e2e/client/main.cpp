@@ -77,7 +77,7 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
 
 int main(int argc, char *argv[]){
   nq_addr_t a1;
-  a1.host = "127.0.0.1";
+  a1.host = "test.qrpc.io";
   a1.port = 8443;
   test_suites(a1);
 

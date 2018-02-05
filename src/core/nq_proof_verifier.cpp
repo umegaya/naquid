@@ -112,7 +112,7 @@ bool NqProofVerifier::VerifyCertChain(
   std::unique_ptr<ProofVerifyDetails>* verify_details) {
   //check hostname
   if (!cert_chain->VerifyNameMatch(hostname, true)) {
-    *error_details = "Failed to verify hostname";
+    *error_details = std::string("Failed to verify hostname") + ":" + hostname;
     DLOG(WARNING) << *error_details;
     PUT_VERIFY_DETAIL(verify_details);
     return false;

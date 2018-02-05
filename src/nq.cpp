@@ -100,7 +100,6 @@ static nq::logger::level::def cr_severity_to_nq_map[] = {
 };
 static bool nq_chromium_logger(int severity,
   const char* file, int line, size_t message_start, const std::string& str) {
-  ASSERT(severity < logging::LOG_FATAL);
   auto lv = cr_severity_to_nq_map[severity + 1];
   nq::logger::log(lv, {
     {"tag", "crlog"},
@@ -108,6 +107,7 @@ static bool nq_chromium_logger(int severity,
     {"line", line},
     {"msg", str.c_str() + message_start},
   });
+  ASSERT(severity < logging::LOG_FATAL);
   return true;
 }
 
