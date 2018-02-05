@@ -234,7 +234,7 @@ void QuicStream::WriteOrBufferData(
       // Write data if there is no buffered data before.
       QUIC_FLAG_COUNT_N(quic_reloadable_flag_quic_save_data_before_consumption2,
                         2, 4);
-      WriteBufferedData();
+      WriteBufferedData(ack_listener);
     }
     return;
   }
@@ -265,7 +265,7 @@ void QuicStream::OnCanWrite() {
     if (HasBufferedData() || (fin_buffered_ && !fin_sent_)) {
       QUIC_FLAG_COUNT_N(quic_reloadable_flag_quic_save_data_before_consumption2,
                         3, 4);
-      WriteBufferedData();
+      WriteBufferedData(nullptr);
     }
     if (!fin_buffered_ && !fin_sent_ && CanWriteNewData()) {
       // Notify upper layer to write new data when buffered data size is below
@@ -370,7 +370,7 @@ QuicConsumedData QuicStream::WritevData(
       // Write data if there is no buffered data before.
       QUIC_FLAG_COUNT_N(quic_reloadable_flag_quic_save_data_before_consumption2,
                         1, 4);
-      WriteBufferedData();
+      WriteBufferedData(nullptr);
     }
 
     return consumed_data;
@@ -478,7 +478,7 @@ QuicConsumedData QuicStream::WriteMemSlices(QuicMemSliceSpan span, bool fin) {
 
   if (!had_buffered_data && (HasBufferedData() || fin_buffered_)) {
     // Write data if there is no buffered data before.
-    WriteBufferedData();
+    WriteBufferedData(nullptr);
   }
 
   return consumed_data;
@@ -676,7 +676,7 @@ bool QuicStream::WriteStreamData(QuicStreamOffset offset,
   return send_buffer_.WriteStreamData(offset, data_length, writer);
 }
 
-void QuicStream::WriteBufferedData() {
+void QuicStream::WriteBufferedData(QuicReferenceCountedPointer<QuicAckListenerInterface> ack_listener) {
   DCHECK(!write_side_closed_ && queued_data_.empty() &&
          (HasBufferedData() || fin_buffered_));
 
@@ -718,7 +718,7 @@ void QuicStream::WriteBufferedData() {
 
   QuicConsumedData consumed_data = WritevDataInner(
       QuicIOVector(/*iov=*/nullptr, /*iov_count=*/0, write_length),
-      stream_bytes_written_, fin, nullptr);
+      stream_bytes_written_, fin, ack_listener);
 
   stream_bytes_written_ += consumed_data.bytes_consumed;
   stream_bytes_outstanding_ += consumed_data.bytes_consumed;

@@ -337,6 +337,14 @@ NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t 
     b->InvokeStream(s.s, st, NqBoxer::OpCode::Send, data, datalen);
   }, "nq_stream_send");
 }
+NQAPI_THREADSAFE void nq_stream_send_ex(nq_stream_t s, const void *data, nq_size_t datalen, nq_stream_opt_t *opt) {
+  NqStream *st; NqBoxer *b;
+  UNWRAP_STREAM_OR_ENQUEUE(s, st, b, {
+    st->Handler<NqStreamHandler>()->SendEx(data, datalen, *opt);
+  }, {
+    b->InvokeStream(s.s, st, NqBoxer::OpCode::SendEx, data, datalen, *opt);
+  }, "nq_stream_send");
+}
 NQAPI_THREADSAFE void nq_stream_task(nq_stream_t s, nq_closure_t cb) {
   NqUnwrapper::UnwrapBoxer(s)->InvokeStream(s.s, ToStream(s), NqBoxer::OpCode::Task, cb);
 }

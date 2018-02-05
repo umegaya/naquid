@@ -32,6 +32,7 @@ class NqBoxer {
     OpenStream,
     Task,
     Send,
+    SendEx,
     Call,
     CallEx,
     Reply,
@@ -76,6 +77,9 @@ class NqBoxer {
         uint16_t type_;
       } call_ex_;
       struct {
+        nq_stream_opt_t stream_opt_;
+      } send_ex_;
+      struct {
         uint16_t type_;
       } notify_;
       struct {
@@ -96,16 +100,19 @@ class NqBoxer {
     };
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {}
+
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, nq_time_t ts, nq_closure_t cb, 
       OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       alarm_.invocation_ts_ = ts;
       alarm_.callback_ = cb;
     }
+
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, nq_closure_t cb, OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       task_.callback_ = cb;
     }
+
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, const char *name, void *ctx, 
       OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
@@ -114,9 +121,17 @@ class NqBoxer {
         stream_.ctx_ = ctx;
       }
     }
+
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, const void *data, nq_size_t datalen, 
        OpTarget target = OpTarget::Stream) : 
       serial_(serial), code_(code), target_(target), data_(data, datalen) {}
+    
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, const void *data, nq_size_t datalen,
+       const nq_stream_opt_t &opt, OpTarget target = OpTarget::Stream) : 
+      serial_(serial), code_(code), target_(target), data_(data, datalen) {
+      send_ex_.stream_opt_ = opt;
+    }
+    
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
        nq_size_t datalen, nq_closure_t on_reply, 
        OpTarget target = OpTarget::Stream) :
@@ -124,18 +139,21 @@ class NqBoxer {
       call_.type_ = type;
       call_.on_reply_ = on_reply;
     }
+    
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
-       nq_size_t datalen, nq_rpc_opt_t rpc_opt, 
+       nq_size_t datalen, const nq_rpc_opt_t &rpc_opt, 
        OpTarget target = OpTarget::Stream) :
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
       call_ex_.type_ = type;
       call_ex_.rpc_opt_ = rpc_opt;
     }
+    
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, uint16_t type, 
        const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
       notify_.type_ = type;
     }
+    
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, 
        nq_error_t result, nq_msgid_t msgid, 
        const void *data, nq_size_t datalen, OpTarget target = OpTarget::Stream) :
@@ -263,6 +281,18 @@ class NqBoxer {
       }
     } else {
       Enqueue(new Op(serial, unboxed, code, data, datalen));
+    }
+  }
+  inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code, 
+                           const void *data, nq_size_t datalen, nq_stream_opt_t &stream_opt, 
+                           bool from_queue = false) {
+    if (from_queue) {
+      if (unboxed->stream_serial() == serial) {
+        ASSERT(code == Send);
+        unboxed->Handler<NqStreamHandler>()->SendEx(data, datalen, stream_opt);
+      }
+    } else {
+      Enqueue(new Op(serial, unboxed, code, data, datalen, stream_opt));
     }
   }
   inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code,

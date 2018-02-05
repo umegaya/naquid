@@ -317,7 +317,7 @@ class QUIC_EXPORT_PRIVATE QuicStream : public StreamNotifierInterface {
   // Write buffered data in send buffer. TODO(fayang): Consider combine
   // WriteOrBufferData, Writev and WriteBufferedData when deprecating
   // quic_reloadable_flag_quic_save_data_before_consumption2.
-  void WriteBufferedData();
+  void WriteBufferedData(QuicReferenceCountedPointer<QuicAckListenerInterface> ack_listener);
 
   std::list<PendingData> queued_data_;
   // How many bytes are queued?

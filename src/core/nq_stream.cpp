@@ -244,9 +244,35 @@ std::mutex &NqServerStream::static_mutex() {
 
 
 
+class AckHandler : public QuicAckListenerInterface {
+  nq_stream_opt_t opt_;
+ public:
+  AckHandler(const nq_stream_opt_t &opt) : opt_(opt) {}
+  //implements QuicAckListenerInterface
+
+  // Called when a packet is acked.  Called once per packet.
+  // |acked_bytes| is the number of data bytes acked.
+  void OnPacketAcked(int acked_bytes,
+                             QuicTime::Delta ack_delay_time) override {
+    if (nq_closure_is_empty(opt_.on_ack)) { return; }
+    nq_closure_call(opt_.on_ack, on_stream_ack, acked_bytes, nq_time_usec(ack_delay_time.ToMicroseconds()));
+  }
+  // Called when a packet is retransmitted.  Called once per packet.
+  // |retransmitted_bytes| is the number of data bytes retransmitted.
+  void OnPacketRetransmitted(int retransmitted_bytes) override {
+    if (nq_closure_is_empty(opt_.on_retransmit)) { return; }
+    nq_closure_call(opt_.on_retransmit, on_stream_retransmit, retransmitted_bytes);
+  }
+};
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
   stream_->SendHandshake();
   stream_->WriteOrBufferData(QuicStringPiece(p, len), false, nullptr);
+}
+void NqStreamHandler::WriteBytes(const char *p, nq_size_t len, const nq_stream_opt_t &opt) {
+  stream_->SendHandshake();
+  //TODO(iyatomi): do we need common ack_callback, which is applied to all stream bytes sent?
+  stream_->WriteOrBufferData(QuicStringPiece(p, len), false, 
+    QuicReferenceCountedPointer<QuicAckListenerInterface>(new AckHandler(opt)));
 }
 
 
@@ -268,10 +294,12 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
   QuicConnection::ScopedPacketBundler bundler(
     nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
-	char buffer[len_buff_len + len];
-	auto enc_len = nq::LengthCodec::Encode(len, buffer, sizeof(buffer));
-  memcpy(buffer + enc_len, p, len);
-	WriteBytes(buffer, enc_len + len);
+  SendCommon(p, len, nullptr);
+}
+void NqSimpleStreamHandler::SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) {
+  QuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  SendCommon(p, len, &opt);
 }
 
 

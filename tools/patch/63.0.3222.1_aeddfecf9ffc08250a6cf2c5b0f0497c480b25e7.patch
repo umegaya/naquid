@@ -254,8 +254,66 @@ index 7aac5bbb6d8d..df20d4009dd9 100644
  };
  
  }  // namespace net
+diff --git a/net/quic/core/quic_stream.cc b/net/quic/core/quic_stream.cc
+index 89806900aa9b..3f8f85794604 100644
+--- a/net/quic/core/quic_stream.cc
++++ b/net/quic/core/quic_stream.cc
+@@ -234,7 +234,7 @@ void QuicStream::WriteOrBufferData(
+       // Write data if there is no buffered data before.
+       QUIC_FLAG_COUNT_N(quic_reloadable_flag_quic_save_data_before_consumption2,
+                         2, 4);
+-      WriteBufferedData();
++      WriteBufferedData(ack_listener);
+     }
+     return;
+   }
+@@ -265,7 +265,7 @@ void QuicStream::OnCanWrite() {
+     if (HasBufferedData() || (fin_buffered_ && !fin_sent_)) {
+       QUIC_FLAG_COUNT_N(quic_reloadable_flag_quic_save_data_before_consumption2,
+                         3, 4);
+-      WriteBufferedData();
++      WriteBufferedData(nullptr);
+     }
+     if (!fin_buffered_ && !fin_sent_ && CanWriteNewData()) {
+       // Notify upper layer to write new data when buffered data size is below
+@@ -370,7 +370,7 @@ QuicConsumedData QuicStream::WritevData(
+       // Write data if there is no buffered data before.
+       QUIC_FLAG_COUNT_N(quic_reloadable_flag_quic_save_data_before_consumption2,
+                         1, 4);
+-      WriteBufferedData();
++      WriteBufferedData(nullptr);
+     }
+ 
+     return consumed_data;
+@@ -478,7 +478,7 @@ QuicConsumedData QuicStream::WriteMemSlices(QuicMemSliceSpan span, bool fin) {
+ 
+   if (!had_buffered_data && (HasBufferedData() || fin_buffered_)) {
+     // Write data if there is no buffered data before.
+-    WriteBufferedData();
++    WriteBufferedData(nullptr);
+   }
+ 
+   return consumed_data;
+@@ -676,7 +676,7 @@ bool QuicStream::WriteStreamData(QuicStreamOffset offset,
+   return send_buffer_.WriteStreamData(offset, data_length, writer);
+ }
+ 
+-void QuicStream::WriteBufferedData() {
++void QuicStream::WriteBufferedData(QuicReferenceCountedPointer<QuicAckListenerInterface> ack_listener) {
+   DCHECK(!write_side_closed_ && queued_data_.empty() &&
+          (HasBufferedData() || fin_buffered_));
+ 
+@@ -718,7 +718,7 @@ void QuicStream::WriteBufferedData() {
+ 
+   QuicConsumedData consumed_data = WritevDataInner(
+       QuicIOVector(/*iov=*/nullptr, /*iov_count=*/0, write_length),
+-      stream_bytes_written_, fin, nullptr);
++      stream_bytes_written_, fin, ack_listener);
+ 
+   stream_bytes_written_ += consumed_data.bytes_consumed;
+   stream_bytes_outstanding_ += consumed_data.bytes_consumed;
 diff --git a/net/quic/core/quic_stream.h b/net/quic/core/quic_stream.h
-index e36e1f4e349c..cd21c4b1a4ae 100644
+index e36e1f4e349c..bf44798d8e4f 100644
 --- a/net/quic/core/quic_stream.h
 +++ b/net/quic/core/quic_stream.h
 @@ -42,6 +42,12 @@ namespace test {
@@ -271,6 +329,15 @@ index e36e1f4e349c..cd21c4b1a4ae 100644
  class QuicSession;
  
  class QUIC_EXPORT_PRIVATE QuicStream : public StreamNotifierInterface {
+@@ -311,7 +317,7 @@ class QUIC_EXPORT_PRIVATE QuicStream : public StreamNotifierInterface {
+   // Write buffered data in send buffer. TODO(fayang): Consider combine
+   // WriteOrBufferData, Writev and WriteBufferedData when deprecating
+   // quic_reloadable_flag_quic_save_data_before_consumption2.
+-  void WriteBufferedData();
++  void WriteBufferedData(QuicReferenceCountedPointer<QuicAckListenerInterface> ack_listener);
+ 
+   std::list<PendingData> queued_data_;
+   // How many bytes are queued?
 @@ -397,6 +403,33 @@ class QUIC_EXPORT_PRIVATE QuicStream : public StreamNotifierInterface {
    const QuicByteCount buffered_data_threshold_;
  

@@ -145,6 +145,7 @@ class NqStreamHandler {
   //interface
   virtual void OnRecv(const void *p, nq_size_t len) = 0;
   virtual void Send(const void *p, nq_size_t len) = 0;  
+  virtual void SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) = 0;  
   virtual void Cleanup() = 0;
 
   //operation
@@ -163,6 +164,7 @@ class NqStreamHandler {
   inline void Disconnect() { stream_->Disconnect(); }
   inline NqStream *stream() { return stream_; }
   void WriteBytes(const char *p, nq_size_t len);
+  void WriteBytes(const char *p, nq_size_t len, const nq_stream_opt_t &opt);
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
 
@@ -180,9 +182,21 @@ class NqSimpleStreamHandler : public NqStreamHandler {
   NqSimpleStreamHandler(NqStream *stream, nq_closure_t on_recv) : 
     NqStreamHandler(stream), on_recv_(on_recv), parse_buffer_() {};
 
+  inline void SendCommon(const void *p, nq_size_t len, const nq_stream_opt_t *opt) {
+    char buffer[len_buff_len + len];
+    auto enc_len = nq::LengthCodec::Encode(len, buffer, sizeof(buffer));
+    memcpy(buffer + enc_len, p, len);
+    if (opt != nullptr) {
+      WriteBytes(buffer, enc_len + len, *opt);
+    } else {
+      WriteBytes(buffer, enc_len + len);    
+    }
+  }
+
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override;
+  void SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) override;
   void Cleanup() override {}
 
  private:
@@ -195,17 +209,22 @@ class NqRawStreamHandler : public NqStreamHandler {
  public:
   NqRawStreamHandler(NqStream *stream, nq_closure_t on_recv, nq_closure_t reader, nq_closure_t writer) : 
     NqStreamHandler(stream), on_recv_(on_recv), reader_(reader), writer_(writer) {}
-  //implements NqStream
-  void OnRecv(const void *p, nq_size_t len) override;
-  void Send(const void *p, nq_size_t len) override {
+    
+  inline void SendCommon(const void *p, nq_size_t len, const nq_stream_opt_t *opt) {
     void *buf;
     auto size = nq_closure_call(writer_, stream_writer, stream_->ToHandle<nq_stream_t>(), p, len, &buf);
     if (size <= 0) {
       stream_->Disconnect();
+    } else if (opt != nullptr) {
+      WriteBytes(static_cast<char *>(buf), size, *opt);
     } else {
-      WriteBytes(static_cast<char *>(buf), size);
+      WriteBytes(static_cast<char *>(buf), size);      
     }
   }
+  //implements NqStream
+  void OnRecv(const void *p, nq_size_t len) override;
+  void Send(const void *p, nq_size_t len) override { SendCommon(p, len, nullptr); }
+  void SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) override { SendCommon(p, len, &opt); }
   void Cleanup() override {}
 
  private:
@@ -271,6 +290,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   //implements NqStream
   void OnRecv(const void *p, nq_size_t len) override;
   void Send(const void *p, nq_size_t len) override { ASSERT(false); }
+  void SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) override { ASSERT(false); }  
   virtual void Call(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb);
   virtual void CallEx(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt);
   void Notify(uint16_t type, const void *p, nq_size_t len);

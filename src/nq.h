@@ -153,6 +153,10 @@ typedef nq_size_t (*nq_stream_writer_t)(void *, nq_stream_t, const void *, nq_si
 typedef void (*nq_on_stream_record_t)(void *, nq_stream_t, const void *, nq_size_t);
 
 typedef void (*nq_on_stream_task_t)(void *, nq_stream_t);
+
+typedef void (*nq_on_stream_ack_t)(void *, int, nq_time_t);
+
+typedef void (*nq_on_stream_retransmit_t)(void *, int);
 //called as 2nd argument nq_stream_valid, when actually given stream is valid.
 typedef void (*nq_on_stream_validate_t)(void *, nq_stream_t, const char *);
 
@@ -201,6 +205,8 @@ typedef struct {
     nq_stream_writer_t stream_writer;
     nq_on_stream_record_t on_stream_record;
     nq_on_stream_task_t on_stream_task;
+    nq_on_stream_ack_t on_stream_ack;
+    nq_on_stream_retransmit_t on_stream_retransmit;
     nq_on_stream_validate_t on_stream_validate;
 
     nq_on_rpc_open_t on_rpc_open;
@@ -361,6 +367,11 @@ NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn);
 // stream API 
 //
 // --------------------------
+typedef struct {
+  nq_closure_t on_ack;
+  nq_closure_t on_retransmit;
+} nq_stream_opt_t;
+
 //create single stream from conn, which has type specified by "name". need to use valid conn && call from owner thread of it
 //return invalid stream on error, ctx will be void **ppctx of open callback of this stream handler
 NQAPI_THREADSAFE void nq_conn_stream(nq_conn_t conn, const char *name, void *ctx);
@@ -377,8 +388,10 @@ NQAPI_THREADSAFE bool nq_stream_is_valid(nq_stream_t s, nq_closure_t cb);
 NQAPI_THREADSAFE bool nq_stream_outgoing(nq_stream_t s, bool *p_valid);
 //close this stream only (conn not closed.) useful if you use multiple stream and only 1 of them go wrong
 NQAPI_THREADSAFE void nq_stream_close(nq_stream_t s);
-//send arbiter byte array/arbiter object to stream peer. 
+//send arbiter byte array/arbiter object to stream peer. if you want ack for each send, use nq_stream_send_ex
 NQAPI_THREADSAFE void nq_stream_send(nq_stream_t s, const void *data, nq_size_t datalen);
+//send arbiter byte array/arbiter object to stream peer, and can receive ack of it.
+NQAPI_THREADSAFE void nq_stream_send_ex(nq_stream_t s, const void *data, nq_size_t datalen, nq_stream_opt_t *opt);
 //schedule execution of closure which is given to cb, will called with given s.
 NQAPI_THREADSAFE void nq_stream_task(nq_stream_t s, nq_closure_t cb);
 //check equality of nq_stream_t.

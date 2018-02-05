@@ -261,6 +261,40 @@ class ModifyHdmapClosureCaller : public ClosureCallerBase {
     return pcc->cb_(hm);
   }  
 };
+class StreamAckClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (int, nq_time_t)> cb_;
+ public:
+  StreamAckClosureCaller(std::function<void (int, nq_time_t)> cb) : cb_(cb) {}
+  ~StreamAckClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_stream_ack, &StreamAckClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, int byte, nq_time_t delay_ns) { 
+    auto pcc = (StreamAckClosureCaller *)arg;
+    pcc->cb_(byte, delay_ns);
+    delete pcc;
+  }    
+};
+class StreamRetransmitClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (int)> cb_;
+ public:
+  StreamRetransmitClosureCaller(std::function<void (int)> cb) : cb_(cb) {}
+  ~StreamRetransmitClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_stream_retransmit, &StreamRetransmitClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, int byte) { 
+    auto pcc = (StreamRetransmitClosureCaller *)arg;
+    pcc->cb_(byte);
+  }    
+};
+
 
 
 class Test {

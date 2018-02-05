@@ -44,6 +44,10 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
         p->InvokeStream(op->serial_, s, op->code_,
                        op->data_.ptr(), op->data_.length(), true);
         break;
+      case SendEx:
+        p->InvokeStream(op->serial_, s, op->code_,
+                       op->data_.ptr(), op->data_.length(), op->send_ex_.stream_opt_, true);
+        break;
       case Call:
         p->InvokeStream(op->serial_, s, op->code_, op->call_.type_, 
                         op->data_.ptr(), op->data_.length(), op->call_.on_reply_, true);
