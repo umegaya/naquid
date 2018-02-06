@@ -86,11 +86,11 @@ void NqLoop::Poll() {
       break;
     }
     NqAlarmInterface* cb = static_cast<NqAlarmInterface*>(it->second);
-    //TRACE("alarm fired %llu %llu %p", it->first, current, cb);
-    cb->OnFire(this);
     auto it_prev = it;
     it++;
-    alarm_map_.erase(it_prev);
+    if (cb->OnFire(this)) {
+      alarm_map_.erase(it_prev);
+    }
     //add small duration to avoid infinite loop 
     //(eg. OnAlarm adds new alarm that adds new alarm on OnAlarm again)
     approx_now_in_usec_++; 

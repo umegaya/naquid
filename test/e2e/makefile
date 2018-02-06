@@ -8,7 +8,7 @@ TEST_OS=osx
 .PHONY: client
 client:
 	-mkdir -p $(CLIENT_BUILD_DIR)/$(TEST_OS)
-	cd $(CLIENT_BUILD_DIR)/$(TEST_OS) && (rm client bench roomcl || true) && cmake -DDEBUG:BOOL=$(DEBUG) -DTEST_OS:STRING=$(TEST_OS) $(RELATIVE_ROOT_DIR)/client && make
+	cd $(CLIENT_BUILD_DIR)/$(TEST_OS) && (rm client bench roomcl echo || true) && cmake -DDEBUG:BOOL=$(DEBUG) -DTEST_OS:STRING=$(TEST_OS) $(RELATIVE_ROOT_DIR)/client && make
 
 .PHONY: server
 server:

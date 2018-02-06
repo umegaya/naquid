@@ -25,6 +25,10 @@ file(GLOB_RECURSE roomcl_src [
 	"./roomcl.cpp" 
 ])
 
+file(GLOB_RECURSE echo_src [
+	"./echo.cpp" 
+])
+
 if (${TEST_OS} STREQUAL "osx")
 	find_library(core_foundation CoreFoundation)
 	find_library(cocoa Cocoa)
@@ -48,3 +52,6 @@ target_link_libraries(bench nq ${platform_libs})
 
 add_executable(roomcl ${roomcl_src})
 target_link_libraries(roomcl nq ${platform_libs})
+
+add_executable(echo ${echo_src})
+target_link_libraries(echo nq ${platform_libs})

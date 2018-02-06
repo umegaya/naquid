@@ -241,13 +241,14 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
             NqAlarmBase(), 
             stream_handler_(stream_handler), on_data_(on_data), msgid_(msgid) {}
     ~Request() {}
-    void OnFire(NqLoop *) override { 
+    bool OnFire(NqLoop *) override { 
       auto it = stream_handler_->req_map_.find(msgid_);
       if (it != stream_handler_->req_map_.end()) {
         nq_closure_call(on_data_, on_rpc_reply, stream_handler_->stream()->ToHandle<nq_rpc_t>(), NQ_ETIMEOUT, "", 0);
         stream_handler_->req_map_.erase(it);
       }
       delete this;
+      return true;
     }
     inline void GoAway() {
       nq_closure_call(on_data_, on_rpc_reply, stream_handler_->stream()->ToHandle<nq_rpc_t>(), NQ_EGOAWAY, "", 0);

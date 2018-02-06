@@ -144,7 +144,7 @@ int main(int argc, char *argv[]){
   nq_hdmap_rpc_handler(hm, "rpc", handler);
 
   nq_addr_t addr = {
-    "127.0.0.1", nullptr, nullptr, nullptr,
+    "test.qrpc.io", nullptr, nullptr, nullptr,
     8443
   };
   nq_clconf_t conf;

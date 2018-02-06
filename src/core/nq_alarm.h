@@ -13,7 +13,9 @@ class NqBoxer;
 class NqAlarmInterface {
  public:
   virtual ~NqAlarmInterface() {}
-  virtual void OnFire(NqLoop *) = 0;
+  //return false if it calls NqLoop::CancelAlarm internally, 
+  //true otherwise, then system automatically remove this interface from NqLoop::alarm_map_
+  virtual bool OnFire(NqLoop *) = 0;
 };
 class NqQuicAlarm : public QuicAlarm, 
                     public NqAlarmInterface {
@@ -23,7 +25,10 @@ class NqQuicAlarm : public QuicAlarm,
   ~NqQuicAlarm() override {}
 
   //implements NqAlarmInterface
-  void OnFire(NqLoop *) override { Fire(); }
+  bool OnFire(NqLoop *) override { 
+    Fire(); 
+    return true;
+  }
 
  protected:
   //implements QuicAlarm
@@ -53,11 +58,12 @@ class NqAlarmBase : public NqAlarmInterface {
   NqAlarmBase() : invocation_ts_(0) {}
   ~NqAlarmBase() override {}
 
-  void OnFire(NqLoop *) override = 0;
+  bool OnFire(NqLoop *) override = 0;
 
  public:
   void Start(NqLoop *loop, nq_time_t first_invocation_ts) {
     Stop(loop);
+    ASSERT(invocation_ts_ == 0);
     invocation_ts_ = first_invocation_ts;
     loop->SetAlarm(this, nq::clock::to_us(invocation_ts_));
   }
@@ -83,7 +89,6 @@ class NqAlarm : public NqAlarmBase {
   ~NqAlarm() override {}
 
   inline void Start(NqLoop *loop, nq_time_t first_invocation_ts, nq_closure_t cb) {
-    Stop(loop);
     cb_ = cb;
     NqAlarmBase::Start(loop, first_invocation_ts);
   }
@@ -94,18 +99,19 @@ class NqAlarm : public NqAlarmBase {
   void InitSerial(const nq_serial_t &serial) { alarm_serial_ = serial; }
 
   // implements NqAlarmInterface
-  void OnFire(NqLoop *loop) override {
-    TRACE("OnFire %p", this);
+  bool OnFire(NqLoop *loop) override {
     nq_time_t next = invocation_ts_;
     nq_closure_call(cb_, on_alarm, &next);
     if (next > invocation_ts_) {
       NqAlarmBase::Start(loop, next);
       ASSERT(invocation_ts_ == next);
+      return false;
     } else if (next == 0) {
       invocation_ts_ = 0;
     } else {
       delete this;
     }
+    return true;
   }
 
   //implement custom allocator
