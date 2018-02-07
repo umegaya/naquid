@@ -35,6 +35,11 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
     QuicSocketAddress server_address,
     QuicIpAddress bind_to_address,
     int bind_to_port) {
+  //close fd on reconnection.
+  if (fd_ > -1) {
+    CleanUpAllUDPSockets();
+    ASSERT(fd_ == -1);
+  }
   fd_ = QuicSocketUtils::CreateUDPSocket(server_address, &overflow_supported_);
   if (fd_ < 0) {
     return false;
@@ -81,6 +86,7 @@ void NqNetworkHelper::CleanUpUDPSocketImpl(Fd fd) {
   DCHECK_EQ(fd, fd_);
   if (fd > -1) {
     loop_->Del(fd);
+    TRACE("close fd: %d", fd);
     int rc = nq::Syscall::Close(fd);
     DCHECK_EQ(0, rc);
     fd_ = -1;
