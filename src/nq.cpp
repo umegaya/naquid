@@ -31,6 +31,23 @@ using namespace net;
 
 // --------------------------
 //
+// chaos modes
+//
+// --------------------------
+#if defined(DEBUG)
+static bool g_chaos_write = false;
+extern bool chaos_write() {
+  return g_chaos_write;
+}
+void chaos_init() {
+  g_chaos_write = getenv("CHAOS") != nullptr;
+}
+#endif
+
+
+
+// --------------------------
+//
 // helper
 //
 // --------------------------
@@ -115,12 +132,15 @@ static void lib_init() {
   g_at_exit_manager = nq_at_exit_manager(); //anchor
   //set loghandoer for chromium codebase
   logging::SetLogMessageHandler(nq_chromium_logger);
+  //break some of the systems according to the env value "CHAOS"
+  chaos_init();
 }
 
 #define no_ret_closure_call_with_check(__pclsr, __type, ...) \
   if ((__pclsr).__type != nullptr) { \
     (__pclsr).__type((__pclsr).arg, __VA_ARGS__); \
   }
+
 
 
 // --------------------------
@@ -139,17 +159,12 @@ NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code) {
 // client API
 //
 // --------------------------
-static bool g_packet_write_error_emu = false;
-extern bool packet_write_error_emu() {
-  return g_packet_write_error_emu;
-}
 NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint) {
   lib_init(); //anchor
 	auto l = new NqClientLoop(max_nfd, max_stream_hint);
 	if (l->Open(max_nfd) < 0) {
 		return nullptr;
 	}
-  //g_packet_write_error_emu = true;
 	return l->ToHandle();
 }
 NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl) {
@@ -504,6 +519,11 @@ NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t invocation_ts, nq_clo
 NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a) {
   NqUnwrapper::UnwrapBoxer(a)->InvokeAlarm(a.s, ToAlarm(a), NqBoxer::OpCode::Finalize);
 }
+NQAPI_THREADSAFE bool nq_alarm_is_valid(nq_alarm_t a) {
+  //because memory pointed to a.p never returned to heap, this check should be work always.
+  auto p = static_cast<NqAlarm *>(a.p);
+  return p->alarm_serial() == a.s;
+}
 
 
 
@@ -528,8 +548,8 @@ NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *para
     case NQ_LOG_STRING:
       j[p.key] = p.value.s;
       break;
-    case NQ_LOG_FLOAT:
-      j[p.key] = p.value.f;
+    case NQ_LOG_DECIMAL:
+      j[p.key] = p.value.d;
       break;
     case NQ_LOG_BOOLEAN:
       j[p.key] = p.value.b;

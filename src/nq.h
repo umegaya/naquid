@@ -93,7 +93,7 @@ typedef int nq_quic_error_t;
 NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code);
 
 typedef enum {
-  NQ_HS_START = 0, //client: client send first packet, server: server receive initial packet
+  NQ_HS_START = 0, //client: client is about to send first packet, server: server receive initial packet
   NQ_HS_DONE = 10,  //client: receive SHLO, server: accept CHLO
 } nq_handshake_event_t;
 
@@ -485,11 +485,13 @@ NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d);
 //at thread which handle receive callback of nq_rpc/stream_t that creates this alarm.
 //if you set next invocation timestamp value(>= input value) to 3rd argument of cb, alarm scheduled to run that time, 
 //if you set the value to 0(STOP_INVOKE_NQ_TIME), it stopped (still valid and can reactivate with nq_alarm_set). 
-//otherwise alarm remove its memory, further use of nq_alarm_t will possibly cause crash
+//otherwise alarm remove its memory, further use of nq_alarm_t is not possible (silently ignored)
 //suitable if you want to create some kind of poll method of your connection.
 NQAPI_THREADSAFE void nq_alarm_set(nq_alarm_t a, nq_time_t first, nq_closure_t cb);
-//destroy alarm. if you call nq_alarm_set after the alarm already called nq_alarm_destroy, it will possibly crash
+//destroy alarm. after call this, any attempt to call nq_alarm_set will be ignored.
 NQAPI_THREADSAFE void nq_alarm_destroy(nq_alarm_t a);
+//check if alarm is valid
+NQAPI_THREADSAFE bool nq_alarm_is_valid(nq_alarm_t a);
 
 
 
@@ -528,14 +530,13 @@ typedef enum {
 typedef enum {
   NQ_LOG_INTEGER,
   NQ_LOG_STRING,
-  NQ_LOG_FLOAT,
+  NQ_LOG_DECIMAL,
   NQ_LOG_BOOLEAN,
 } nq_logparam_type_t;
 typedef struct {
   const char *key;
   nq_logparam_type_t type;
   union {
-    float f;
     double d;
     uint64_t n;
     const char *s;
@@ -544,9 +545,9 @@ typedef struct {
 } nq_logparam_t;
 
 NQAPI_BOOTSTRAP void nq_log_config(const nq_logconf_t *conf);
-
+//write JSON structured log output. 
 NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *params, int n_params);
-
+//write JSON Structured log output, with only msg
 NQAPI_INLINE void nq_msg(nq_loglv_t lv, const char *msg) { nq_log(lv, msg, NULL, 0); }
 //flush cached log. only enable if you configure manual_flush to true. 
 //recommend to call from only one thread. otherwise log output order may change from actual order.

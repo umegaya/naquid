@@ -79,7 +79,6 @@ void NqClient::OnFinalize() {
   }
 }
 void NqClient::DoReconnect() {
-  TRACE("NqClient::DoReconnect");
   Initialize();
   StartConnect(); 
 }

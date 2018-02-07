@@ -33,7 +33,7 @@
 
 using std::string;
 
-extern bool packet_write_error_emu();
+extern bool chaos_write();
 
 namespace net {
 
@@ -297,7 +297,7 @@ WriteResult QuicSocketUtils::WritePacket(
 
 #if defined(DEBUG)
   static int n_count = 0;
-  if (packet_write_error_emu()) {
+  if (chaos_write()) {
     n_count++;
   }
   if (n_count < 11) {
