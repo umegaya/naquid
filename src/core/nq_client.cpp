@@ -91,6 +91,7 @@ void NqClient::ScheduleDestroy() {
 }
 void NqClient::Destroy() {
   OnFinalize();
+  loop_->RemoveClient(this);
   delete this;
 }
 nq_conn_t NqClient::ToHandle() { 

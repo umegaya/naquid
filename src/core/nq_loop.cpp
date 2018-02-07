@@ -54,7 +54,7 @@ void NqLoop::CancelAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
       if (alarm_process_us_ts_ == 0 || alarm_process_us_ts_ < timeout_in_us) {
         alarm_map_.erase(it);
       } else {
-        TRACE("mark erased: %llu", timeout_in_us);
+        TRACE("mark erased: %p %llu", it->second.ptr_, timeout_in_us);
         it->second.erased_ = true;
       }
       return;

@@ -38,7 +38,7 @@
 - [x] test: stream handle send/recv test
 - [x] test: timeout test for handshake / rpc call
 - [ ] test: ensure robustness for connectivity change
-- [ ] bench: higher concurrency test (around 10k client connection)
+- [x] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread
 - [x] bench: comparing latency and throughput with mrs, which contains ENet based gaming specific udp network library
   - ~10% faster than mrs, with 100ccu/5000 request (roughly 500k req/sec) almost batched (mrs does not allow 100+ ccu, so more comparision is not possible)

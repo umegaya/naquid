@@ -63,11 +63,11 @@ void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
   g_ctxs[idx].fd = nq_conn_fd(c);
   g_ctxs[idx].cid = nq_conn_cid(c);
 #endif
-  TRACE("on_conn_open event:%ld %d\n", idx, hsev);
+  TRACE("on_conn_open:%d event:%d\n", idx, hsev);
 }
 nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *detail, bool) {
   intptr_t idx = (intptr_t)arg;
-  fprintf(stderr, "on_conn_close: reason:%ld %s %s\n", idx, detail, nq_quic_error_str(e));
+  TRACE("on_conn_close:%ld reason:%s(%s)\n", idx, detail, nq_quic_error_str(e));
   return nq_time_sec(2);
 }
 
@@ -85,7 +85,7 @@ bool on_rpc_open(void *p, nq_rpc_t rpc, void **ctx) {
 }
 void on_rpc_close(void *p, nq_rpc_t rpc) {
   auto v = (closure_ctx *)nq_rpc_ctx(rpc);
-  fprintf(stderr, "on_rpc_close: idx:%d\n", v->index);
+  TRACE("on_rpc_close:%d", v->index);
   return;
 }
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
