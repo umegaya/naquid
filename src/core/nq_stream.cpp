@@ -317,6 +317,10 @@ void NqRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
 
 
 void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, nq_time_t timeout_duration_ts) {
+  if (stream()->stream_serial().IsEmpty()) {
+    //if NqStreamHandler::WriteBytes fails, stream closed before returning it. 
+    return;
+  }
   auto req = new Request(this, msgid, cb);
   req_map_[msgid] = req;
   auto now = nq_time_now();
