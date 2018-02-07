@@ -33,6 +33,10 @@ void on_alarm(void *arg, nq_time_t *next) {
 /* conn callback */
 void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
   TRACE("on_conn_open event:%d\n", hsev);
+  if (hsev == NQ_HS_START) {
+    return;
+  }
+  nq_conn_rpc(c, "rpc", arg);
 }
 nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *detail, bool) {
   TRACE("on_conn_close: reason:%s %s\n", detail, nq_quic_error_str(e));
@@ -52,6 +56,7 @@ bool on_rpc_open(void *p, nq_rpc_t rpc, void **ctx) {
 void on_rpc_close(void *p, nq_rpc_t rpc) {
   auto v = (context *)nq_rpc_ctx(rpc);
   TRACE("on_rpc_close at %d", v->n_send);
+  nq_alarm_destroy(v->alarm);
   return;
 }
 void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *data, nq_size_t len) {
@@ -61,7 +66,10 @@ void on_rpc_notify(void *p, nq_rpc_t rpc, uint16_t type, const void *data, nq_si
 
 }
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq_size_t len) {
-  ASSERT(result >= 0);
+  if (result < 0) {
+    TRACE("rpc error %d", result);
+    return;
+  }
   auto v = (context *)nq_rpc_ctx(rpc);
   auto sent = nq::Endian::NetbytesToHost<nq_time_t>((const char *)data);
   nq_time_t latency = nq_time_now() - sent;
@@ -88,7 +96,7 @@ int main(int argc, char *argv[]){
   nq_closure_init(handler.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
   nq_closure_init(handler.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
   handler.use_large_msgid = false;
-  handler.timeout = nq_time_sec(60);
+  handler.timeout = nq_time_sec(10);
   nq_hdmap_rpc_handler(hm, "rpc", handler);
 
   nq_addr_t addr = {
@@ -111,13 +119,12 @@ int main(int argc, char *argv[]){
   ctx.sum_latency = 0;
 
   //reinitialize closure, with giving client index as arg
-  nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, nullptr);
+  nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, &ctx);
   nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, nullptr);
   nq_conn_t c = nq_client_connect(cl, &addr, &conf);
   if (!nq_conn_is_valid(c, on_validate)) {
     return -1;
   }
-  nq_conn_rpc(c, "rpc", &ctx);
 
   while (true) {
     //nq_time_pause(nq_time_msec(10));

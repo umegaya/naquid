@@ -33,6 +33,8 @@
 
 using std::string;
 
+extern bool packet_write_error_emu();
+
 namespace net {
 
 // static
@@ -257,7 +259,6 @@ size_t QuicSocketUtils::SetIpInfoInCmsg(const QuicIpAddress& self_address,
 }
 
 
-
 // static
 WriteResult QuicSocketUtils::WritePacket(
     int fd,
@@ -294,6 +295,30 @@ WriteResult QuicSocketUtils::WritePacket(
     hdr.msg_controllen = cmsg->cmsg_len;
   }
 
+#if defined(DEBUG)
+  static int n_count = 0;
+  if (packet_write_error_emu()) {
+    n_count++;
+  }
+  if (n_count < 11) {
+    int rc;
+    do {
+      rc = sendmsg(fd, &hdr, 0);
+    } while (rc < 0 && errno == EINTR);
+    if (rc >= 0) {
+      return WriteResult(WRITE_STATUS_OK, rc);
+    }
+    fprintf(stderr, "%d: fail to send: %s(%s)\n", fd, strerror(errno), (errno == EAGAIN || errno == EWOULDBLOCK) ? "blocked" : "error");
+    return WriteResult((errno == EAGAIN || errno == EWOULDBLOCK)
+                           ? WRITE_STATUS_BLOCKED
+                           : WRITE_STATUS_ERROR,
+                       errno);
+  } 
+  if (n_count >= 20) {
+    n_count = 0;
+  }
+  return WriteResult(WRITE_STATUS_ERROR, 49);
+#else
   int rc;
   do {
     rc = sendmsg(fd, &hdr, 0);
@@ -306,6 +331,7 @@ WriteResult QuicSocketUtils::WritePacket(
                          ? WRITE_STATUS_BLOCKED
                          : WRITE_STATUS_ERROR,
                      errno);
+#endif
 }
 
 

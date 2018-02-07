@@ -12,6 +12,7 @@
 #include "net/tools/quic/quic_client_base.h"
 
 #include "basis/allocator.h"
+#include "core/nq_alarm.h"
 #include "core/nq_client_session.h"
 #include "core/nq_config.h"
 
@@ -23,9 +24,9 @@ class NqClientStream;
 class NqBoxer;
 
 class NqClient : public QuicClientBase, 
-                 public QuicAlarm::Delegate,
                  public QuicCryptoClientStream::ProofHandler, 
-                 public NqSession::Delegate {
+                 public NqSession::Delegate,
+                 public NqAlarmBase {
  public:
   enum ConnectState : uint8_t {
     DISCONNECT,
@@ -33,13 +34,6 @@ class NqClient : public QuicClientBase,
     CONNECTED,
     FINALIZED,
     RECONNECTING,
-  };
-  class ReconnectAlarm : public QuicAlarm::Delegate {
-   public:
-    ReconnectAlarm(NqClient *client) : client_(client) {}
-    void OnAlarm();
-   private:
-    NqClient *client_;
   };
   class StreamManager {
     struct Entry {
@@ -131,7 +125,6 @@ class NqClient : public QuicClientBase,
   void ScheduleDestroy();
   void OnFinalize();
   
-  inline void Destroy() { OnFinalize(); OnAlarm(); }
   inline void InvalidateSerial() { 
     std::unique_lock<std::mutex> lk(static_mutex());
     session_serial_.Clear(); 
@@ -147,8 +140,9 @@ class NqClient : public QuicClientBase,
   void InitializeSession() override;
 
 
-  // implements QuicAlarm::Delegate
-  void OnAlarm() override;
+  // implements NqAlarmBase
+  void OnFire(NqLoop *loop) override;
+  bool IsNonQuicAlarm() const override { return true  ; }
   // implements QuicCryptoClientStream::ProofHandler
   // Called when the proof in |cached| is marked valid.  If this is a secure
   // QUIC session, then this will happen only after the proof verifier
@@ -162,6 +156,8 @@ class NqClient : public QuicClientBase,
 
   // implements NqSession::Delegate
   void *Context() const override { return context_; }
+  void Destroy() override;
+  void DoReconnect() override;
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
@@ -190,7 +186,6 @@ class NqClient : public QuicClientBase,
  private:
   NqClientLoop* loop_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
-  std::unique_ptr<QuicAlarm> alarm_;
   nq_closure_t on_close_, on_open_, on_finalize_;
   NqSerial session_serial_;
   StreamManager stream_manager_;

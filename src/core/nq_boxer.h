@@ -26,6 +26,7 @@ class NqBoxer {
     Nop = 0,
     Disconnect,
     Reconnect,
+    DoReconnect,
     Flush,
     Finalize,
     Start,
@@ -37,6 +38,7 @@ class NqBoxer {
     CallEx,
     Reply,
     Notify,
+    Exec,
   };
   enum OpTarget : uint8_t {
     Invalid = 0,
@@ -193,8 +195,11 @@ class NqBoxer {
         case Reconnect:
           unboxed->Reconnect();
           break;
+        case DoReconnect:
+          unboxed->DoReconnect();
+          break;
         case Finalize:
-          delete unboxed;
+          unboxed->Destroy();
           break;
         case Flush: {
           QuicConnection::ScopedPacketBundler bundler(unboxed->Connection(), QuicConnection::SEND_ACK_IF_QUEUED);
@@ -238,11 +243,21 @@ class NqBoxer {
   inline void InvokeAlarm(const nq_serial_t &serial, NqAlarm *unboxed, OpCode code, bool from_queue = false) {
     if (from_queue) {
       if (unboxed->alarm_serial() == serial) {
-        ASSERT(code == Finalize);
-        RemoveAlarm(unboxed->alarm_index());
-        unboxed->Destroy(Loop());
+        switch (code) {
+        case Finalize:
+          RemoveAlarm(unboxed->alarm_index());
+          unboxed->Destroy(Loop());
+          break;
+        case Exec:
+          unboxed->Exec();
+          break;
+        default:
+          ASSERT(false);
+          break;
+        }
       } else {
         //already got invalid
+        ASSERT(false);
       }
     } else {
       Enqueue(new Op(serial, unboxed, code, OpTarget::Alarm));

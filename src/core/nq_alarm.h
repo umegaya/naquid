@@ -15,7 +15,13 @@ class NqAlarmInterface {
   virtual ~NqAlarmInterface() {}
   //return false if it calls NqLoop::CancelAlarm internally, 
   //true otherwise, then system automatically remove this interface from NqLoop::alarm_map_
-  virtual bool OnFire(NqLoop *) = 0;
+
+  //CAUTION: its generally unsafe that call NqLoop::CancelAlarm directly in OnFire callback,
+  //because it may change ieterator state of NqLoop::alarm_map_ unpredictable way, as you can see at NqLoop::Poll
+  //but operation to nq_alarm_t is safe because it does such operation by queueing it to NqBoxer::Processor. 
+  //so if you want to operate alarm directly in OnFire, please add similar task to NqBoxer's Operation and InvokeXXXX function, then use it.
+  virtual void OnFire(NqLoop *) = 0;
+  virtual bool IsNonQuicAlarm() const = 0;
 };
 class NqQuicAlarm : public QuicAlarm, 
                     public NqAlarmInterface {
@@ -25,10 +31,8 @@ class NqQuicAlarm : public QuicAlarm,
   ~NqQuicAlarm() override {}
 
   //implements NqAlarmInterface
-  bool OnFire(NqLoop *) override { 
-    Fire(); 
-    return true;
-  }
+  void OnFire(NqLoop *) override { Fire(); }
+  bool IsNonQuicAlarm() const override { return false; }
 
  protected:
   //implements QuicAlarm
@@ -58,7 +62,8 @@ class NqAlarmBase : public NqAlarmInterface {
   NqAlarmBase() : invocation_ts_(0) {}
   ~NqAlarmBase() override {}
 
-  bool OnFire(NqLoop *) override = 0;
+  void OnFire(NqLoop *) override = 0;
+  bool IsNonQuicAlarm() const override { return false; }
 
  public:
   void Start(NqLoop *loop, nq_time_t first_invocation_ts) {
@@ -77,6 +82,10 @@ class NqAlarmBase : public NqAlarmInterface {
     Stop(loop);
     delete this;
   }
+ protected:
+  void ClearInvocationTS() {
+    invocation_ts_ = 0;
+  }
 };
 class NqAlarm : public NqAlarmBase {
   nq_closure_t cb_;
@@ -86,9 +95,10 @@ class NqAlarm : public NqAlarmBase {
   typedef nq::Allocator<NqAlarm> Allocator;
 
   NqAlarm() : NqAlarmBase(), cb_(nq_closure_empty()), alarm_serial_() {}
-  ~NqAlarm() override {}
+  ~NqAlarm() override { alarm_serial_.Clear(); }
 
   inline void Start(NqLoop *loop, nq_time_t first_invocation_ts, nq_closure_t cb) {
+    TRACE("NqAlarm Start:%p", this);
     cb_ = cb;
     NqAlarmBase::Start(loop, first_invocation_ts);
   }
@@ -99,20 +109,8 @@ class NqAlarm : public NqAlarmBase {
   void InitSerial(const nq_serial_t &serial) { alarm_serial_ = serial; }
 
   // implements NqAlarmInterface
-  bool OnFire(NqLoop *loop) override {
-    nq_time_t next = invocation_ts_;
-    nq_closure_call(cb_, on_alarm, &next);
-    if (next > invocation_ts_) {
-      NqAlarmBase::Start(loop, next);
-      ASSERT(invocation_ts_ == next);
-      return false;
-    } else if (next == 0) {
-      invocation_ts_ = 0;
-    } else {
-      delete this;
-    }
-    return true;
-  }
+  void OnFire(NqLoop *loop) override;
+  void Exec();
 
   //implement custom allocator
   void* operator new(std::size_t sz);

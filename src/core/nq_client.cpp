@@ -75,14 +75,23 @@ NqStreamIndex NqClient::NewStreamIndex() {
 void NqClient::OnFinalize() {
   if (!nq_closure_is_empty(on_finalize_)) {
     nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
+    on_finalize_ = nq_closure_empty();
   }
+}
+void NqClient::DoReconnect() {
+  TRACE("NqClient::DoReconnect");
+  Initialize();
+  StartConnect(); 
 }
 void NqClient::ScheduleDestroy() {
   OnFinalize();
-  alarm_.reset(alarm_factory()->CreateAlarm(this));
-  alarm_->Set(NqLoop::ToQuicTime(loop_->NowInUsec()));
   loop_->RemoveClient(this);
   InvalidateSerial();
+  boxer()->InvokeConn(session_serial_, this, NqBoxer::OpCode::Finalize);
+}
+void NqClient::Destroy() {
+  OnFinalize();
+  delete this;
 }
 nq_conn_t NqClient::ToHandle() { 
   return MakeHandle<nq_conn_t, NqSession::Delegate>(static_cast<NqSession::Delegate *>(this), session_serial_);
@@ -103,19 +112,18 @@ std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* c
   return QuicWrapUnique(s);
 }
 void NqClient::InitializeSession() {
+  connect_state_ = CONNECTING;
   QuicClientBase::InitializeSession();
   nq_session()->GetClientCryptoStream()->CryptoConnect();
-  connect_state_ = CONNECTING;
-  alarm_.reset(); //free existing reconnection alarm
 }
 
 
 
-// implements QuicAlarm::Delegate
-void NqClient::OnAlarm() { 
-  ASSERT(session_serial_.IsEmpty());
-  alarm_.release(); //release QuicAlarm which should contain *this* pointer, to prevent double free.
-  delete this;
+// implements NqAlarmBase
+void NqClient::OnFire(NqLoop *l) { 
+  ASSERT(connect_state_ == RECONNECTING);
+  boxer()->InvokeConn(session_serial_, this, NqBoxer::OpCode::DoReconnect);
+  ClearInvocationTS();
 }
 
 
@@ -155,8 +163,8 @@ void NqClient::OnClose(QuicErrorCode error,
     //via auto free of pointer which holds in QuicArenaScopedPtr<QuicAlarm::Delegate> of QuicAlarm.
   } else if (next_connect_us > 0 || connect_state_ == RECONNECTING) {
     next_reconnect_us_ts_ = loop_->NowInUsec() + next_connect_us;
-    alarm_.reset(alarm_factory()->CreateAlarm(new ReconnectAlarm(this)));
-    alarm_->Set(NqLoop::ToQuicTime(next_reconnect_us_ts_));
+    TRACE("set reconnection alarm: to %llu(%llu)", nq_time_usec(next_reconnect_us_ts_), nq_time_usec(next_connect_us));
+    NqAlarmBase::Start(loop_, nq_time_usec(next_reconnect_us_ts_));
     connect_state_ = RECONNECTING;
   } else {
     //client become disconnect state, but reconnection not scheduled. 
@@ -165,14 +173,10 @@ void NqClient::OnClose(QuicErrorCode error,
     connect_state_ = DISCONNECT;
   }
   //remove non established outgoing streams.
-  stream_manager_.CleanupStreamsOnClose();
+  stream_manager_.CleanupStreamsOnClose();  
   return;
 }
 void NqClient::Disconnect() {
-  if (connect_state_ != FINALIZED && alarm_ != nullptr) {
-    alarm_->Cancel();
-    alarm_.reset();
-  }
   if (connect_state_ == CONNECTING || connect_state_ == CONNECTED) {
     connect_state_ = FINALIZED;
     QuicClientBase::Disconnect(); 
@@ -181,7 +185,6 @@ void NqClient::Disconnect() {
     ScheduleDestroy();
   } else {
     //finalize do nothing, because this client already scheduled to destroy.
-    ASSERT(alarm_ != nullptr);
   }
 }
 bool NqClient::Reconnect() {
@@ -189,11 +192,9 @@ bool NqClient::Reconnect() {
     connect_state_ = RECONNECTING;
     QuicClientBase::Disconnect(); 
   } else if (connect_state_ == DISCONNECT) {
-    Initialize();
-    StartConnect();    
+    DoReconnect();
   } else {
     //finalize do nothing, because this client already scheduled to destroy.
-    ASSERT(alarm_ != nullptr);
   }
   return true;
 }
@@ -220,25 +221,6 @@ void NqClient::OpenStream(const std::string &, void *) {
 }
 QuicCryptoStream *NqClient::NewCryptoStream(NqSession* session) {
   return new QuicCryptoClientStream(server_id(), session,  new ProofVerifyContext(), crypto_config(), this);
-}
-
-
-
-//ReconnectAlarm
-void NqClient::ReconnectAlarm::OnAlarm() { 
-#if defined(USE_DIRECT_WRITE)
-  auto loop = client_->loop_;
-  loop->LockSession(client_->session_index());
-  auto m = &(client_->static_mutex());
-  std::unique_lock<std::mutex> session_lock(*m);
-#endif
-
-  client_->Initialize();
-  client_->StartConnect(); 
-  //here, this already become invalid. but loop can be used
-#if defined(USE_DIRECT_WRITE)
-  loop->UnlockSession();  
-#endif
 }
 
 

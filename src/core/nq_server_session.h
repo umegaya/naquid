@@ -43,6 +43,8 @@ class NqServerSession : public NqSession,
 
   //implements NqSession::Delegate
   void *Context() const override { return context_; }
+  void Destroy() override { ASSERT(false); }
+  void DoReconnect() override { ASSERT(false); }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;

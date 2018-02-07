@@ -42,22 +42,44 @@ QuicTime NqLoop::ToQuicTime(uint64_t from_us) {
 
 
 void NqLoop::SetAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
-  AlarmMap().insert(std::make_pair(timeout_in_us, a));
+  //if (a->IsNonQuicAlarm()) {
+   //TRACE("---- set alarm %p(%s) at %llu %llu %llu", a, a->IsNonQuicAlarm() ? "reconn" : "", timeout_in_us, approx_now_in_usec_, timeout_in_us - approx_now_in_usec_);
+ // }
+  //alarm_map_.insert(std::make_pair(timeout_in_us, a));
+  alarm_map_.emplace(std::piecewise_construct, 
+                    std::forward_as_tuple(timeout_in_us), 
+                    std::forward_as_tuple(a));
+  //if (a->IsNonQuicAlarm()) {
+  //for (auto kv : alarm_map_) {
+  //  TRACE("after insert entries:%p,%llu,%p", this, kv.first, kv.second);
+  //}
+//}
 }
 void NqLoop::CancelAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
-    auto &alarm_map = AlarmMap();
-    auto p = alarm_map.equal_range(timeout_in_us);
+  //if (a->IsNonQuicAlarm()) {
+   // TRACE("---- cancel alarm %p(%s) at %llu", a, a->IsNonQuicAlarm() ? "reconn" : "", timeout_in_us);
+    //}
+
+  //for (auto kv : alarm_map_) {
+  //  TRACE("before remove entries:%p,%llu,%p", this, kv.first, kv.second);
+  //}
+    auto p = alarm_map_.equal_range(timeout_in_us);
     auto it = p.first;
     for (; it != p.second; ++it) {
-      if (it->second == a) {
-        break;
+      if (it->second.ptr_ == a) {
+        if (alarm_process_us_ts_ == 0 || alarm_process_us_ts_ < timeout_in_us) {
+          alarm_map_.erase(it);
+        } else {
+          TRACE("mark erased: %llu", timeout_in_us);
+          it->second.erased_ = true;
+        }
+    //for (auto kv : alarm_map_) {
+    //  TRACE("after remove entries:%p,%llu,%p", this, kv.first, kv.second);
+    //}
+        return;
       }
     }
-    if (it != alarm_map.end()) {
-      AlarmMap().erase(it);
-    } else {
-      ASSERT(false);
-    }  
+    ASSERT(false);
 }
 
 //implements QuicAlarmFactory
@@ -75,25 +97,49 @@ QuicArenaScopedPtr<QuicAlarm> NqLoop::CreateAlarm(
   }
 }
 
+
+
 // polling
 void NqLoop::Poll() {
   nq::Loop::Poll();
   approx_now_in_usec_ = NowInUsec();
-  auto current = approx_now_in_usec_;
-  for (auto it = alarm_map_.begin(); it != alarm_map_.end();) {
+  alarm_process_us_ts_ = approx_now_in_usec_;
+  auto it = alarm_map_.begin();
+  while (true) {
+    //TRACE("try invoke alarm %p at %llu %llu %lld", it->second, it->first, current, current - it->first);
     //prevent infinite looping when OnAlarm keep on re-assigning alarm to the alarm_map_.
-    if (it->first > current) { //multimap key should be ordered
+    if (it == alarm_map_.end()) {
+      alarm_map_.clear();
       break;
     }
-    NqAlarmInterface* cb = static_cast<NqAlarmInterface*>(it->second);
-    auto it_prev = it;
-    it++;
-    if (cb->OnFire(this)) {
-      alarm_map_.erase(it_prev);
+    if (it->first > alarm_process_us_ts_) { //multimap key should be ordered
+      /*if (alarm_map_.size() > 0) {
+        TRACE("break by future alarm:%lld", it->first - current); 
+      for (auto kv : alarm_map_) {
+        TRACE("after break entries:%p,%llu,%p", this, kv.first, kv.second);
+      }
+    }//*/
+      alarm_map_.erase(alarm_map_.begin(), it);
+      break;
     }
+    if (it->second.erased_) {
+      TRACE("erased alarm: %p %llu", it->second.ptr_, it->first);
+      it++;
+      continue;
+    }
+    NqAlarmInterface* cb = static_cast<NqAlarmInterface*>(it->second.ptr_);
+    //TRACE("invoke alarm %p(%s) at %llu", cb, cb->IsNonQuicAlarm() ? "reconn" : "",it->first);
+    cb->OnFire(this);
+    it++;
+    /*for (auto kv : alarm_map_) {
+      TRACE("after erase entries:%p,%llu,%p", this, kv.first, kv.second);
+    }
+    TRACE("iters: %llu,%p and %llu,%p", it->first, it->second, it_prev->first, it_prev->second);*/
     //add small duration to avoid infinite loop 
     //(eg. OnAlarm adds new alarm that adds new alarm on OnAlarm again)
     approx_now_in_usec_++; 
   }
+  alarm_process_us_ts_ = 0;
+  //TRACE("------------ end -------------------");
 }
 }  // namespace net

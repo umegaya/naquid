@@ -23,6 +23,7 @@ class NqLoop : public nq::Loop,
   NqLoop() : nq::Loop(), 
              approx_now_in_usec_(0),
              alarm_map_(), 
+             alarm_process_us_ts_(0),
              current_locked_session_id(0) {}
 
   inline void LockSession(NqSessionIndex idx) { current_locked_session_id = idx + 1; }
@@ -51,7 +52,7 @@ class NqLoop : public nq::Loop,
       const QuicWallTime& walltime) const override;
 
  public:
-  inline std::multimap<uint64_t, NqAlarmInterface*> &AlarmMap() { return alarm_map_; }
+  //inline std::multimap<uint64_t, NqAlarmInterface*> &AlarmMap() { return alarm_map_; }
   void Poll();
   uint64_t NowInUsec() const;
 
@@ -62,9 +63,17 @@ class NqLoop : public nq::Loop,
   void CancelAlarm(NqAlarmInterface *a, uint64_t timeout_in_us);
 
  private:
+  class AlarmEntry {
+   public:
+    NqAlarmInterface *ptr_;
+    bool erased_;
+   public:
+    AlarmEntry(NqAlarmInterface *ptr) : ptr_(ptr), erased_(false) {}
+  };
   uint64_t approx_now_in_usec_;
   SimpleBufferAllocator buffer_allocator_;
-  std::multimap<uint64_t, NqAlarmInterface*> alarm_map_;
+  std::multimap<uint64_t, AlarmEntry> alarm_map_;
+  nq_time_t alarm_process_us_ts_;
   nq::atomic<NqSessionIndex> current_locked_session_id;
 };
 }

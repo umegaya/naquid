@@ -80,6 +80,7 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
                       op->alarm_.invocation_ts_, op->alarm_.callback_, true);
         break;
       case Finalize:
+      case Exec:
         p->InvokeAlarm(op->serial_, a, op->code_, true);
         break;
       default:

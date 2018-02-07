@@ -139,12 +139,17 @@ NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code) {
 // client API
 //
 // --------------------------
+static bool g_packet_write_error_emu = false;
+extern bool packet_write_error_emu() {
+  return g_packet_write_error_emu;
+}
 NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint) {
   lib_init(); //anchor
 	auto l = new NqClientLoop(max_nfd, max_stream_hint);
 	if (l->Open(max_nfd) < 0) {
 		return nullptr;
 	}
+  //g_packet_write_error_emu = true;
 	return l->ToHandle();
 }
 NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl) {

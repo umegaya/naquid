@@ -33,4 +33,24 @@ void NqAlarm::operator delete(void *p) noexcept {
 void NqAlarm::operator delete(void *p, NqBoxer *b) noexcept {
   b->GetAlarmAllocator()->Free(p);
 }
+void NqAlarm::OnFire(NqLoop *loop) {
+  boxer_->InvokeAlarm(alarm_serial_, this, NqBoxer::OpCode::Exec);
+  //ClearInvocationTS();
+}
+void NqAlarm::Exec() {
+  //here, alarm is already unregistered from NqLoop::alarm_map_
+  NqLoop *loop = boxer_->Loop();
+  nq_time_t invoke = invocation_ts_;
+  nq_time_t next = invoke;
+  nq_closure_call(cb_, on_alarm, &next);
+  ClearInvocationTS();
+  if (next > invoke) {
+    NqAlarmBase::Start(loop, next);
+    ASSERT(invocation_ts_ == next);
+  } else if (next == 0) {
+    //stopped but not freed. you can resume by using nq_alarm_set
+  } else {
+    delete this;
+  }    
+}
 }
