@@ -79,6 +79,10 @@ void NqClient::OnFinalize() {
     nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
     on_finalize_ = nq_closure_empty();
   }
+  if (reachability_ != nullptr) {
+    NqReachability::Destroy(reachability_);
+    reachability_ = nullptr;
+  }
 }
 void NqClient::OnReachabilityChangeTranpoline(void *self, nq_reachability_t status) {
   auto cl = ((NqClient *)self);
