@@ -1,3 +1,4 @@
+#include "core/platform/nq_platform.h"
 #if !defined(OS_ANDROID) && !defined(OS_MACOSX)
 #include "core/platform/nq_reachability.h"
 #include "basis/assert.h"

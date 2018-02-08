@@ -1,3 +1,4 @@
+#include "core/platform/nq_platform.h"
 //entry point of android jni
 #if defined(OS_ANDROID)
 #include "core/platform/nq_jni.h"
