@@ -30,7 +30,7 @@ class NqReachabilityAndroid : public NqReachability {
   }
   NqReachabilityAndroid(nq_closure_t cb) : NqReachability(cb), connectivity_manager_(nullptr) {}
  protected:
-  ~NqReachabilityMac() override {}
+  ~NqReachabilityAndroid() override {}
   nq_reachability_t ToNqReachability(NetworkStatus status) {
     switch (status) {
       case NotReachable:
