@@ -21,6 +21,7 @@
 #include "basis/defs.h"
 #include "basis/endian.h"
 #include "basis/header_codec.h"
+#include "basis/syscall.h"
 
 #ifndef SO_RXQ_OVFL
 #define SO_RXQ_OVFL 40
@@ -258,7 +259,6 @@ size_t QuicSocketUtils::SetIpInfoInCmsg(const QuicIpAddress& self_address,
   }
 }
 
-
 // static
 WriteResult QuicSocketUtils::WritePacket(
     int fd,
@@ -308,8 +308,8 @@ WriteResult QuicSocketUtils::WritePacket(
     if (rc >= 0) {
       return WriteResult(WRITE_STATUS_OK, rc);
     }
-    fprintf(stderr, "%d: fail to send: %s(%s)\n", fd, strerror(errno), (errno == EAGAIN || errno == EWOULDBLOCK || errno == 49) ? "blocked" : "error");
-    return WriteResult((errno == EAGAIN || errno == EWOULDBLOCK || errno == 49)
+    fprintf(stderr, "%d: fail to send: %s(%d:%s)\n", fd, strerror(errno), errno, nq::Syscall::WriteMayBlocked(errno) ? "blocked" : "error");
+    return WriteResult(nq::Syscall::WriteMayBlocked(errno)
                            ? WRITE_STATUS_BLOCKED
                            : WRITE_STATUS_ERROR,
                        errno);
@@ -326,8 +326,9 @@ WriteResult QuicSocketUtils::WritePacket(
   if (rc >= 0) {
     return WriteResult(WRITE_STATUS_OK, rc);
   }
-  fprintf(stderr, "%d: fail to send: %s(%s)\n", fd, strerror(errno), (errno == EAGAIN || errno == EWOULDBLOCK) ? "blocked" : "error");
-  return WriteResult((errno == EAGAIN || errno == EWOULDBLOCK)
+  fprintf(stderr, "%d: fail to send: %s(%d:%s)\n", fd, strerror(errno), errno, 
+    nq::Syscall::WriteMayBlocked(errno) ? "blocked" : "error");
+  return WriteResult(nq::Syscall::WriteMayBlocked(errno)
                          ? WRITE_STATUS_BLOCKED
                          : WRITE_STATUS_ERROR,
                      errno);

@@ -26,6 +26,20 @@ public:
 		int eno = Errno();
 		return (EINTR == eno || EAGAIN == eno || EWOULDBLOCK == eno);
 	}
+  /* note that we treat EADDRNOTAVAIL and ENETUNREACH as blocked error, 
+  because it typically happens during network link change (eg. wifi-cellular handover)
+  and make QUIC connections to close. but soon link change finished and 
+  QUIC actually can continue connection after that. add above errnos will increase
+  possibility to migrate QUIC connection on another socket.
+  
+  TODO(iyatomi): more errno, say, ENETDOWN should be treated as blocked error? 
+  basically we add errno to WriteBlocked list with evidence based policy. 
+  that is, you actually need to see the new errno on write error caused by link change, 
+  to add it to this list.
+  */
+  static inline bool WriteMayBlocked(int eno) {
+    return (eno == EAGAIN || eno == EWOULDBLOCK || eno == EADDRNOTAVAIL || eno == ENETUNREACH);
+  }
   static socklen_t GetSockAddrLen(int address_family) {
     switch(address_family) {
     case AF_INET:
