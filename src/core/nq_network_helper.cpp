@@ -40,8 +40,8 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
     CleanUpAllUDPSockets();
     ASSERT(fd_ == -1);
   }
-  fd_ = QuicSocketUtils::CreateUDPSocket(server_address, &overflow_supported_);
-  if (fd_ < 0) {
+  auto fd = QuicSocketUtils::CreateUDPSocket(server_address, &overflow_supported_);
+  if (fd < 0) {
     return false;
   }
 
@@ -56,19 +56,22 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
   sockaddr_storage addr = address_.generic_address();
   socklen_t slen = nq::Syscall::GetSockAddrLen(addr.ss_family);
   if (slen == 0) {
+    nq::Syscall::Close(fd);
     return false;
   }
-  int rc = bind(fd_, reinterpret_cast<sockaddr*>(&addr), slen);
+  int rc = bind(fd, reinterpret_cast<sockaddr*>(&addr), slen);
   if (rc < 0) {
     QUIC_LOG(ERROR) << "Bind failed: " << strerror(errno);
+    nq::Syscall::Close(fd);
     return false;
   }
 
-  if (address_.FromSocket(fd_) != 0) {
+  if (address_.FromSocket(fd) != 0) {
     QUIC_LOG(ERROR) << "Unable to get self address.  Error: "
                     << strerror(errno);
   }
 
+  fd_ = fd;
   loop_->Add(fd_, this, kLoopFlags);
   return true;
 }

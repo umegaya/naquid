@@ -97,9 +97,9 @@ void NqClient::OnReachabilityChange(nq_reachability_t state) {
     case NQ_REACHABLE_WIFI:
     case NQ_REACHABLE_WWAN:
       //try migrate to new network
-      if (!MigrateSocket(server_address().host())) {
+      if (!MigrateSocket(bind_to_address())) {
         TRACE("fail to migrate socket");
-        Disconnect();
+        Reconnect(); //give up migrating and re-establish
       }
       break;
     default:
@@ -233,7 +233,7 @@ bool NqClient::Reconnect() {
   } else if (connect_state_ == DISCONNECT) {
     DoReconnect();
   } else {
-    //finalize do nothing, because this client already scheduled to destroy.
+    //finalize/reconnecting do nothing, because this client already scheduled to destroy.
   }
   return true;
 }

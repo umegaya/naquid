@@ -308,8 +308,8 @@ WriteResult QuicSocketUtils::WritePacket(
     if (rc >= 0) {
       return WriteResult(WRITE_STATUS_OK, rc);
     }
-    fprintf(stderr, "%d: fail to send: %s(%s)\n", fd, strerror(errno), (errno == EAGAIN || errno == EWOULDBLOCK) ? "blocked" : "error");
-    return WriteResult((errno == EAGAIN || errno == EWOULDBLOCK)
+    fprintf(stderr, "%d: fail to send: %s(%s)\n", fd, strerror(errno), (errno == EAGAIN || errno == EWOULDBLOCK || errno == 49) ? "blocked" : "error");
+    return WriteResult((errno == EAGAIN || errno == EWOULDBLOCK || errno == 49)
                            ? WRITE_STATUS_BLOCKED
                            : WRITE_STATUS_ERROR,
                        errno);
