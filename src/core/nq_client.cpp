@@ -13,6 +13,8 @@
 #include "core/nq_stub_interface.h"
 #include "core/nq_client_loop.h"
 
+#include "core/platform/nq_reachability.h"
+
 namespace net {
 
 NqClient::NqClient(QuicSocketAddress server_address,
@@ -34,7 +36,7 @@ NqClient::NqClient(QuicSocketAddress server_address,
           on_open_(config.client().on_open), 
           on_finalize_(config.client().on_finalize),
           stream_manager_(), connect_state_(DISCONNECT),
-          context_(nullptr) {
+          context_(nullptr), reachability_(nullptr) {
   set_server_address(server_address);
 }
 NqClient::~NqClient() {
@@ -77,6 +79,40 @@ void NqClient::OnFinalize() {
     nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
     on_finalize_ = nq_closure_empty();
   }
+}
+void NqClient::OnReachabilityChangeTranpoline(void *self, nq_reachability_t status) {
+  auto cl = ((NqClient *)self);
+  //let process in main thread of this client
+  cl->boxer()->InvokeConn(cl->SessionSerial(), cl, NqBoxer::OpCode::Reachability);
+}
+void NqClient::OnReachabilityChange() {
+  auto status = reachability_->current_state();
+  TRACE("OnReachabilityChange to %u", status);
+  switch (status) {
+    case NQ_NOT_REACHABLE:
+      break; //soon closed 
+    case NQ_REACHABLE_WIFI:
+    case NQ_REACHABLE_WWAN:
+      //try migrate to new network
+      if (!MigrateSocket(server_address().host())) {
+        TRACE("fail to migrate socket");
+        Disconnect();
+      }
+      break;
+    default:
+      ASSERT(false);
+      break;
+  }  
+}
+bool NqClient::TrackReachability(const std::string &host) {
+  if (reachability_ != nullptr) {
+    return true;
+  }
+  nq_closure_t observer;
+  nq_closure_init(observer, on_reachability_change, OnReachabilityChangeTranpoline, this);
+  reachability_ = NqReachability::Create(observer);
+
+  return reachability_->Start(host);
 }
 void NqClient::DoReconnect() {
   Initialize();

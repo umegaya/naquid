@@ -53,9 +53,12 @@ set(lib_src
 	./src/core/compat/nq_spdy_protocol.cpp 
 	./src/core/compat/nq_string_util.cpp
 	./src/core/compat/nq_url_canon_icu.cpp
+
+	./src/core/platform/nq_reachability.cpp
 )
 set(lib_mm_src
 	./src/core/compat/nq_foundation_util.mm
+	./src/core/platform/nq_reachability_mac.mm
 )
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/net.cmake)
 # platforms
@@ -81,22 +84,23 @@ if (IOS OR NQ_OSX_BUNDLE OR NQ_OSX)
 	find_library(cocoa Cocoa)
 	find_library(iokit IOKit)
 	find_library(security Security)
+	find_library(system_configuration SystemConfiguration)
 	set(nqsrc ${src} ${lib_mm_src} ${mac_src})
 	if (IOS)
 		# workaround for problem detailed in https://karp.id.au/a/2015/09/15/xcode-7s-new-linker-rules/
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -miphoneos-version-min=7.0 -Wno-nullability-completeness -D__ENABLE_KQUEUE__")
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -miphoneos-version-min=7.0 -Wno-nullability-completeness")
 		add_library(nq STATIC ${nqsrc})
-		target_link_libraries(nq ${core_foundation} ${iokit} ${security})
+		target_link_libraries(nq ${core_foundation} ${iokit} ${security} ${system_configuration})
 	elseif (NQ_OSX_BUNDLE)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_KQUEUE__")
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -bundle")
 		add_executable(nq MACOSX_BUNDLE ${nqsrc}) 	
-		target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security})
+		target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security} ${system_configuration})
 	elseif (NQ_OSX)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_KQUEUE__")
 		add_library(nq STATIC ${nqsrc})
-		target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security})		
+		target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security} ${system_configuration})		
 	endif()
 elseif (ANDROID)
 	set(nqsrc ${src} ${android_src})

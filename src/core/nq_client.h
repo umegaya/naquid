@@ -22,6 +22,7 @@ class QuicServerId;
 class NqClientLoop;
 class NqClientStream;
 class NqBoxer;
+class NqReachability;
 
 class NqClient : public QuicClientBase, 
                  public QuicCryptoClientStream::ProofHandler, 
@@ -124,6 +125,8 @@ class NqClient : public QuicClientBase,
   void InitSerial();
   void ScheduleDestroy();
   void OnFinalize();
+
+  bool TrackReachability(const std::string &host);
   
   inline void InvalidateSerial() { 
     std::unique_lock<std::mutex> lk(static_mutex());
@@ -166,6 +169,7 @@ class NqClient : public QuicClientBase,
   bool IsConnected() const override { return connect_state_ == CONNECTED; }
   void Disconnect() override;
   bool Reconnect() override;
+  void OnReachabilityChange() override;
   uint64_t ReconnectDurationUS() const override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
@@ -183,6 +187,9 @@ class NqClient : public QuicClientBase,
   void operator delete(void *p) noexcept;
   void operator delete(void *p, NqClientLoop *l) noexcept;
 
+  //callback for reachability
+  static void OnReachabilityChangeTranpoline(void *self, nq_reachability_t status);
+
  private:
   NqClientLoop* loop_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
@@ -192,6 +199,7 @@ class NqClient : public QuicClientBase,
   uint64_t next_reconnect_us_ts_;
   nq::atomic<ConnectState> connect_state_;
   void *context_;
+  NqReachability *reachability_;
 
   DISALLOW_COPY_AND_ASSIGN(NqClient);
 };

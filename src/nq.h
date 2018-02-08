@@ -102,6 +102,12 @@ typedef struct {
   int port;
 } nq_addr_t;
 
+typedef enum {
+  NQ_NOT_REACHABLE = 0,
+  NQ_REACHABLE_WIFI = 2,
+  NQ_REACHABLE_WWAN = 1,
+} nq_reachability_t;
+
 
 
 // --------------------------
@@ -183,6 +189,9 @@ typedef void (*nq_on_rpc_validate_t)(void *, nq_rpc_t, const char *);
 /* alarm */
 typedef void (*nq_on_alarm_t)(void *, nq_time_t *);
 
+/* reachability */
+typedef void (*nq_on_reachability_change_t)(void *, nq_reachability_t);
+
 
 /* closure */
 typedef struct {
@@ -218,7 +227,10 @@ typedef struct {
     nq_on_rpc_validate_t on_rpc_validate;
 
     nq_create_stream_t create_stream;
+
     nq_on_alarm_t on_alarm;
+
+    nq_on_reachability_change_t on_reachability_change;
   };
 } nq_closure_t;
 
@@ -246,6 +258,10 @@ typedef struct {
 
   //set true to ignore proof verification
   bool insecure; 
+
+  //track reachability to the provide hostname and recreate socket if changed.
+  //useful for mobile connection.
+  bool track_reachability;
   
   //total handshake time limit / no input limit. default 1000ms/500ms
   nq_time_t handshake_timeout, idle_timeout; 

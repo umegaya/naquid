@@ -57,6 +57,12 @@ NqClient *NqClientLoop::Create(const std::string &host,
     delete c;
     return nullptr;
   }
+  if (config.client().track_reachability) {
+    if (!c->TrackReachability(host)) {
+      delete c;
+      return nullptr;
+    }
+  }
   c->StartConnect();
   c->InitSerial(); //insert c into client_map_
   return c;

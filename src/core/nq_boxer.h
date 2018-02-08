@@ -39,6 +39,7 @@ class NqBoxer {
     Reply,
     Notify,
     Exec,
+    Reachability,
   };
   enum OpTarget : uint8_t {
     Invalid = 0,
@@ -204,6 +205,9 @@ class NqBoxer {
         case Flush: {
           QuicConnection::ScopedPacketBundler bundler(unboxed->Connection(), QuicConnection::SEND_ACK_IF_QUEUED);
         } break;
+        case Reachability:
+          unboxed->OnReachabilityChange();
+          break;
         default:
           ASSERT(false);
           return;

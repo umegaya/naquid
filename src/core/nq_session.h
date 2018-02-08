@@ -39,6 +39,7 @@ class NqSession : public QuicSession {
     virtual void Disconnect() = 0;
     virtual bool Reconnect() = 0; //only supported for client 
     virtual void DoReconnect() = 0;
+    virtual void OnReachabilityChange() = 0;
     virtual uint64_t ReconnectDurationUS() const = 0;
     virtual bool IsClient() const = 0;
     virtual bool IsConnected() const = 0;
