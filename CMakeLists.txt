@@ -54,7 +54,9 @@ set(lib_src
 	./src/core/compat/nq_string_util.cpp
 	./src/core/compat/nq_url_canon_icu.cpp
 
+	./src/core/platform/nq_jni_android.cpp
 	./src/core/platform/nq_reachability.cpp
+	./src/core/platform/nq_reachability_android.cpp
 )
 set(lib_mm_src
 	./src/core/compat/nq_foundation_util.mm

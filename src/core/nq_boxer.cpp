@@ -17,6 +17,9 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
       case OpenStream:
         p->InvokeConn(op->serial_, c, op->code_, op->stream_.name_, op->stream_.ctx_, true);
         break;
+      case Reachability:
+        p->InvokeConn(op->serial_, c, op->code_, op->reachability_.state_, true);
+        break;
       default:
         p->InvokeConn(op->serial_, c, op->code_, true);
         break;

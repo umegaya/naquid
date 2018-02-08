@@ -14,7 +14,7 @@
 - [x] conn: enable MMSG_MORE for linux
 - [ ] conn: loop up ip address by using c-ares
 - [ ] conn: able to use custom dns
-- [ ] conn: handle connectivity change (if not handled)
+- [x] conn: handle connectivity change (if not handled)
 - [x] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
 - [x] API: use direct pointer to access conn/stream
 - [x] API: consider the good way to integrate nq_error_t and user defined error code, as the value of nq_result_t of nq_rpc_reply.
@@ -37,9 +37,9 @@
 - [x] test: client conn reconnection or finalization using on open callback
 - [x] test: stream handle send/recv test
 - [x] test: timeout test for handshake / rpc call
-- [ ] test: ensure robustness for connectivity change
+- [x] test: ensure robustness for connectivity change
 - [x] bench: higher concurrency test (around 10k client connection)
-- [ ] bench: ensure scalability with number of thread
+- [ ] bench: ensure scalability with number of thread (need to find proper workload)
 - [x] bench: comparing latency and throughput with mrs, which contains ENet based gaming specific udp network library
   - ~10% faster than mrs, with 100ccu/5000 request (roughly 500k req/sec) almost batched (mrs does not allow 100+ ccu, so more comparision is not possible)
 

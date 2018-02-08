@@ -84,15 +84,14 @@ void NqClient::OnFinalize() {
     reachability_ = nullptr;
   }
 }
-void NqClient::OnReachabilityChangeTranpoline(void *self, nq_reachability_t status) {
+void NqClient::OnReachabilityChangeTranpoline(void *self, nq_reachability_t state) {
   auto cl = ((NqClient *)self);
   //let process in main thread of this client
-  cl->boxer()->InvokeConn(cl->SessionSerial(), cl, NqBoxer::OpCode::Reachability);
+  cl->boxer()->InvokeConn(cl->SessionSerial(), cl, NqBoxer::OpCode::Reachability, state);
 }
-void NqClient::OnReachabilityChange() {
-  auto status = reachability_->current_state();
-  TRACE("OnReachabilityChange to %u", status);
-  switch (status) {
+void NqClient::OnReachabilityChange(nq_reachability_t state) {
+  TRACE("OnReachabilityChange to %u", state);
+  switch (state) {
     case NQ_NOT_REACHABLE:
       break; //soon closed 
     case NQ_REACHABLE_WIFI:

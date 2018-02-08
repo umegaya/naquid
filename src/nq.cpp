@@ -293,6 +293,9 @@ NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
   }, "nq_conn_cid");
   return 0;
 }
+NQAPI_THREADSAFE void nq_conn_reachability_change(nq_conn_t conn, nq_reachability_t state) {
+  NqUnwrapper::UnwrapBoxer(conn)->InvokeConn(conn.s, ToConn(conn), NqBoxer::OpCode::Reachability, state);
+}
 NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {

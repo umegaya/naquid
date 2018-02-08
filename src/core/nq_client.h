@@ -169,7 +169,7 @@ class NqClient : public QuicClientBase,
   bool IsConnected() const override { return connect_state_ == CONNECTED; }
   void Disconnect() override;
   bool Reconnect() override;
-  void OnReachabilityChange() override;
+  void OnReachabilityChange(nq_reachability_t state) override;
   uint64_t ReconnectDurationUS() const override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;

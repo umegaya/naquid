@@ -45,7 +45,7 @@ class NqServerSession : public NqSession,
   void *Context() const override { return context_; }
   void Destroy() override { ASSERT(false); }
   void DoReconnect() override { ASSERT(false); }
-  void OnReachabilityChange() override { ASSERT(false); }
+  void OnReachabilityChange(nq_reachability_t) override { ASSERT(false); }
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;

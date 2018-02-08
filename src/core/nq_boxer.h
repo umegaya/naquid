@@ -100,6 +100,9 @@ class NqBoxer {
       struct {
         nq_closure_t callback_;
       } task_;
+      struct {
+        nq_reachability_t state_;
+      } reachability_;
     };
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {}
@@ -123,6 +126,12 @@ class NqBoxer {
         stream_.name_ = strdup(name);
         stream_.ctx_ = ctx;
       }
+    }
+
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, nq_reachability_t state, 
+      OpTarget target) : 
+      serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
+      reachability_.state_ = state;
     }
 
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, const void *data, nq_size_t datalen, 
@@ -205,9 +214,6 @@ class NqBoxer {
         case Flush: {
           QuicConnection::ScopedPacketBundler bundler(unboxed->Connection(), QuicConnection::SEND_ACK_IF_QUEUED);
         } break;
-        case Reachability:
-          unboxed->OnReachabilityChange();
-          break;
         default:
           ASSERT(false);
           return;
@@ -230,6 +236,20 @@ class NqBoxer {
       }
     } else {
       Enqueue(new Op(serial, unboxed, code, name, ctx, OpTarget::Conn));      
+    }
+  }
+  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, nq_reachability_t state, bool from_queue = false) {
+    //UnboxResult r = UnboxResult::Ok;
+    //always enter queue to be safe when this call inside protocol handler
+    if (from_queue) {
+      if (unboxed->SessionSerial() == serial) {
+        ASSERT(code == Reachability);
+        unboxed->OnReachabilityChange(state);
+      } else {
+        //already got invalid
+      }
+    } else {
+      Enqueue(new Op(serial, unboxed, code, state, OpTarget::Conn));      
     }
   }
   inline void InvokeAlarm(const nq_serial_t &serial, NqAlarm *unboxed, OpCode code, nq_time_t invocation_ts, nq_closure_t cb, bool from_queue = false) {

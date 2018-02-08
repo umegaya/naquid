@@ -260,7 +260,7 @@ typedef struct {
   bool insecure; 
 
   //track reachability to the provide hostname and recreate socket if changed.
-  //useful for mobile connection.
+  //useful for mobile connection. currently iOS only. use nq_conn_reachability_change for android.
   bool track_reachability;
   
   //total handshake time limit / no input limit. default 1000ms/500ms
@@ -375,6 +375,9 @@ NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn);
 NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn);
 //check equality of nq_conn_t.
 NQAPI_INLINE bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
+//manually set reachability change for current connection
+NQAPI_THREADSAFE void nq_conn_reachability_change(nq_conn_t conn, nq_reachability_t new_status);
+
 NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn);
 
 
