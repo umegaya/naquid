@@ -1,3 +1,6 @@
 [submodule "ext/json"]
 	path = ext/json
 	url = https://github.com/nlohmann/json.git
+[submodule "ext/cares/src"]
+	path = ext/cares/src
+	url = https://github.com/c-ares/c-ares.git
