@@ -78,7 +78,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/ssl.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/pb.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/cares.cmake)
 # setup group specific compiler flags
-set_source_files_properties(${cares_src} PROPERTIES COMPILE_FLAGS -DHAVE_CONFIG_H)
+set_source_files_properties(${cares_src} PROPERTIES COMPILE_FLAGS "-DHAVE_CONFIG_H -D_GNU_SOURCE")
 # define common sources
 set(src ${lib_src} ${net_src} ${common_src} ${zlib_src} ${ssl_src} ${pb_src} ${cares_src})
 
