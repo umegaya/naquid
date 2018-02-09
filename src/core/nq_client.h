@@ -15,6 +15,7 @@
 #include "core/nq_alarm.h"
 #include "core/nq_client_session.h"
 #include "core/nq_config.h"
+#include "core/nq_packet_writer.h"
 
 namespace net {
 
@@ -115,7 +116,9 @@ class NqClient : public QuicClientBase,
   inline const NqSerial &session_serial() const { return session_serial_; }
   inline NqSessionIndex session_index() const { 
     return NqConnSerialCodec::ClientSessionIndex(session_serial_); }
+  inline NqPacketWriter *packet_writer() { return static_cast<NqPacketWriter *>(writer()); }
   
+  inline bool IsReachabilityTracked() const { return reachability_ != nullptr; }
   std::mutex &static_mutex();
   NqBoxer *boxer();
   

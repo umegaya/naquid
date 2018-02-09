@@ -34,8 +34,6 @@
 
 using std::string;
 
-extern bool chaos_write();
-
 namespace net {
 
 // static
@@ -164,6 +162,17 @@ bool QuicSocketUtils::SetReceiveBufferSize(int fd, size_t size) {
 }
 
 // static
+WriteResult QuicSocketUtils::WritePacket(
+    int,
+    const char*,
+    size_t,
+    const QuicIpAddress&,
+    const QuicSocketAddress&) {
+  ASSERT(false);
+  //move to nq_packet_writer.cpp
+  return WriteResult(WRITE_STATUS_ERROR, EINVAL);
+}
+// static
 int QuicSocketUtils::ReadPacket(int fd,
                                 char* buffer,
                                 size_t buf_len,
@@ -258,83 +267,6 @@ size_t QuicSocketUtils::SetIpInfoInCmsg(const QuicIpAddress& self_address,
     return 0;
   }
 }
-
-// static
-WriteResult QuicSocketUtils::WritePacket(
-    int fd,
-    const char* buffer,
-    size_t buf_len,
-    const QuicIpAddress& self_address,
-    const QuicSocketAddress& peer_address) {
-  //TRACE("Write %zu bytes to %d from %s", buf_len, fd, self_address.ToString().c_str());
-  sockaddr_storage raw_address = peer_address.generic_address();
-  iovec iov = {const_cast<char*>(buffer), buf_len};
-
-  msghdr hdr;
-  hdr.msg_name = &raw_address;
-  hdr.msg_namelen = raw_address.ss_family == AF_INET ? sizeof(sockaddr_in)
-                                                     : sizeof(sockaddr_in6);
-  hdr.msg_iov = &iov;
-  hdr.msg_iovlen = 1;
-  hdr.msg_flags = 0;
-
-  const int kSpaceForIpv4 = CMSG_SPACE(sizeof(in_pktinfo));
-  const int kSpaceForIpv6 = CMSG_SPACE(sizeof(in6_pktinfo));
-  // kSpaceForIp should be big enough to hold both IPv4 and IPv6 packet info.
-  const int kSpaceForIp =
-      (kSpaceForIpv4 < kSpaceForIpv6) ? kSpaceForIpv6 : kSpaceForIpv4;
-  char cbuf[kSpaceForIp];
-  if (!self_address.IsInitialized()) {
-    hdr.msg_control = nullptr;
-    hdr.msg_controllen = 0;
-  } else {
-    hdr.msg_control = cbuf;
-    hdr.msg_controllen = kSpaceForIp;
-    cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr);
-    SetIpInfoInCmsg(self_address, cmsg);
-    hdr.msg_controllen = cmsg->cmsg_len;
-  }
-
-#if defined(DEBUG)
-  static int n_count = 0;
-  if (chaos_write()) {
-    n_count++;
-  }
-  if (n_count < 11) {
-    int rc;
-    do {
-      rc = sendmsg(fd, &hdr, 0);
-    } while (rc < 0 && errno == EINTR);
-    if (rc >= 0) {
-      return WriteResult(WRITE_STATUS_OK, rc);
-    }
-    fprintf(stderr, "%d: fail to send: %s(%d:%s)\n", fd, strerror(errno), errno, nq::Syscall::WriteMayBlocked(errno) ? "blocked" : "error");
-    return WriteResult(nq::Syscall::WriteMayBlocked(errno)
-                           ? WRITE_STATUS_BLOCKED
-                           : WRITE_STATUS_ERROR,
-                       errno);
-  } 
-  if (n_count >= 20) {
-    n_count = 0;
-  }
-  return WriteResult(WRITE_STATUS_ERROR, 49);
-#else
-  int rc;
-  do {
-    rc = sendmsg(fd, &hdr, 0);
-  } while (rc < 0 && errno == EINTR);
-  if (rc >= 0) {
-    return WriteResult(WRITE_STATUS_OK, rc);
-  }
-  fprintf(stderr, "%d: fail to send: %s(%d:%s)\n", fd, strerror(errno), errno, 
-    nq::Syscall::WriteMayBlocked(errno) ? "blocked" : "error");
-  return WriteResult(nq::Syscall::WriteMayBlocked(errno)
-                         ? WRITE_STATUS_BLOCKED
-                         : WRITE_STATUS_ERROR,
-                     errno);
-#endif
-}
-
 
 static bool SetNonblocking(int fd) {
   int flags = fcntl(fd, F_GETFL, 0);

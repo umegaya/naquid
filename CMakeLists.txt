@@ -39,6 +39,7 @@ set(lib_src
 	./src/core/nq_loop.cpp
 	./src/core/nq_network_helper.cpp
 	./src/core/nq_packet_reader.cpp
+	./src/core/nq_packet_writer.cpp
 	./src/core/nq_proof_verifier.cpp
 	./src/core/nq_server.cpp
 	./src/core/nq_server_loop.cpp

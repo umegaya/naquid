@@ -4,6 +4,7 @@
 
 #include "basis/syscall.h"
 #include "core/nq_client_loop.h"
+#include "core/nq_packet_writer.h"
 
 namespace net {
 
@@ -123,7 +124,11 @@ void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
 }
 
 QuicPacketWriter* NqNetworkHelper::CreateQuicPacketWriter() {
-  return new QuicDefaultPacketWriter(fd_);
+  auto w = new NqPacketWriter(fd_);
+  if (client_->IsReachabilityTracked()) {
+    w->SetReachabilityTracked(true);
+  }
+  return w;
 }
 
 QuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {

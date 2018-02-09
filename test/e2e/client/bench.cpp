@@ -149,6 +149,7 @@ int main(int argc, char *argv[]){
   };
   nq_clconf_t conf;
   conf.insecure = false;
+  conf.track_reachability = false;
   conf.idle_timeout = nq_time_sec(60);
   conf.handshake_timeout = nq_time_sec(120);
 

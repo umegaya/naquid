@@ -115,7 +115,12 @@ bool NqClient::TrackReachability(const std::string &host) {
   nq_closure_init(observer, on_reachability_change, OnReachabilityChangeTranpoline, this);
   reachability_ = NqReachability::Create(observer);
 
-  return reachability_->Start(host);
+  bool ret = reachability_->Start(host);
+  if (!ret) {
+    NqReachability::Destroy(reachability_);
+    reachability_ = nullptr;
+  }
+  return ret;
 }
 void NqClient::DoReconnect() {
   Initialize();

@@ -229,6 +229,7 @@ bool Test::Run(const RunOptions *opt) {
 
   nq_clconf_t conf;
   conf.insecure = false;
+  conf.track_reachability = false;
   conf.handshake_timeout = options.handshake_timeout;
   conf.idle_timeout = options.idle_timeout;
 

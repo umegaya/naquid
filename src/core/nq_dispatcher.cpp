@@ -3,6 +3,7 @@
 #include "net/tools/quic/quic_default_packet_writer.h"
 
 #include "core/nq_client_loop.h"
+#include "core/nq_packet_writer.h"
 #include "core/nq_server_session.h"
 #include "core/nq_server.h"
 #include "core/nq_network_helper.h"
@@ -64,7 +65,7 @@ void NqDispatcher::OnEvent(nq::Fd fd, const Event &e) {
   } 
 }
 int NqDispatcher::OnOpen(nq::Fd fd) {
-  InitializeWithWriter(new QuicDefaultPacketWriter(fd));
+  InitializeWithWriter(new NqPacketWriter(fd));
   return NQ_OK;
 }
 void NqDispatcher::OnRecv(NqPacket *packet) {

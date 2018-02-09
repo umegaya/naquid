@@ -1,5 +1,6 @@
 #include <nq.h>
 #include <basis/endian.h>
+#include <basis/convert.h>
 
 #include "rpctypes.h"
 
@@ -86,6 +87,10 @@ void on_rpc_validate(void *p, nq_rpc_t rpc, const char *error) {
 
 
 int main(int argc, char *argv[]){
+  bool track_reachability = false;
+  if (argc > 1) {
+    track_reachability = nq::convert::Do(argv[1], 0) != 0;
+  }
   nq_client_t cl = nq_client_create(N_CLIENT, N_CLIENT * 4); //N_CLIENT connection client
 
   nq_hdmap_t hm;
@@ -106,7 +111,7 @@ int main(int argc, char *argv[]){
 
   nq_clconf_t conf;
   conf.insecure = false;
-  conf.track_reachability = true;
+  conf.track_reachability = track_reachability;
   conf.idle_timeout = nq_time_sec(60);
   conf.handshake_timeout = nq_time_sec(120);
 
