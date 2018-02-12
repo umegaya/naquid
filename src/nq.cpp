@@ -44,6 +44,8 @@ extern bool chaos_write() {
 void chaos_init() {
   g_chaos_write = getenv("CHAOS") != nullptr;
 }
+#else
+#define chaos_init()
 #endif
 
 

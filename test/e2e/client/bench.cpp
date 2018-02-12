@@ -62,6 +62,7 @@ void on_conn_open(void *arg, nq_conn_t c, void **) {
   g_ctxs[idx].cid = nq_conn_cid(c);
 #endif
   TRACE("on_conn_open:%d\n", idx);
+  nq_conn_rpc(c, "rpc", g_ctxs + idx);
 }
 nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_error_t e, const nq_error_detail_t *detail, bool remote) {
   intptr_t idx = (intptr_t)arg;
