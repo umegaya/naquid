@@ -10,37 +10,35 @@ nq_stream_t Test::Conn::invalid_stream = { {{0}}, const_cast<char *>("invalid") 
 nq_rpc_t Test::Conn::invalid_rpc { {{0}}, const_cast<char *>("invalid") };
 
 
-void Test::OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  if (hsev != NQ_HS_DONE) {
-    return;
-  }
+void Test::OnConnOpen(void *arg, nq_conn_t c, void **ppctx) {
   auto tc = (Conn *)arg;
   if (tc->opened) {
     //already start
     nq_closure_t clsr;
     if (tc->FindClosure(CallbackType::ConnOpen, clsr)) {
       TRACE("OnConnOpen: call closure, %d", tc->disconnect);
-      nq_closure_call(clsr, on_client_conn_open, c, hsev, ppctx);
+      nq_closure_call(clsr, on_client_conn_open, c, ppctx);
     }
     TRACE("OnConnOpen: no closure, %d", tc->disconnect);
     return; 
   }
   //ensure thread completely start up before next network event happens
   TRACE("launch connection_id=%llx|%llx", c.s.data[0], c.s.data[1]);
+  tc->SetConn(c);
   tc->t->testproc_(*tc);
   tc->opened = true;
   tc->t->StartThread();
   return;
 }
-nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_quic_error_t r, const char *reason, bool close_from_remote) {
+nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_error_t r, const nq_error_detail_t *detail, bool close_from_remote) {
   auto tc = (Conn *)arg;
   tc->disconnect++;
   nq_closure_t clsr;
   if (tc->FindClosure(CallbackType::ConnClose, clsr)) {
-    TRACE("OnConnClose: call closure, %d %s", tc->disconnect, nq_quic_error_str(r));
-    return nq_closure_call(clsr, on_client_conn_close, c, r, reason, close_from_remote);
+    TRACE("OnConnClose: call closure, %d %s", tc->disconnect, detail->msg);
+    return nq_closure_call(clsr, on_client_conn_close, c, r, detail, close_from_remote);
   }
-  TRACE("OnConnClose: no closure set yet, %d %s", tc->disconnect, nq_quic_error_str(r));
+  TRACE("OnConnClose: no closure set yet, %d %s", tc->disconnect, detail->msg);
   return nq_time_sec(1);
 }
 void Test::OnConnFinalize(void *arg, nq_conn_t c, void *ctx) {
@@ -224,24 +222,27 @@ void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
 
 bool Test::Run(const RunOptions *opt) {
   static RunOptions fallback;
-  RunOptions options = (opt != nullptr) ? *opt : fallback;
+  current_options_ = (opt != nullptr) ? *opt : fallback;
   nq_client_t cl = nq_client_create(256, 256 * 4);
 
   nq_clconf_t conf;
   conf.insecure = false;
   conf.track_reachability = false;
-  conf.handshake_timeout = options.handshake_timeout;
-  conf.idle_timeout = options.idle_timeout;
+  conf.handshake_timeout = current_options_.handshake_timeout;
+  conf.idle_timeout = current_options_.idle_timeout;
 
   Conn *conns = new Conn[concurrency_];
   for (int i = 0; i < concurrency_; i++) {
     nq_closure_init(conf.on_open, on_client_conn_open, &Test::OnConnOpen, conns + i);
     nq_closure_init(conf.on_close, on_client_conn_close, &Test::OnConnClose, conns + i);
     nq_closure_init(conf.on_finalize, on_client_conn_finalize, &Test::OnConnFinalize, conns + i);
-    auto c = nq_client_connect(cl, &addr_, &conf);
-    conns[i].Init(this, c, i, options);
+    if (!nq_client_connect(cl, &addr_, &conf)) {
+      ASSERT(false);
+      return false;
+    }
+    conns[i].Init(this, i);
   }
-  auto execute_duration = options.execute_duration;
+  auto execute_duration = current_options_.execute_duration;
   nq_time_t end = nq_time_now() + execute_duration;
   while (!Finished() && (execute_duration == 0 || nq_time_now() < end)) {
     nq_client_poll(cl);

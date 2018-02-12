@@ -20,6 +20,9 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
       case Reachability:
         p->InvokeConn(op->serial_, c, op->code_, op->reachability_.state_, true);
         break;
+      case ModifyHandlerMap:
+        p->InvokeConn(op->serial_, c, op->code_, op->task_.callback_, true);
+        break;
       default:
         p->InvokeConn(op->serial_, c, op->code_, true);
         break;

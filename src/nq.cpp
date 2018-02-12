@@ -1,5 +1,7 @@
 #include "nq.h"
 
+#include <ares.h>
+
 #include "base/at_exit.h"
 #include "base/logging.h"
 
@@ -128,12 +130,22 @@ static bool nq_chromium_logger(int severity,
   return true;
 }
 
-static void lib_init() {
+static void lib_init(bool client) {
   g_at_exit_manager = nq_at_exit_manager(); //anchor
   //set loghandoer for chromium codebase
   logging::SetLogMessageHandler(nq_chromium_logger);
   //break some of the systems according to the env value "CHAOS"
   chaos_init();
+  if (client) {
+    //initialize c-ares
+    auto status = ares_library_init(ARES_LIB_INIT_ALL);
+    if (status != ARES_SUCCESS) {
+      nq::logger::fatal({
+        {"msg", "fail to init ares"},
+        {"status", status}
+      });
+    }    
+  }
 }
 
 #define no_ret_closure_call_with_check(__pclsr, __type, ...) \
@@ -148,10 +160,18 @@ static void lib_init() {
 // misc API
 //
 // --------------------------
-NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code) {
-  return QuicErrorCodeToString(static_cast<QuicErrorCode>(code));
+NQAPI_THREADSAFE const char *nq_error_detail_code2str(nq_error_t code, int detail_code) {
+  if (code == NQ_EQUIC) {
+    return QuicErrorCodeToString(static_cast<QuicErrorCode>(code));
+  } else if (code == NQ_ERESOLVE) {
+    //TODO ares erorr code
+    ASSERT(false);
+    return "";
+  } else {
+    ASSERT(false);
+    return "";
+  }
 }
-
 
 
 // --------------------------
@@ -160,7 +180,7 @@ NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint) {
-  lib_init(); //anchor
+  lib_init(true); //anchor
 	auto l = new NqClientLoop(max_nfd, max_stream_hint);
 	if (l->Open(max_nfd) < 0) {
 		return nullptr;
@@ -173,14 +193,14 @@ NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl) {
 NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl) {
 	NqClientLoop::FromHandle(cl)->Poll();
 }
-NQAPI_BOOTSTRAP nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
+NQAPI_BOOTSTRAP bool nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
   auto loop = NqClientLoop::FromHandle(cl);
   auto cf = NqClientConfig(*conf);
 	auto c = loop->Create(addr->host, addr->port, cf);
   if (c == nullptr) {
-    return INVALID_HANDLE<nq_conn_t>(IHR_CONN_CREATE_FAIL);
+    return false;
   }
-  return c->ToHandle();
+  return true;
 }
 NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
 	return NqClientLoop::FromHandle(cl)->mutable_handler_map()->ToHandle();
@@ -198,7 +218,7 @@ NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_server_t nq_server_create(int n_worker) {
-	lib_init(); //anchor
+	lib_init(false); //anchor
   auto sv = new NqServer(n_worker);
 	return sv->ToHandle();
 }
@@ -265,10 +285,13 @@ NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, nq_closure_t cb) {
 }
 NQAPI_THREADSAFE void nq_conn_modify_hdmap(nq_conn_t conn, nq_closure_t modifier) {
   NqSession::Delegate *d;
-  UNWRAP_CONN(conn, d, {
+  NqBoxer *b;
+  UNWRAP_CONN_OR_ENQUEUE(conn, d, b, {
     auto hm = d->ResetHandlerMap()->ToHandle();
     nq_closure_call(modifier, on_conn_modify_hdmap, hm);
-  }, "nq_conn_hdmap");
+  }, {
+    b->InvokeConn(conn.s, ToConn(conn), NqBoxer::OpCode::ModifyHandlerMap, modifier);
+  }, "nq_conn_modify_hdmap");
 }
 NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn) {
   NqSession::Delegate *d;

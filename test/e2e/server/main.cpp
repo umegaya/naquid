@@ -62,15 +62,12 @@ void add_recv(uint64_t serial, uint64_t data) {
 struct conn_context {
   int count;
 };
-void on_conn_open(void *, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  TRACE("on_conn_open event:%d", hsev);
+void on_conn_open(void *, nq_conn_t c, void **ppctx) {
+  TRACE("on_conn_open event");
 }
 int g_reject = 2;
-void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  TRACE("on_conn_open_reject event:%d", hsev);
-  if (hsev != NQ_HS_DONE) {
-    return;
-  }
+void on_conn_open_reject(void *arg, nq_conn_t c, void **ppctx) {
+  TRACE("on_conn_open_reject event");
   if (g_reject > 0) {
     g_reject--;
     TRACE("on_conn_open_reject g_reject:%d", g_reject);
@@ -81,10 +78,10 @@ void on_conn_open_reject(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void
   ctx->count = 3;
   *ppctx = ctx;
   TRACE("set context for %p, %p", c.p, ctx);
-  on_conn_open(arg, c, hsev, ppctx);
+  on_conn_open(arg, c, ppctx);
 }
-void on_conn_close(void *, nq_conn_t c, nq_quic_error_t r, const char *detail, bool) {
-  TRACE("on_conn_close reason:%s %s", detail, nq_quic_error_str(r));
+void on_conn_close(void *, nq_conn_t c, nq_error_t r, const nq_error_detail_t *detail, bool) {
+  TRACE("on_conn_close reason:%s", detail->msg);
   free(nq_conn_ctx(c));
 }
 

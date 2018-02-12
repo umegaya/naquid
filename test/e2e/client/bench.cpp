@@ -30,8 +30,6 @@ struct closure_ctx {
   uint64_t cid;
 #endif
 };
-nq_conn_t g_cs[N_CLIENT];
-nq_rpc_t g_rpcs[N_CLIENT];
 closure_ctx g_ctxs[N_CLIENT];
 nq_closure_t g_reps[N_CLIENT];
 
@@ -57,17 +55,17 @@ static void send_rpc(nq_rpc_t rpc, nq_closure_t reply_cb, int index) {
 
 
 /* conn callback */
-void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
+void on_conn_open(void *arg, nq_conn_t c, void **) {
   intptr_t idx = (intptr_t)arg;
 #if defined(STORE_DETAIL)
   g_ctxs[idx].fd = nq_conn_fd(c);
   g_ctxs[idx].cid = nq_conn_cid(c);
 #endif
-  TRACE("on_conn_open:%d event:%d\n", idx, hsev);
+  TRACE("on_conn_open:%d\n", idx);
 }
-nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *detail, bool) {
+nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_error_t e, const nq_error_detail_t *detail, bool remote) {
   intptr_t idx = (intptr_t)arg;
-  TRACE("on_conn_close:%ld reason:%s(%s)\n", idx, detail, nq_quic_error_str(e));
+  TRACE("on_conn_close:%ld, %d(from %s) reason:%s(%d)\n", idx, e, remote ? "remote": "local", detail->msg, detail->code);
   return nq_time_sec(2);
 }
 
@@ -76,7 +74,6 @@ nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *d
 /* rpc stream callback */
 bool on_rpc_open(void *p, nq_rpc_t rpc, void **ctx) {
   auto v = (closure_ctx *)nq_rpc_ctx(rpc);
-  g_rpcs[v->index] = rpc;
   auto rep = g_reps[v->index];
   for (int i = 0; i < N_SEND; i++) {
     send_rpc(rpc, rep, v->index);
@@ -159,14 +156,12 @@ int main(int argc, char *argv[]){
     //reinitialize closure, with giving client index as arg
     nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, (void *)(intptr_t)i);
     nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, (void *)(intptr_t)i);
-    g_cs[i] = nq_client_connect(cl, &addr, &conf);
-    if (!nq_conn_is_valid(g_cs[i], on_validate)) {
+    if (!nq_client_connect(cl, &addr, &conf)) {
       return -1;
     }
     g_ctxs[i].seed = 0;
     g_ctxs[i].last_recv = 0;
     g_ctxs[i].index = i;
-    nq_conn_rpc(g_cs[i], "rpc", g_ctxs + i);
     nq_closure_init(g_reps[i], on_rpc_reply, on_rpc_reply, g_ctxs + i);
   }
 

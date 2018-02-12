@@ -29,6 +29,7 @@ set(lib_src
 	./src/basis/timespec.cpp
 
 	./src/core/nq_alarm.cpp
+	./src/core/nq_async_resolver.cpp
 	./src/core/nq_at_exit.cpp
 	./src/core/nq_boxer.cpp
 	./src/core/nq_client.cpp

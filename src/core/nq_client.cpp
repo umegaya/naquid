@@ -151,9 +151,7 @@ NqBoxer *NqClient::boxer() {
 
 // implements QuicClientBase
 std::unique_ptr<QuicSession> NqClient::CreateQuicClientSession(QuicConnection* connection) {
-  auto s = new NqClientSession(connection, loop_, this, *config());
-  OnOpen(NQ_HS_START);
-  return QuicWrapUnique(s);
+  return QuicWrapUnique(new NqClientSession(connection, loop_, this, *config()));
 }
 void NqClient::InitializeSession() {
   connect_state_ = CONNECTING;
@@ -186,10 +184,10 @@ void NqClient::OnProofVerifyDetailsAvailable(const ProofVerifyDetails& verify_de
 NqLoop *NqClient::GetLoop() { 
   return loop_; 
 }
-void NqClient::OnOpen(nq_handshake_event_t hsev) { 
-  nq_closure_call(on_open_, on_client_conn_open, ToHandle(), hsev, &context_); 
+void NqClient::OnOpen() { 
+  nq_closure_call(on_open_, on_client_conn_open, ToHandle(), &context_); 
   //order is important because connect_state_ may change in above callback.
-  if (hsev == NQ_HS_DONE && connect_state_ == CONNECTING) {
+  if (connect_state_ == CONNECTING) {
     connect_state_ = CONNECTED;
     stream_manager_.RecoverOutgoingStreams(nq_session());
   }
@@ -197,9 +195,13 @@ void NqClient::OnOpen(nq_handshake_event_t hsev) {
 void NqClient::OnClose(QuicErrorCode error,
              const std::string& error_details,
              ConnectionCloseSource close_by_peer_or_self) {
+  nq_error_detail_t detail = {
+    .code = error,
+    .msg = error_details.c_str(),
+  };
   uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, on_client_conn_close, ToHandle(), 
-                                              static_cast<int>(error), 
-                                              error_details.c_str(), 
+                                              NQ_EQUIC, 
+                                              &detail, 
                                               close_by_peer_or_self == ConnectionCloseSource::FROM_PEER));
   if (destroyed()) {
     ScheduleDestroy();

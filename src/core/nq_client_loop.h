@@ -9,6 +9,7 @@
 #include "basis/allocator.h"
 #include "core/nq_loop.h"
 #include "core/nq_alarm.h"
+#include "core/nq_async_resolver.h"
 #include "core/nq_config.h"
 #include "core/nq_boxer.h"
 #include "core/nq_client.h"
@@ -34,6 +35,7 @@ class NqClientLoop : public NqLoop,
   ClientAllocator client_allocator_;
   StreamAllocator stream_allocator_;
   AlarmAllocator alarm_allocator_;
+  NqAsyncResolver async_resolver_;
   nq::IdFactory<uint32_t> stream_index_factory_;
   uint32_t worker_index_;
 
@@ -41,7 +43,7 @@ class NqClientLoop : public NqLoop,
   NqClientLoop(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
     processor_(), versions_(net::AllSupportedVersions()),
     client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint),
-    stream_index_factory_(0x7FFFFFFF) {
+    async_resolver_(), stream_index_factory_(0x7FFFFFFF) {
     worker_index_ = client_worker_index_factory_.New();
     set_main_thread();
   }
@@ -65,6 +67,7 @@ class NqClientLoop : public NqLoop,
   inline StreamAllocator &stream_allocator() { return stream_allocator_; }
   inline nq::IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
   inline int worker_index() const { return worker_index_; }
+  inline NqAsyncResolver &async_resolver() { return async_resolver_; }
 
   static inline NqClientLoop *FromHandle(nq_client_t cl) { return (NqClientLoop *)cl; }
   static bool ParseUrl(const std::string &host, 

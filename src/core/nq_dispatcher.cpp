@@ -111,7 +111,6 @@ QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
   auto s = new(this) NqServerSession(connection, it->second);
   s->Initialize();
   s->InitSerial();
-  s->OnOpen(NQ_HS_START);
   return s;
 }
 

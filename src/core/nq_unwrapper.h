@@ -129,7 +129,7 @@ class NqUnwrapper {
       if (__d->SessionSerial() == __handle.s) { \
         __code; \
       } \
-    } if (__d->SessionSerial() == __handle.s) { \
+    } else if (__d->SessionSerial() == __handle.s) { \
       __code; \
     } \
   } \
@@ -140,7 +140,7 @@ class NqUnwrapper {
   } else { \
     __boxer = NqUnwrapper::UnwrapBoxer(__handle); \
     if (__boxer->MainThread()) { \
-      __d = reinterepret_cast<NqSession::Delegate *>(__handle.p); \
+      __d = reinterpret_cast<NqSession::Delegate *>(__handle.p); \
       if (__d->SessionSerial() == __handle.s) { \
         __code; \
       } \
@@ -164,7 +164,7 @@ class NqUnwrapper {
       if (__s->stream_serial() == __handle.s) { \
         __code; \
       } \
-    } if (__s->stream_serial() == __handle.s) { \
+    } else if (__s->stream_serial() == __handle.s) { \
       __code; \
     } \
   } \

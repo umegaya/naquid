@@ -9,6 +9,7 @@ nq::IdFactory<uint32_t> NqClientLoop::client_worker_index_factory_;
 
 void NqClientLoop::Poll() {
   processor_.Poll(this);
+  //async_resolver_.Poll(this);
   NqLoop::Poll();
 }
 void NqClientLoop::Close() {

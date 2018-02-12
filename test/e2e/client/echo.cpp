@@ -32,15 +32,11 @@ void on_alarm(void *arg, nq_time_t *next) {
 
 
 /* conn callback */
-void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
-  TRACE("on_conn_open event:%d\n", hsev);
-  if (hsev == NQ_HS_START) {
-    return;
-  }
+void on_conn_open(void *arg, nq_conn_t c, void **) {
   nq_conn_rpc(c, "rpc", arg);
 }
-nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *detail, bool) {
-  TRACE("on_conn_close: reason:%s %s\n", detail, nq_quic_error_str(e));
+nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_error_t e, const nq_error_detail_t *detail, bool remote) {
+  TRACE("on_conn_close:%d(from %s) reason:%s(%d)\n", e, remote ? "remote": "local", detail->msg, detail->code);
   return nq_time_sec(1);
 }
 
@@ -127,8 +123,7 @@ int main(int argc, char *argv[]){
   //reinitialize closure, with giving client index as arg
   nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, &ctx);
   nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, nullptr);
-  nq_conn_t c = nq_client_connect(cl, &addr, &conf);
-  if (!nq_conn_is_valid(c, on_validate)) {
+  if (!nq_client_connect(cl, &addr, &conf)) {
     return -1;
   }
 

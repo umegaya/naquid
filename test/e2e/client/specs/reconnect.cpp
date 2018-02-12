@@ -29,9 +29,9 @@ void test_reconnect_client(Test::Conn &conn) {
 		static nq_time_t last_close = 0;
 
 		WATCH_CONN(conn, ConnClose, ([done](
-			nq_conn_t c, nq_quic_error_t result, const char *detail, bool from_remote) -> nq_time_t {
+			nq_conn_t c, nq_error_t result, const nq_error_detail_t *detail, bool from_remote) -> nq_time_t {
 			close_counter++;
-			TRACE("ConnClose(%d): detail = %s", close_counter, detail);
+			TRACE("ConnClose(%d): detail = %s", close_counter, detail->msg);
 			if (!nq_conn_is_valid(c, nq_closure_empty())) {
 				done(false);
 				return 0;
@@ -63,14 +63,14 @@ void test_reconnect_client(Test::Conn &conn) {
 		}));
 		int *ctx_ptr = reinterpret_cast<int *>(0x5678);
 		WATCH_CONN(conn, ConnOpen, ([done2, ctx_ptr](
-			nq_conn_t c, nq_handshake_event_t hsev, void *ppctx) {
+			nq_conn_t c, void *ppctx) {
 			if (!nq_conn_is_valid(c, nq_closure_empty())) {
 				done2(false);
 				return 0;
 			}
 			counter--;
 			*(int **)ppctx = ctx_ptr;
-			TRACE("ConnOpen, counter %d %d (%d)", counter, close_counter, hsev);
+			TRACE("ConnOpen, counter %d %d", counter, close_counter);
 			if (counter <= 0) {
 				done2(close_counter == 4);
 				nq_conn_close(c);
@@ -118,8 +118,7 @@ void test_reconnect_server(Test::Conn &conn) {
 
 	static int close_counter = 0, open_counter = 0, stream_close_counter = 0, stream_open_counter = 0, recv_goaway = 0;
 	static nq_rpc_t rpcs[8];
-	WATCH_CONN(conn, ConnOpen, ([&conn](
-		nq_conn_t, nq_handshake_event_t hsev, void **) {
+	WATCH_CONN(conn, ConnOpen, ([&conn](nq_conn_t, void **) {
 		open_counter++;
 		TRACE("test_reconnect_server ConnOpen: %d %d %d", close_counter, open_counter, stream_close_counter);
 		//create new stream
@@ -128,7 +127,7 @@ void test_reconnect_server(Test::Conn &conn) {
 		});
 		return true;
 	}));
-	WATCH_CONN(conn, ConnClose, ([](nq_conn_t conn, nq_quic_error_t result, const char *detail, bool from_remote) -> nq_time_t {
+	WATCH_CONN(conn, ConnClose, ([](nq_conn_t conn, nq_error_t result, const nq_error_detail_t *detail, bool from_remote) -> nq_time_t {
 		close_counter++;
 		TRACE("test_reconnect_server ConnClose: %d %d %d", close_counter, open_counter, stream_close_counter);
 		return nq_time_sec(1); //1 sec to reconnect

@@ -25,6 +25,7 @@
 - [x] API: ```nq_(conn|rpc|stream)_is_valid``` returns optional error detail msg 
 - [x] API: actually obsolute APIs which are decided to obsolute (hide header declaration)
 - [x] API: ack callback for nq_stream_send
+- [ ] API: provide different type for each closure (now unified as nq_closure_t)
 - [x] server: QuicAlarm should be more efficient
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
 - [ ] server: graceful shutdown
@@ -38,6 +39,7 @@
 - [x] test: stream handle send/recv test
 - [x] test: timeout test for handshake / rpc call
 - [x] test: ensure robustness for connectivity change
+- [ ] test: server aging (more than day) and check memory and fd (not possible through)
 - [x] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread (need to find proper workload)
 - [x] bench: comparing latency and throughput with mrs, which contains ENet based gaming specific udp network library

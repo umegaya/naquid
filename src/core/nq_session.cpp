@@ -47,7 +47,7 @@ void NqSession::OnConnectionClosed(QuicErrorCode error,
 void NqSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   QuicSession::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
-    delegate_->OnOpen(NQ_HS_DONE);
+    delegate_->OnOpen();
   }
 }
 

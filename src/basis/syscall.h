@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 
+#include "net/quic/platform/api/quic_logging.h"
+
 #include "basis/defs.h"
 
 namespace nq {

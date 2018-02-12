@@ -49,7 +49,7 @@ class NqServerSession : public NqSession,
   void OnClose(QuicErrorCode error,
                const std::string& error_details,
                ConnectionCloseSource close_by_peer_or_self) override;
-  void OnOpen(nq_handshake_event_t hsev) override;
+  void OnOpen() override;
   void Disconnect() override;
   bool Reconnect() override; //only supported for client 
   bool IsClient() const override;

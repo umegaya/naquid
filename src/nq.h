@@ -85,17 +85,17 @@ typedef enum {
   NQ_EALLOC = -3,
   NQ_ENOTSUPPORT = -4,
   NQ_EGOAWAY = -5,
-  NQ_EQUIC = -6,  //quic library error
-  NQ_EUSER = -7,  //for rpc, user calls nq_rpc_error to reply
+  NQ_EQUIC = -6,    //quic library error
+  NQ_EUSER = -7,    //for rpc, user calls nq_rpc_error to reply
+  NQ_ERESOLVE = -8, //address resolve error
 } nq_error_t;
-//quic library error
-typedef int nq_quic_error_t;
-NQAPI_THREADSAFE const char *nq_quic_error_str(nq_quic_error_t code);
 
-typedef enum {
-  NQ_HS_START = 0, //client: client is about to send first packet, server: server receive initial packet
-  NQ_HS_DONE = 10,  //client: receive SHLO, server: accept CHLO
-} nq_handshake_event_t;
+typedef struct {
+  int code;        //explanation numeric error code
+  const char *msg; //explanation message
+} nq_error_detail_t;
+
+NQAPI_THREADSAFE const char *nq_error_detail_code2str(nq_error_t code, int detail_code);
 
 typedef struct {
   const char *host, *cert, *key, *ca;
@@ -115,16 +115,22 @@ typedef enum {
 // Closure type
 //
 // --------------------------
+#define NQ_CLOSURE_TYPE(__typename, __return_type, ...) \
+  typedef struct { \
+    void *arg; \
+    __return_type (*proc)(__VA_ARGS__); \
+  } __typename
+
 /* client */
 //receive client handshake progress and done event. note that this usucally called twice to establish connection.
 //optionally you can set arbiter pointer via last argument, which can be retrieved via nq_conn_ctx afterward.
 //TODO(iyatomi): give more imformation for deciding shutdown connection from nq_conn_t
 //TODO(iyatomi): re-evaluate we should call this twice (now mainly because to make open/close callback surely called as pair)
-typedef void (*nq_on_client_conn_open_t)(void *, nq_conn_t, nq_handshake_event_t, void **);
+typedef void (*nq_on_client_conn_open_t)(void *, nq_conn_t, void **);
 //client connection closed. after this called, nq_stream_t/nq_rpc_t created by given nq_conn_t, will be invalid.
 //last boolean indicates connection is closed from local or remote. if this function returns positive value, 
 //connection automatically reconnect with back off which equals to returned value.
-typedef nq_time_t (*nq_on_client_conn_close_t)(void *, nq_conn_t, nq_quic_error_t, const char*, bool);
+typedef nq_time_t (*nq_on_client_conn_close_t)(void *, nq_conn_t, nq_error_t, const nq_error_detail_t*, bool);
 //client connection finalized. just after this callback is done, memory corresponding to the nq_conn_t, will be freed. 
 //because nq_conn_t is already invalidate when this callback invokes, almost nq_conn_* API returns invalid value in this callback.
 //so the callback is basically for cleanup user defined resourse, like closure arg pointer (1st arg) or user context (3rd arg).
@@ -135,7 +141,7 @@ typedef void (*nq_on_client_conn_finalize_t)(void *, nq_conn_t, void *);
 //server connection opened. same as nq_on_client_conn_open_t.
 typedef nq_on_client_conn_open_t nq_on_server_conn_open_t;
 //server connection closed. same as nq_on_client_conn_close_t but no reconnection feature
-typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_quic_error_t, const char*, bool);
+typedef void (*nq_on_server_conn_close_t)(void *, nq_conn_t, nq_error_t, const nq_error_detail_t*, bool);
 
 
 /* conn */
@@ -276,7 +282,7 @@ NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl);
 // create conn from client. server side can get from argument of on_accept handler
 // return invalid conn on error, can check with nq_conn_is_valid. 
 // TODO(iyatomi): make it NQAPI_THREADSAFE
-NQAPI_BOOTSTRAP nq_conn_t nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
+NQAPI_BOOTSTRAP bool nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
 // get handler map of the client. 
 NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl);
 // set thread id that calls nq_client_poll.
@@ -353,7 +359,9 @@ NQAPI_BOOTSTRAP void nq_hdmap_raw_handler(nq_hdmap_t h, nq_stream_handler_t hand
 // conn API
 //
 // --------------------------
-//can modify handler map of connection, which is usually inherit from nq_client_t or nq_server_t
+//can modify handler map of connection, which is usually inherit from nq_client_t or nq_server_t. 
+//note that if it called from outside of callback functions for nq_conn_t, it will be queued
+//and actual modification will not immediately take place.
 NQAPI_THREADSAFE void nq_conn_modify_hdmap(nq_conn_t conn, nq_closure_t modifier);
 //close and destroy conn/associated stream eventually, so never touch conn/stream/rpc after calling this API.
 NQAPI_THREADSAFE void nq_conn_close(nq_conn_t conn); 

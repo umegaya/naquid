@@ -9,11 +9,11 @@ using namespace nqtest;
 static const int kThreads = 4;  //4 thread server
 
 /* conn callbacks */
-void on_conn_open(void *, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx) {
-  TRACE("on_conn_open event:%llx|%p %d", c.s.data[0], c.p, hsev);
+void on_conn_open(void *, nq_conn_t c, void **ppctx) {
+  TRACE("on_conn_open event:%llx|%p", c.s.data[0], c.p);
 }
-void on_conn_close(void *, nq_conn_t c, nq_quic_error_t r, const char *detail, bool) {
-  TRACE("on_conn_close reason:%llx|%p %s", c.s.data[0], c.p, nq_quic_error_str(r));
+void on_conn_close(void *, nq_conn_t c, nq_error_t r, const nq_error_detail_t *detail, bool) {
+  TRACE("on_conn_close reason:%llx|%p %s", c.s.data[0], c.p, detail->msg);
   free(nq_conn_ctx(c));
 }
 

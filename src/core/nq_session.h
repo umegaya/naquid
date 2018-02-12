@@ -35,7 +35,7 @@ class NqSession : public QuicSession {
     virtual void OnClose(QuicErrorCode error,
                          const std::string& error_details,
                          ConnectionCloseSource close_by_peer_or_self) = 0;
-    virtual void OnOpen(nq_handshake_event_t hsev) = 0;
+    virtual void OnOpen() = 0;
     virtual void Disconnect() = 0;
     virtual bool Reconnect() = 0; //only supported for client 
     virtual void DoReconnect() = 0;

@@ -40,6 +40,7 @@ class NqBoxer {
     Notify,
     Exec,
     Reachability,
+    ModifyHandlerMap,
   };
   enum OpTarget : uint8_t {
     Invalid = 0,
@@ -250,6 +251,21 @@ class NqBoxer {
       }
     } else {
       Enqueue(new Op(serial, unboxed, code, state, OpTarget::Conn));      
+    }
+  }
+  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, nq_closure_t cb, bool from_queue = false) {
+    //UnboxResult r = UnboxResult::Ok;
+    //always enter queue to be safe when this call inside protocol handler
+    if (from_queue) {
+      if (unboxed->SessionSerial() == serial) {
+        ASSERT(code == ModifyHandlerMap);
+        auto hm = unboxed->ResetHandlerMap()->ToHandle();
+        nq_closure_call(cb, on_conn_modify_hdmap, hm);
+      } else {
+        //already got invalid
+      }
+    } else {
+      Enqueue(new Op(serial, unboxed, code, cb, OpTarget::Conn));      
     }
   }
   inline void InvokeAlarm(const nq_serial_t &serial, NqAlarm *unboxed, OpCode code, nq_time_t invocation_ts, nq_closure_t cb, bool from_queue = false) {

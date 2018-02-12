@@ -81,14 +81,18 @@ NqLoop *NqServerSession::GetLoop() {
 void NqServerSession::OnClose(QuicErrorCode error,
                      const std::string& error_details,
                      ConnectionCloseSource close_by_peer_or_self) {
+  nq_error_detail_t detail = {
+    .code = error,
+    .msg = error_details.c_str(),
+  };
   nq_closure_call(port_config_.server().on_close, on_server_conn_close, ToHandle(), 
-                  (int)error, 
-                  error_details.c_str(), 
+                  NQ_EQUIC, 
+                  &detail, 
                   close_by_peer_or_self == ConnectionCloseSource::FROM_PEER);
   InvalidateSerial(); //now session pointer not valid
 }
-void NqServerSession::OnOpen(nq_handshake_event_t hsev) {
-  nq_closure_call(port_config_.server().on_open, on_server_conn_open, ToHandle(), hsev, &context_);
+void NqServerSession::OnOpen() {
+  nq_closure_call(port_config_.server().on_open, on_server_conn_open, ToHandle(), &context_);
 }
 void NqServerSession::Disconnect() {
   connection()->CloseConnection(QUIC_CONNECTION_CANCELLED, "server side close", 

@@ -27,8 +27,6 @@ struct closure_ctx {
   uint64_t acked_max;
   uint8_t state;
 };
-nq_conn_t *g_cs;
-nq_rpc_t *g_rpcs;
 closure_ctx *g_ctxs;
 nq_closure_t *g_reps;
 nq::atomic<uint64_t> g_fin(0);
@@ -41,19 +39,17 @@ int g_recv_num = N_RECV;
 
 
 /* conn callback */
-void on_conn_open(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **) {
-  if (hsev == NQ_HS_DONE) {
-    TRACE("conn open for %p %llx", arg, c.s.data[0]);
-    intptr_t i = (intptr_t)arg;
-    nq_conn_rpc(g_cs[i], "rpc", g_ctxs + i);
-  }
+void on_conn_open(void *arg, nq_conn_t c, void **) {
+  TRACE("on_conn_open:%p %llx", arg, c.s.data[0]);
+  intptr_t i = (intptr_t)arg;
+  nq_conn_rpc(c, "rpc", g_ctxs + i);
 }
-nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_quic_error_t e, const char *detail, bool) {
-  TRACE("conn close for %p %llx", arg, c.s.data[0]);
+nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_error_t e, const nq_error_detail_t *detail, bool remote) {
+  TRACE("on_conn_close:%p %llx, %d(from %s) reason:%s(%d)\n", arg, c.s.data[0], e, remote ? "remote": "local", detail->msg, detail->code);
   return nq_time_msec(10);
 }
 void on_conn_finalize(void *arg, nq_conn_t c, void *) {
-  TRACE("conn fin for %p %llx", arg, c.s.data[0]);
+  TRACE("on_conn_finalize:%p %llx", arg, c.s.data[0]);
   g_fin++;
   if (g_fin >= g_client_num) {
     g_alive = false;
@@ -184,8 +180,6 @@ int main(int argc, char *argv[]){
     }
   }
 
-  g_cs = new nq_conn_t[g_client_num];
-  g_rpcs = new nq_rpc_t[g_client_num];
   g_ctxs = new closure_ctx[g_client_num];
   g_reps = new nq_closure_t[g_client_num];
 
@@ -221,8 +215,7 @@ int main(int argc, char *argv[]){
     nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, (void *)(intptr_t)i);
     nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, (void *)(intptr_t)i);
     nq_closure_init(conf.on_finalize, on_client_conn_finalize, on_conn_finalize, (void *)(intptr_t)i);
-    g_cs[i] = nq_client_connect(cl, &addr, &conf);
-    if (!nq_conn_is_valid(g_cs[i], on_validate)) {
+    if (!nq_client_connect(cl, &addr, &conf)) {
       return -1;
     }
     g_ctxs[i].id = (i + 1);

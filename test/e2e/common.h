@@ -145,7 +145,7 @@ class ConnCloseStreamClosureCaller : public ClosureCallerBase {
 };
 class ConnOpenClosureCaller : public ClosureCallerBase {
  public:
-  std::function<void (nq_conn_t, nq_handshake_event_t, void **)> cb_;
+  std::function<void (nq_conn_t, void **)> cb_;
  public:
   ConnOpenClosureCaller() : cb_() {}
   ~ConnOpenClosureCaller() override {}
@@ -154,14 +154,14 @@ class ConnOpenClosureCaller : public ClosureCallerBase {
     nq_closure_init(clsr, on_client_conn_open, &ConnOpenClosureCaller::Call, this);
     return clsr;
   }
-  static void Call(void *arg, nq_conn_t conn, nq_handshake_event_t hsev, void **ppctx) { 
+  static void Call(void *arg, nq_conn_t conn, void **ppctx) { 
     auto pcc = (ConnOpenClosureCaller *)arg;
-    return pcc->cb_(conn, hsev, ppctx);
+    return pcc->cb_(conn, ppctx);
   }
 };
 class ConnCloseClosureCaller : public ClosureCallerBase {
  public:
-  std::function<nq_time_t (nq_conn_t, nq_quic_error_t, const char*, bool)> cb_;
+  std::function<nq_time_t (nq_conn_t, nq_error_t, const nq_error_detail_t*, bool)> cb_;
  public:
   ConnCloseClosureCaller() : cb_() {}
   ~ConnCloseClosureCaller() override {}
@@ -170,7 +170,7 @@ class ConnCloseClosureCaller : public ClosureCallerBase {
     nq_closure_init(clsr, on_client_conn_close, &ConnCloseClosureCaller::Call, this);
     return clsr;
   }
-  static nq_time_t Call(void *arg, nq_conn_t conn, nq_quic_error_t result, const char *detail, bool from_remote) { 
+  static nq_time_t Call(void *arg, nq_conn_t conn, nq_error_t result, const nq_error_detail_t *detail, bool from_remote) { 
     auto pcc = (ConnCloseClosureCaller *)arg;
     return pcc->cb_(conn, result, detail, from_remote);
   }
@@ -477,16 +477,17 @@ class Test {
     Latch NewLatch() {
       return t->NewLatch();
     }
-    void Init(Test *test, nq_conn_t conn, int idx, const RunOptions &options) {
+    void Init(Test *test, int idx) {
       send_buf = (char *)malloc(256);
       send_buf_len = 256;
       index = idx;
       disconnect = 0;
       opened = false;
       t = test;
+    }
+    void SetConn(nq_conn_t conn) {
       c = conn;
-      (t->init_ != nullptr ? t->init_ : Test::RegisterCallback)(*this, options);
-
+      (t->init_ != nullptr ? t->init_ : Test::RegisterCallback)(*this, t->current_options_);
     }
   };
  protected:
@@ -499,6 +500,7 @@ class Test {
   TestInitProc init_;
   nq_addr_t addr_;
   int concurrency_;
+  RunOptions current_options_;
  public:
   Test(const nq_addr_t &addr, TestProc tf, TestInitProc init = nullptr, int cc = 1) : 
     running_(0), result_(0), test_start_(0), thread_start_(0), closed_conn_(0), 
@@ -532,8 +534,8 @@ class Test {
 
   static void RegisterCallback(Conn &tc, const RunOptions &options);
 
-  static void OnConnOpen(void *arg, nq_conn_t c, nq_handshake_event_t hsev, void **ppctx);
-  static nq_time_t OnConnClose(void *arg, nq_conn_t c, nq_quic_error_t r, const char *reason, bool closed_from_remote);
+  static void OnConnOpen(void *arg, nq_conn_t c, void **ppctx);
+  static nq_time_t OnConnClose(void *arg, nq_conn_t c, nq_error_t r, const nq_error_detail_t *reason, bool closed_from_remote);
   static void OnConnFinalize(void *arg, nq_conn_t c, void *ctx);
 
   static bool OnStreamOpen(void *arg, nq_stream_t s, void **pctx);
