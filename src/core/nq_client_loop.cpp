@@ -5,27 +5,32 @@
 #include "core/nq_client.h"
 
 namespace net {
-struct NqDnsQuery {
-  NqClientLoop *loop;
-  NqClientConfig config;
-  std::string host;
-  int port;
-
-  static bool FindSuitableEntry(struct hostent *entries, int port, QuicSocketAddress &address) {
+struct NqDnsQuery : public NqAsyncResolver::Query {
+  static bool ConvertToIpAddress(struct hostent *entries, QuicIpAddress &ip) {
+    return ip.FromPackedString(entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype));
+  }
+  static bool ConvertToSocketAddress(struct hostent *entries, int port, QuicSocketAddress &address) {
     QuicIpAddress ip;
-    if (!ip.FromPackedString(entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype))) {
+    if (!ConvertToIpAddress(entries, ip)) {
       return false;
     }
     address = QuicSocketAddress(ip, port);
     return true;
   }
-  static void OnComplete(void *arg, int status, int timeouts, struct hostent *hostent) {
-    auto q = std::unique_ptr<NqDnsQuery>((NqDnsQuery *)arg);
+};
+
+struct NqDnsQueryForClient : public NqDnsQuery {
+  NqClientLoop *loop_;
+  NqClientConfig config_;
+  int port_;
+
+  NqDnsQueryForClient(const nq_clconf_t &conf) : NqDnsQuery(), config_(conf), port_(0) {}
+  void OnComplete(int status, int timeouts, struct hostent *entries) override {
     if (ARES_SUCCESS == status) {
       QuicSocketAddress server_address;
-      QuicServerId server_id = QuicServerId(q->host, q->port, PRIVACY_MODE_ENABLED);
-      if (FindSuitableEntry(hostent, q->port, server_address)) {
-        q->loop->Create(q->host, server_id, server_address, q->config);
+      QuicServerId server_id = QuicServerId(host_, port_, PRIVACY_MODE_ENABLED);
+      if (ConvertToSocketAddress(entries, port_, server_address)) {
+        loop_->Create(host_, server_id, server_address, config_);
         return;
       } else {
         status = ARES_ENOTFOUND;
@@ -37,9 +42,25 @@ struct NqDnsQuery {
     };
     //call on close with empty nq_conn_t. 
     nq_conn_t empty = {{{0}}, nullptr};
-    nq_closure_call(q->config.client().on_close, on_client_conn_close, 
+    nq_closure_call(config_.client().on_close, on_client_conn_close, 
       empty, NQ_ERESOLVE, &detail, false);
   }
+};
+
+struct NqDnsQueryForClosure : public NqDnsQuery {
+  nq_closure_t cb_;
+  void OnComplete(int status, int timeouts, struct hostent *entries) override {
+    if (ARES_SUCCESS == status) {
+      nq_closure_call(cb_, on_resolve_host, NQ_OK, nullptr, 
+        entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype));
+    } else {
+      nq_error_detail_t detail = {
+        .code = status,
+        .msg = ares_strerror(status),
+      };
+      nq_closure_call(cb_, on_resolve_host, NQ_ERESOLVE, &detail, nullptr, 0);
+    }
+  }  
 };
 
 
@@ -60,25 +81,34 @@ bool NqClientLoop::InitResolver(const nq_dns_conf_t *dns_conf) {
         }
       }
     } else {
-      c.SetServerHostPort("8.8.8.8");
+      c.SetServerHostPort(DEFAULT_DNS);
     }
     if (dns_conf->use_round_robin) {
       c.SetRotateDns();
     }
+  } else {
+    c.SetServerHostPort(DEFAULT_DNS);    
   }
   if (!async_resolver_.Initialize(c)) {
     return false;
   }
   return true;    
 }
-bool NqClientLoop::Resolve(const std::string &host, int port, NqClientConfig &config) {
-  auto q = new NqDnsQuery {
-    .loop = this,
-    .config = config,
-    .host = host,
-    .port = port,
-  };
-  async_resolver_.Resolve(host.c_str(), AF_UNSPEC, NqDnsQuery::OnComplete, q);
+bool NqClientLoop::Resolve(int family_pref, const std::string &host, int port, const nq_clconf_t *conf) {
+  auto q = new NqDnsQueryForClient(*conf);
+  q->host_ = host;
+  q->loop_ = this;
+  q->family_ = family_pref;
+  q->port_ = port;
+  async_resolver_.StartResolve(q);  
+  return true;
+}
+bool NqClientLoop::Resolve(int family_pref, const std::string &host, nq_closure_t cb) {
+  auto q = new NqDnsQueryForClosure;
+  q->host_ = host;
+  q->family_ = family_pref;
+  q->cb_ = cb;
+  async_resolver_.StartResolve(q);  
   return true;
 }
 int NqClientLoop::Open(int max_nfd, const nq_dns_conf_t *dns_conf) {

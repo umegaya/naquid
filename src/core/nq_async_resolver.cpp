@@ -113,7 +113,7 @@ void NqAsyncResolver::Poll(NqLoop *l) {
           }
         } else {
           TRACE("ares: fd add: %d %x", fd, flags);
-          auto req = new IoRequest(channel_, fd);
+          auto req = new IoRequest(channel_, fd, flags);
           if (l->Add(fd, req, flags) < 0) {
             ASSERT(false);
             delete req;
@@ -129,11 +129,27 @@ void NqAsyncResolver::Poll(NqLoop *l) {
     it++;
     if (!it_prev->second->alive()) {
       auto req = it_prev->second;
-      io_requests_.erase(it);
+      io_requests_.erase(it_prev);
       TRACE("ares: fd del: %d", req->fd());
-      l->Del(req->fd());
+      //fd already closed in ares internal and reused by another object (eg. NqClient)
+      l->DelWithCheck(req->fd(), req);
       delete req;
     }
+  }
+  if (queries_.size() > 0) {
+    for (auto q : queries_) {
+      switch (q->family_) {
+        case AF_INET6:
+          //AF_UNSPEC automatically search AF_INET6 => AF_INET addresses
+          Resolve(q->host_.c_str(), AF_UNSPEC, Query::OnComplete, q);
+          break;
+        default:
+          //if AF_INET and not found, then Query::OnComplete re-invoke with AF_INET6
+          Resolve(q->host_.c_str(), q->family_, Query::OnComplete, q);
+          break;
+      }
+    }
+    queries_.clear();
   }
   //TODO(iyatomi): if bits == 0, pause executing this Polling?
   //then activate again if any Resolve call happens.

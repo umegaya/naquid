@@ -26,6 +26,7 @@ class NqClientLoop : public NqLoop,
   typedef nq::Allocator<NqClientStream, NqStaticSection> StreamAllocator;
   typedef NqAlarm::Allocator AlarmAllocator;
   static constexpr nq_time_t CLIENT_LOOP_WAIT_NS = 1000 * 1000; 
+  static constexpr const char *DEFAULT_DNS = "8.8.8.8";
   static nq::IdFactory<uint32_t> client_worker_index_factory_;
   nq::HandlerMap handler_map_;
   ClientMap client_map_;
@@ -54,7 +55,9 @@ class NqClientLoop : public NqLoop,
   int Open(int max_nfd, const nq_dns_conf_t *dns_conf);
   void Close();
   void RemoveClient(NqClient *cl);
-  bool Resolve(const std::string &host, int port, NqClientConfig &config);
+  //af_first specifies first lookup address family
+  bool Resolve(int family_pref, const std::string &host, int port, const nq_clconf_t *conf);
+  bool Resolve(int family_pref, const std::string &host, nq_closure_t cb);
   NqClient *Create(const std::string &host, 
                    const QuicServerId server_id,
                    const QuicSocketAddress server_address,  

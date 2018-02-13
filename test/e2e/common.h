@@ -258,7 +258,8 @@ class ModifyHdmapClosureCaller : public ClosureCallerBase {
   }
   static void Call(void *arg, nq_hdmap_t hm) { 
     auto pcc = (ModifyHdmapClosureCaller *)arg;
-    return pcc->cb_(hm);
+    pcc->cb_(hm);
+    delete pcc;
   }  
 };
 class StreamAckClosureCaller : public ClosureCallerBase {
@@ -292,6 +293,23 @@ class StreamRetransmitClosureCaller : public ClosureCallerBase {
   static void Call(void *arg, int byte) { 
     auto pcc = (StreamRetransmitClosureCaller *)arg;
     pcc->cb_(byte);
+  }    
+};
+class ResolveHostClosureCaller : public ClosureCallerBase {
+ public:
+  std::function<void (nq_error_t, const nq_error_detail_t *, const char *, nq_size_t)> cb_;
+ public:
+  ResolveHostClosureCaller(std::function<void (nq_error_t, const nq_error_detail_t *, const char *, nq_size_t)> cb) : cb_(cb) {}
+  ~ResolveHostClosureCaller() override {}
+  nq_closure_t closure() override {
+    nq_closure_t clsr;
+    nq_closure_init(clsr, on_resolve_host, &ResolveHostClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_error_t r, const nq_error_detail_t *d, const char *p, nq_size_t l) { 
+    auto pcc = (ResolveHostClosureCaller *)arg;
+    pcc->cb_(r, d, p, l);
+    delete pcc;
   }    
 };
 
@@ -501,10 +519,12 @@ class Test {
   nq_addr_t addr_;
   int concurrency_;
   RunOptions current_options_;
+  nq_client_t current_client_;
  public:
   Test(const nq_addr_t &addr, TestProc tf, TestInitProc init = nullptr, int cc = 1) : 
     running_(0), result_(0), test_start_(0), thread_start_(0), closed_conn_(0), 
-    testproc_(tf), init_(init), addr_(addr), concurrency_(cc) {}  
+    testproc_(tf), init_(init), addr_(addr), concurrency_(cc), current_client_(nullptr) {}  
+  nq_client_t current_client() { return current_client_; }
   Latch NewLatch() {
     Start();
     return std::bind(&Test::End, this, std::placeholders::_1);
@@ -597,7 +617,10 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
 #define MODIFY_HDMAP(conn, callback) { \
   auto *pcc = new nqtest::ModifyHdmapClosureCaller(callback); \
   nq_conn_modify_hdmap(conn, pcc->closure()); \
-  delete pcc; \
+}
+#define RESOLVE(client, family_pref, hostname, callback) { \
+  auto *pcc = new nqtest::ResolveHostClosureCaller(callback); \
+  nq_client_resolve_host(client, family_pref, hostname, pcc->closure()); \
 }
 
 

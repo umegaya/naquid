@@ -196,8 +196,13 @@ typedef void (*nq_on_rpc_validate_t)(void *, nq_rpc_t, const char *);
 /* alarm */
 typedef void (*nq_on_alarm_t)(void *, nq_time_t *);
 
+
 /* reachability */
 typedef void (*nq_on_reachability_change_t)(void *, nq_reachability_t);
+
+
+/* resolver */
+typedef void (*nq_on_resolve_host_t)(void *, nq_error_t, const nq_error_detail_t *, const char *, nq_size_t);
 
 
 /* closure */
@@ -238,6 +243,8 @@ typedef struct {
     nq_on_alarm_t on_alarm;
 
     nq_on_reachability_change_t on_reachability_change;
+
+    nq_on_resolve_host_t on_resolve_host;
   };
 } nq_closure_t;
 
@@ -304,6 +311,9 @@ NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl);
 // set thread id that calls nq_client_poll.
 // call this if thread which polls this nq_client_t is different from creator thread.
 NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl);
+// resolve host. nq_client_t need to be polled by nq_client_poll to work correctly
+// family_pref can be AF_INET or AF_INET6, and control which address family searched first. 
+NQAPI_BOOTSTRAP bool nq_client_resolve_host(nq_client_t, int family_pref, const char *hostname, nq_closure_t cb);
 
 
 

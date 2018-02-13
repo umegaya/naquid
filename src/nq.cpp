@@ -197,15 +197,17 @@ NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl) {
 }
 NQAPI_BOOTSTRAP bool nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
   auto loop = NqClientLoop::FromHandle(cl);
-  auto cf = NqClientConfig(*conf);
-	loop->Resolve(addr->host, addr->port, cf);
-  return true;
+  //we are not smart aleck and wanna use ipv4 if possible 
+	return loop->Resolve(AF_INET, addr->host, addr->port, conf);
 }
 NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
 	return NqClientLoop::FromHandle(cl)->mutable_handler_map()->ToHandle();
 }
 NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl) {
   NqClientLoop::FromHandle(cl)->set_main_thread();
+}
+NQAPI_BOOTSTRAP bool nq_client_resolve_host(nq_client_t cl, int family_pref, const char *hostname, nq_closure_t cb) {
+  return NqClientLoop::FromHandle(cl)->Resolve(family_pref, hostname, cb);
 }
 
 

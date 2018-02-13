@@ -27,6 +27,26 @@ class NqAsyncResolver {
     //methods may fail sometimes
     bool SetServerHostPort(const std::string &host, int port = 53);
   };
+  struct Query {
+    NqAsyncResolver *resolver_;
+    std::string host_;
+    int family_;
+
+    Query() : host_(), family_(AF_UNSPEC) {}
+    virtual ~Query() {}
+
+    virtual void OnComplete(int status, int timeouts, struct hostent *hostent) = 0;  
+    static void OnComplete(void *arg, int status, int timeouts, struct hostent *hostent) {
+      auto q = (Query *)arg;
+      if (q->family_ == AF_INET && (status == ARES_ENOTFOUND || status == ARES_ENODATA)) {
+        q->family_ = AF_INET6;
+        q->resolver_->StartResolve(q);
+        return;
+      }
+      q->OnComplete(status, timeouts, hostent);
+      delete q;
+    }
+  };
   typedef ares_host_callback Callback;  
   typedef ares_channel Channel;
  protected:
@@ -39,8 +59,8 @@ class NqAsyncResolver {
     Channel channel_;
     Fd fd_;
    public:
-    IoRequest(Channel channel, Fd fd) : 
-      current_flags_(0), alive_(true), channel_(channel), fd_(fd) {}
+    IoRequest(Channel channel, Fd fd, uint32_t flags) : 
+      current_flags_(flags), alive_(true), channel_(channel), fd_(fd) {}
     ~IoRequest() override {}
     // implements nq::IoProcessor
     void OnEvent(Fd fd, const Event &e) override;
@@ -55,9 +75,11 @@ class NqAsyncResolver {
   };
   Channel channel_;
   std::map<Fd, IoRequest*> io_requests_;
+  std::vector<Query*> queries_;
  public:
   NqAsyncResolver() : channel_(nullptr), io_requests_() {}
   bool Initialize(const Config &config);
+  void StartResolve(Query *q) { q->resolver_ = this; queries_.push_back(q); }
   void Resolve(const char *host, int family, Callback cb, void *arg);
   void Poll(NqLoop *l);
   static inline int PtoN(const std::string &host, int *af, void *buff) {

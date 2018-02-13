@@ -3,6 +3,7 @@
 #include "stream.h"
 #include "timeout.h"
 #include "reconnect.h"
+#include "resolver.h"
 #include "task.h"
 
 using namespace nqtest;
@@ -19,6 +20,11 @@ extern bool is_packet_received(uint64_t cid) {
 
 
 void test_suites(const nq_addr_t &addr, bool skip = true) {
+  TRACE("==================== test_resolver ====================");
+  {
+    Test t(addr, test_resolver);
+    if (!t.Run()) { ALERT_AND_EXIT("test_resolver fails"); }
+  }//*/
   TRACE("==================== test_rpc ====================");
   {
     Test t(addr, test_rpc);

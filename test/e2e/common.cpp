@@ -224,6 +224,7 @@ bool Test::Run(const RunOptions *opt) {
   static RunOptions fallback;
   current_options_ = (opt != nullptr) ? *opt : fallback;
   nq_client_t cl = nq_client_create(256, 256 * 4, nullptr);
+  current_client_ = cl;
 
   nq_clconf_t conf;
   conf.insecure = false;

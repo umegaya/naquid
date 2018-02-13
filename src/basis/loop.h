@@ -55,6 +55,13 @@ namespace nq {
 			}
 			return r;
 		}
+		inline int DelWithCheck(Fd fd, IoProcessor *proc) {
+			if (processors_[fd] == proc) {
+				return Del(fd);
+			} else {
+				return NQ_EGOAWAY; //already fd reused
+			}
+		}
 		inline void Poll() {
 			Event list[max_nfd_];
 			int n_list = LoopImpl::Wait(list, max_nfd_, timeout_);

@@ -43,6 +43,7 @@ class NqClientConfig : public NqConfig {
  protected:
   nq_clconf_t client_;
  public:
+  NqClientConfig() : NqConfig() { memset(&client_, 0, sizeof(client_)); }
   NqClientConfig(const nq_clconf_t &conf) : NqConfig(), client_(conf) {
     Setup();
   }
