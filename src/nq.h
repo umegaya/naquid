@@ -118,7 +118,7 @@ typedef enum {
 #define NQ_CLOSURE_TYPE(__typename, __return_type, ...) \
   typedef struct { \
     void *arg; \
-    __return_type (*proc)(__VA_ARGS__); \
+    __return_type (*proc)(void *, __VA_ARGS__); \
   } __typename
 
 /* client */

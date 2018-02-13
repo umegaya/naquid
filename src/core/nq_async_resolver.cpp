@@ -132,7 +132,8 @@ void NqAsyncResolver::Poll(NqLoop *l) {
       io_requests_.erase(it_prev);
       TRACE("ares: fd del: %d", req->fd());
       //fd already closed in ares internal and reused by another object (eg. NqClient)
-      l->DelWithCheck(req->fd(), req);
+      //also, fd seems closed in ares library when control path comes here.
+      l->ForceDelWithCheck(req->fd(), req);
       delete req;
     }
   }

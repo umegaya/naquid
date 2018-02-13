@@ -12,7 +12,7 @@
 - [x] conn: make user able to read property of NqSession::Delegate via nq_conn_t from all thread
 - [x] conn: check ```[1122/035845.066728:WARNING:rtt_stats.cc(44)] Ignoring measured send_delta``` log is valid
 - [x] conn: enable MMSG_MORE for linux
-- [ ] conn: loop up ip address by using c-ares
+- [x] conn: loop up ip address by using c-ares
 - [x] conn: able to use custom dns
 - [x] conn: handle connectivity change (if not handled)
 - [x] stream: ```nq_[stream|rpc]_task``` to access its internal property (name/ctx) safely. because these property does not assure to be access from other thread.
@@ -30,8 +30,6 @@
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
 - [ ] server: graceful shutdown
   - stop accepting connection and wait until all request in the worker queue consumed
-- [ ] client: remove stub alarm and connection helper interface
-  - override NqLoop operator new/delete to avoid freeing with unique_ptr of QuicClientBase
 - [x] test: high frequent reconnection test
 - [x] test: server side stream initiation
 - [x] test: stream disconnection using on open callback 
@@ -39,7 +37,7 @@
 - [x] test: stream handle send/recv test
 - [x] test: timeout test for handshake / rpc call
 - [x] test: ensure robustness for connectivity change
-- [ ] test: server aging (more than day) and check memory and fd leak
+- [ ] test: server long run test (more than a day) and check memory and fd leak
 - [x] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread (need to find proper workload)
 - [x] bench: comparing latency and throughput with mrs, which contains ENet based gaming specific udp network library

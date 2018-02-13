@@ -55,9 +55,14 @@ namespace nq {
 			}
 			return r;
 		}
-		inline int DelWithCheck(Fd fd, IoProcessor *proc) {
+		inline int ForceDelWithCheck(Fd fd, IoProcessor *proc) {
 			if (processors_[fd] == proc) {
-				return Del(fd);
+				if (Del(fd) < 0) {
+					auto h = processors_[fd];
+					processors_[fd] = nullptr;
+					h->OnClose(fd);
+				}
+				return NQ_OK;					
 			} else {
 				return NQ_EGOAWAY; //already fd reused
 			}
