@@ -16,7 +16,7 @@ namespace nq {
 		Loop() : LoopImpl(), processors_(nullptr), max_nfd_(-1) {}
 		~Loop() { Close(); }
 		template <class T> T *ProcessorAt(int fd) { return (T *)processors_[fd]; }
-		inline int Open(int max_nfd, int timeout_ns = 1000 * 1000) {
+		inline int Open(int max_nfd, uint64_t timeout_ns = 1000 * 1000) {
 			if (max_nfd < kMinimumProcessorArraySize) {
 				max_nfd = kMinimumProcessorArraySize;
 			}

@@ -183,7 +183,7 @@ int main(int argc, char *argv[]){
   g_ctxs = new closure_ctx[g_client_num];
   g_reps = new nq_closure_t[g_client_num];
 
-  nq_client_t cl = nq_client_create(g_client_num, g_client_num * 4); //g_client_num connection client
+  nq_client_t cl = nq_client_create(g_client_num, g_client_num * 4, nullptr); //g_client_num connection client
 
   srand(nq_time_unix());
 

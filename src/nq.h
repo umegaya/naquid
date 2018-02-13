@@ -128,7 +128,8 @@ typedef enum {
 //TODO(iyatomi): re-evaluate we should call this twice (now mainly because to make open/close callback surely called as pair)
 typedef void (*nq_on_client_conn_open_t)(void *, nq_conn_t, void **);
 //client connection closed. after this called, nq_stream_t/nq_rpc_t created by given nq_conn_t, will be invalid.
-//last boolean indicates connection is closed from local or remote. if this function returns positive value, 
+//last boolean indicates connection is closed from local(false) or remote(true). 
+//if this function returns positive value, 
 //connection automatically reconnect with back off which equals to returned value.
 typedef nq_time_t (*nq_on_client_conn_close_t)(void *, nq_conn_t, nq_error_t, const nq_error_detail_t*, bool);
 //client connection finalized. just after this callback is done, memory corresponding to the nq_conn_t, will be freed. 
@@ -259,6 +260,21 @@ NQAPI_THREADSAFE nq_closure_t nq_closure_empty();
 //
 // --------------------------
 typedef struct {
+  //dns query timeout in nsec
+  nq_time_t query_timeout;
+
+  //array of ipv4 or ipv6 ip address literal and its size.
+  //first entry will be used first. if use_round_robin set to false
+  //otherwise used one by one.
+  //set null to dns_hosts to use default dns (for now 8.8.8.8)
+  struct {
+    const char *addr;
+    int port; 
+  } *dns_hosts;
+  int n_dns_hosts;
+  bool use_round_robin;
+} nq_dns_conf_t;
+typedef struct {
   //connection open/close/finalize watcher
   nq_closure_t on_open, on_close, on_finalize;
 
@@ -274,7 +290,7 @@ typedef struct {
 } nq_clconf_t;
 
 // create client object which have max_nfd of connection. 
-NQAPI_BOOTSTRAP nq_client_t nq_client_create(int max_nfd, int max_stream_hint);
+NQAPI_BOOTSTRAP nq_client_t nq_client_create(int max_nfd, int max_stream_hint, const nq_dns_conf_t *dns_conf);
 // do actual network IO. need to call periodically
 NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.
@@ -491,6 +507,14 @@ NQAPI_INLINE nq_time_t nq_time_msec(uint64_t n) { return ((n) * 1000 * 1000); }
 NQAPI_INLINE nq_time_t nq_time_usec(uint64_t n) { return ((n) * 1000); }
 
 NQAPI_INLINE nq_time_t nq_time_nsec(uint64_t n) { return (n); }
+
+NQAPI_INLINE double nq_time_to_sec(nq_time_t n) { return ((n) / (1000 * 1000 * 1000)); }
+
+NQAPI_INLINE double nq_time_to_msec(nq_time_t n) { return ((n) / (1000 * 1000)); }
+
+NQAPI_INLINE double nq_time_to_usec(nq_time_t n) { return ((n) / 1000); }
+
+NQAPI_INLINE double nq_time_to_nsec(nq_time_t n) { return (n); }
 
 NQAPI_THREADSAFE nq_time_t nq_time_now();
 

@@ -64,7 +64,6 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
   }
   int port_index = 0;
   for (auto &kv : server_.port_configs()) {
-    //TODO(iyatomi): enable multiport server
     QuicSocketAddress address;
     if (!ToSocketAddress(kv.second.address_, address)) {
       ASSERT(false);
@@ -132,8 +131,16 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
 }
 /* static */
 bool NqWorker::ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &socket_address) {
-  QuicServerId server_id;
-  QuicConfig config;
-  return NqClientLoop::ParseUrl(addr.host, addr.port, 0, server_id, socket_address, config);
+  char buffer[sizeof(struct sockaddr_storage)];
+  int len, af;
+  if ((len = NqAsyncResolver::PtoN(addr.host, &af, &buffer)) < 0) {
+    return false;
+  }
+  QuicIpAddress ip;
+  if (!ip.FromPackedString(buffer, len)) {
+    return false;
+  }
+  socket_address = QuicSocketAddress(ip, addr.port);
+  return true;
 }
 }

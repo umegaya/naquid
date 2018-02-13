@@ -87,7 +87,7 @@ int main(int argc, char *argv[]){
   if (argc > 1) {
     track_reachability = nq::convert::Do(argv[1], 0) != 0;
   }
-  nq_client_t cl = nq_client_create(N_CLIENT, N_CLIENT * 4); //N_CLIENT connection client
+  nq_client_t cl = nq_client_create(N_CLIENT, N_CLIENT * 4, nullptr); //N_CLIENT connection client
 
   nq_hdmap_t hm;
   hm = nq_client_hdmap(cl);

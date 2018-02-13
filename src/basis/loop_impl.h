@@ -70,7 +70,7 @@ namespace internal {
 		static inline bool Readable(const Event &e) { return e.events & EV_READ; }
 		static inline bool Writable(const Event &e) { return e.events & EV_WRITE; }
 		static inline bool Closed(const Event &e) { return e.events & EPOLLRDHUP; }
-		static inline void ToTimeout(int timeout_ns, Timeout &to) { to = (timeout_ns / (1000 * 1000)); }
+		static inline void ToTimeout(uint64_t timeout_ns, Timeout &to) { to = (timeout_ns / (1000 * 1000)); }
 	private:
 		const Epoll &operator = (const Epoll &);
 	};
@@ -136,7 +136,7 @@ namespace internal {
 		static inline bool Writable(const Event &e) { return e.filter == EVFILT_WRITE; }
 		/* TODO: not sure about this check */
 		static inline bool Closed(const Event &e) { return e.flags & (EV_EOF | EV_ERROR);}
-		static inline void ToTimeout(int timeout_ns, Timeout &to) {
+		static inline void ToTimeout(uint64_t timeout_ns, Timeout &to) {
 			to.tv_sec = (timeout_ns / (1000 * 1000 * 1000));
 			to.tv_nsec = (timeout_ns % (1000 * 1000 * 1000));
 		}

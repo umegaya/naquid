@@ -2,7 +2,7 @@
 - now basic client/server communication done. more test for ensure stability and performance improvement is required
 
 
-#### remain tasks for 0.1.0
+#### tasks for 0.1.0
 - [x] rpc: reduce frame number (unify length header/msgid/type to one frame)
 - [x] rpc: add header byte to indicate msgid/type size
 - [x] conn: client side proof verification (import ProofVerifierChromium)
@@ -39,20 +39,23 @@
 - [x] test: stream handle send/recv test
 - [x] test: timeout test for handshake / rpc call
 - [x] test: ensure robustness for connectivity change
-- [ ] test: server aging (more than day) and check memory and fd (not possible through)
+- [ ] test: server aging (more than day) and check memory and fd leak
 - [x] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread (need to find proper workload)
 - [x] bench: comparing latency and throughput with mrs, which contains ENet based gaming specific udp network library
   - throughput ~10% faster than mrs, with 100ccu/5000 request (roughly 350k req/sec) almost batched (mrs does not allow 100+ ccu, so more comparision is not possible)
 
 
-#### remain tasks for 1.0.0
+#### tasks for 1.0.0
 - [ ] stream/rpc: unreliable packet sending (based on https://tools.ietf.org/html/draft-tiesel-quic-unreliable-streams-00)
+- [ ] stream/rpc: support tcp transport for QUIC fallback and internal datacenter usage
+- [ ] API: http2 plugin: extra library to make nq_client_t http2 compatible
+- [ ] API: grpc support: because some important backend services (eg. google cloud services or cockroachDB) expose API for that
 - [ ] conn: optional faster network stack by by-passing kernel (like dpdk)
 
 
 #### YAGNI
-- [ ] stream/rpc: unencrypted packet sending 
+- [ ] stream/rpc: unencrypted packet sending ()
 - [ ] conn: more cert check. eg. optinally enable certificate transparency verification
   - maybe better just expose certificate data to user
 - [ ] conn: try to use let's encrypt cert (with corresponding host name) by default

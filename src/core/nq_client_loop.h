@@ -25,6 +25,7 @@ class NqClientLoop : public NqLoop,
   typedef nq::Allocator<NqClient, NqStaticSection> ClientAllocator;
   typedef nq::Allocator<NqClientStream, NqStaticSection> StreamAllocator;
   typedef NqAlarm::Allocator AlarmAllocator;
+  static constexpr nq_time_t CLIENT_LOOP_WAIT_NS = 1000 * 1000; 
   static nq::IdFactory<uint32_t> client_worker_index_factory_;
   nq::HandlerMap handler_map_;
   ClientMap client_map_;
@@ -50,10 +51,13 @@ class NqClientLoop : public NqLoop,
   ~NqClientLoop() { Close(); }
 
   void Poll();
+  int Open(int max_nfd, const nq_dns_conf_t *dns_conf);
   void Close();
   void RemoveClient(NqClient *cl);
+  bool Resolve(const std::string &host, int port, NqClientConfig &config);
   NqClient *Create(const std::string &host, 
-                   int port, 
+                   const QuicServerId server_id,
+                   const QuicSocketAddress server_address,  
                    NqClientConfig &config);
 
   inline nq::HandlerMap *mutable_handler_map() { return &handler_map_; }
@@ -104,5 +108,6 @@ class NqClientLoop : public NqLoop,
 
  protected:
   void AddAlarm(NqAlarm *a);
+  bool InitResolver(const nq_dns_conf_t *dns_conf);
 };
 }

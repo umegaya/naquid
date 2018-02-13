@@ -181,10 +181,10 @@ NQAPI_THREADSAFE const char *nq_error_detail_code2str(nq_error_t code, int detai
 // client API
 //
 // --------------------------
-NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint) {
+NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint, const nq_dns_conf_t *dns_conf) {
   lib_init(true); //anchor
 	auto l = new NqClientLoop(max_nfd, max_stream_hint);
-	if (l->Open(max_nfd) < 0) {
+	if (l->Open(max_nfd, dns_conf) < 0) {
 		return nullptr;
 	}
 	return l->ToHandle();
@@ -198,10 +198,7 @@ NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl) {
 NQAPI_BOOTSTRAP bool nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
   auto loop = NqClientLoop::FromHandle(cl);
   auto cf = NqClientConfig(*conf);
-	auto c = loop->Create(addr->host, addr->port, cf);
-  if (c == nullptr) {
-    return false;
-  }
+	loop->Resolve(addr->host, addr->port, cf);
   return true;
 }
 NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl) {

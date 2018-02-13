@@ -5,11 +5,91 @@
 #include "core/nq_client.h"
 
 namespace net {
+struct NqDnsQuery {
+  NqClientLoop *loop;
+  NqClientConfig config;
+  std::string host;
+  int port;
+
+  static bool FindSuitableEntry(struct hostent *entries, int port, QuicSocketAddress &address) {
+    QuicIpAddress ip;
+    if (!ip.FromPackedString(entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype))) {
+      return false;
+    }
+    address = QuicSocketAddress(ip, port);
+    return true;
+  }
+  static void OnComplete(void *arg, int status, int timeouts, struct hostent *hostent) {
+    auto q = std::unique_ptr<NqDnsQuery>((NqDnsQuery *)arg);
+    if (ARES_SUCCESS == status) {
+      QuicSocketAddress server_address;
+      QuicServerId server_id = QuicServerId(q->host, q->port, PRIVACY_MODE_ENABLED);
+      if (FindSuitableEntry(hostent, q->port, server_address)) {
+        q->loop->Create(q->host, server_id, server_address, q->config);
+        return;
+      } else {
+        status = ARES_ENOTFOUND;
+      }
+    } 
+    nq_error_detail_t detail = {
+      .code = status,
+      .msg = ares_strerror(status),
+    };
+    //call on close with empty nq_conn_t. 
+    nq_conn_t empty = {{{0}}, nullptr};
+    nq_closure_call(q->config.client().on_close, on_client_conn_close, 
+      empty, NQ_ERESOLVE, &detail, false);
+  }
+};
+
+
 nq::IdFactory<uint32_t> NqClientLoop::client_worker_index_factory_;
 
+bool NqClientLoop::InitResolver(const nq_dns_conf_t *dns_conf) {
+  NqAsyncResolver::Config c;
+  c.SetLookup(true, true);
+  if (dns_conf != nullptr) {
+    if (dns_conf->query_timeout > 0) {
+      c.SetTimeout(dns_conf->query_timeout);
+    }
+    if (dns_conf->dns_hosts != nullptr && dns_conf->n_dns_hosts > 0) {
+      for (int i = 0; i < dns_conf->n_dns_hosts; i++) {
+        auto h = dns_conf->dns_hosts + i;
+        if (!c.SetServerHostPort(h->addr, h->port)) {
+          return false;
+        }
+      }
+    } else {
+      c.SetServerHostPort("8.8.8.8");
+    }
+    if (dns_conf->use_round_robin) {
+      c.SetRotateDns();
+    }
+  }
+  if (!async_resolver_.Initialize(c)) {
+    return false;
+  }
+  return true;    
+}
+bool NqClientLoop::Resolve(const std::string &host, int port, NqClientConfig &config) {
+  auto q = new NqDnsQuery {
+    .loop = this,
+    .config = config,
+    .host = host,
+    .port = port,
+  };
+  async_resolver_.Resolve(host.c_str(), AF_UNSPEC, NqDnsQuery::OnComplete, q);
+  return true;
+}
+int NqClientLoop::Open(int max_nfd, const nq_dns_conf_t *dns_conf) {
+  if (!InitResolver(dns_conf)) {
+    return NQ_ERESOLVE;
+  }
+  return NqLoop::Open(max_nfd, CLIENT_LOOP_WAIT_NS);
+}
 void NqClientLoop::Poll() {
   processor_.Poll(this);
-  //async_resolver_.Poll(this);
+  async_resolver_.Poll(this);
   NqLoop::Poll();
 }
 void NqClientLoop::Close() {
@@ -38,14 +118,11 @@ void NqClientLoop::RemoveAlarm(NqAlarmIndex index) {
 void NqClientLoop::RemoveClient(NqClient *cl) {
   client_map_.Remove(cl->session_index());
 }
-NqClient *NqClientLoop::Create(const std::string &host,
-                               int port,  
+NqClient *NqClientLoop::Create(const std::string &host, 
+                               const QuicServerId server_id,
+                               const QuicSocketAddress server_address,  
                                NqClientConfig &config) {
-  QuicServerId server_id;
-  QuicSocketAddress server_address;
-  if (!ParseUrl(host, port, 0, server_id, server_address, config)) {
-    return nullptr;
-  }
+
   auto supported_versions = AllSupportedVersions();//versions_.GetSupportedVersions();
   auto c = new(this) NqClient(
     server_address,
@@ -69,7 +146,7 @@ NqClient *NqClientLoop::Create(const std::string &host,
   return c;
 }
 /* static */
-bool NqClientLoop::ParseUrl(const std::string &host, int port, int address_family, 
+/*bool NqClientLoop::ParseUrl(const std::string &host, int port, int address_family, 
                             QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
   if (host.empty()) {
     return false;
@@ -114,5 +191,5 @@ bool NqClientLoop::ParseUrl(const std::string &host, int port, int address_famil
     }
   }
   return false;
-}	
+}	*/
 } //net

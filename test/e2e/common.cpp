@@ -223,7 +223,7 @@ void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
 bool Test::Run(const RunOptions *opt) {
   static RunOptions fallback;
   current_options_ = (opt != nullptr) ? *opt : fallback;
-  nq_client_t cl = nq_client_create(256, 256 * 4);
+  nq_client_t cl = nq_client_create(256, 256 * 4, nullptr);
 
   nq_clconf_t conf;
   conf.insecure = false;

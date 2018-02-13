@@ -62,6 +62,20 @@ public:
 			return 0;
 		}
 	}
+	static socklen_t GetIpAddrLen(int address_family) {
+		switch(address_family) {
+		case AF_INET:
+			return sizeof(struct in_addr);
+			break;
+		case AF_INET6:
+			return sizeof(struct in6_addr);
+			break;
+		default:
+			ASSERT(false);
+			QUIC_LOG(ERROR) << "unsupported address family: " << address_family;
+			return 0;
+		}
+	}
 	static void *Memdup(const void *p, nq_size_t sz) {
 		void *r = malloc(sz);
 		memcpy(r, p, sz);
@@ -69,6 +83,9 @@ public:
 	}
 	static void MemFree(void *p) {
 		free(p);
+	}
+	static void *MemAlloc(nq_size_t sz) {
+		return malloc(sz);
 	}
 };
 }
