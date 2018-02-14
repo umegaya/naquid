@@ -38,6 +38,7 @@
 - [x] test: timeout test for handshake / rpc call
 - [x] test: ensure robustness for connectivity change
 - [ ] test: server long run test (more than a day) and check memory and fd leak
+- [ ] test: travis or something (introduce auto test execution)
 - [x] bench: higher concurrency test (around 10k client connection)
 - [ ] bench: ensure scalability with number of thread (need to find proper workload)
 - [x] bench: comparing latency and throughput with mrs, which contains ENet based gaming specific udp network library

@@ -358,7 +358,7 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   conf.max_stream_hint = 1024 * 4;
   conf.handshake_timeout = nq_time_sec(120);
   conf.idle_timeout = nq_time_sec(60);
-  conf.shutdown_wait = nq_time_sec(5);
+  conf.shutdown_timeout = nq_time_sec(5);
   CONFIG_CB(svconfig, on_server_conn_open, on_conn_open, conf.on_open);
   nq_closure_init(conf.on_close, on_server_conn_close, on_conn_close, nullptr);
 

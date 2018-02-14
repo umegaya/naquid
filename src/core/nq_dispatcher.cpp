@@ -59,14 +59,14 @@ bool NqDispatcher::ShutdownFinished(nq_time_t shutdown_start) const {
       {"port", port_},
     });
     return true;
-  } else if ((shutdown_start + config_.server().shutdown_wait) < nq_time_now()) {
+  } else if ((shutdown_start + config_.server().shutdown_timeout) < nq_time_now()) {
     nq::logger::error({
       {"msg", "shutdown finished"},
       {"reason", "timeout"},
       {"worker_index", index_},
       {"port", port_},
       {"shutdown_start", shutdown_start},
-      {"shutdown_wait", config_.server().shutdown_wait},
+      {"shutdown_timeout", config_.server().shutdown_timeout},
     });
     return true;
   } else {

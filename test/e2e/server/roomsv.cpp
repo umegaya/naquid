@@ -88,6 +88,7 @@ void setup_server(nq_server_t sv, int port) {
   conf.max_stream_hint = 1024 * 4;
   conf.handshake_timeout = nq_time_sec(120);
   conf.idle_timeout = nq_time_sec(60);
+  conf.shutdown_timeout = 0; //use default
   nq_closure_init(conf.on_open, on_server_conn_open, on_conn_open, nullptr);
   nq_closure_init(conf.on_close, on_server_conn_close, on_conn_close, nullptr);
 
