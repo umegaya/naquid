@@ -27,8 +27,13 @@ class NqServer {
 
     inline const nq::HandlerMap *handler_map() const { return &handler_map_; }
   }; 
+  enum Status {
+    RUNNING,
+    TERMINATING,
+    TERMINATED,
+  };
  protected:
-  bool alive_;
+  nq::atomic<uint32_t> status_;
   uint32_t n_worker_;
 	std::unique_ptr<PacketQueue[]> worker_queue_;
   std::map<int, std::unique_ptr<InvokeQueue[]>> invoke_queues_list_;
@@ -41,7 +46,7 @@ class NqServer {
 
  public:
 	NqServer(uint32_t n_worker) : 
-    alive_(true), n_worker_(n_worker), worker_queue_(nullptr), invoke_queues_list_(), 
+    status_(RUNNING), n_worker_(n_worker), worker_queue_(nullptr), invoke_queues_list_(), 
     stream_index_factory_(0x7FFFFFFF) {}
   ~NqServer() {}
   nq::HandlerMap *Open(const nq_addr_t *addr, const nq_svconf_t *conf) {
@@ -66,7 +71,7 @@ class NqServer {
     return &(pconf.handler_map_);
   }
 	int Start(bool block) {
-    if (!alive_) { return NQ_OK; }
+    if (!alive()) { return NQ_OK; }
 		worker_queue_.reset(new PacketQueue[n_worker_]);
 		if (worker_queue_ == nullptr) {
 			return NQ_EALLOC;
@@ -79,27 +84,43 @@ class NqServer {
 		}
     if (block) {
       std::unique_lock<std::mutex> lock(mutex_);
-      cond_.wait(lock);
+      cond_.wait(lock, [this]() { return !alive(); });
+      //TRACE("exit wait: mutex_ should locked");
+      ASSERT(lock.owns_lock() && !alive());
       Stop();
+      //TRACE("exit thread: mutex_ should unlocked");
     } else {
       shutdown_thread_ = std::thread([this]() {
         std::unique_lock<std::mutex> lock(mutex_);
-        cond_.wait(lock);
+        cond_.wait(lock, [this]() { return !alive(); });
+        ASSERT(lock.owns_lock() && !alive());
         Stop();
       });
     }
 		return NQ_OK;
 	}
   void Join() {
-    cond_.notify_one();
-    //here, mutex_ should be acquired inside of Start() call (at blocking or waiter thread)
-    std::unique_lock<std::mutex> lock(mutex_); //wait for Stop() call finished
-    if (shutdown_thread_.joinable()) {
-      shutdown_thread_.join(); //ensure shutdown thread finished
+    {
+      std::unique_lock<std::mutex> lock(mutex_); //wait for Stop() call finished
+      status_ = TERMINATING;
+    }
+    cond_.notify_all();
+    {
+      //wait for Stop() call finished by wait for condition_variable.
+      //note that mutex_ is not assured to be locked by the thread which is waken by above notify_all here.
+      std::unique_lock<std::mutex> lock(mutex_); 
+      //finailized should evaluated before first actual wait operation, so never deadlock.
+      //if reach here earlier than Stop() finished, this thread should be waken up by the thread calls Stop(),
+      //otherwise, Stop() is already finished here and finalized() returns true
+      cond_.wait(lock, [this]() { return terminated(); });
+      if (shutdown_thread_.joinable()) {
+        shutdown_thread_.join(); //ensure shutdown thread finished
+      }
     }
   }
   PacketQueue &Q4(int idx) { return worker_queue_[idx]; }
-  inline bool alive() const { return alive_; }
+  inline bool alive() const { return status_ == RUNNING; }
+  inline bool terminated() const { return status_ == TERMINATED; }
   inline uint32_t n_worker() const { return n_worker_; }
   inline InvokeQueue *InvokeQueuesFromPort(int port) { 
     auto it = invoke_queues_list_.find(port);
@@ -112,11 +133,11 @@ class NqServer {
 
  protected:
   void Stop() {
-    //TODO: wait for conditional variable
-    alive_ = false;
     for (auto &kv : workers_) {
       kv.second->Join();
     } 
+    status_ = TERMINATED;
+    cond_.notify_all();
   }
   int StartWorker(int index) {
     auto l = new NqWorker(index, *this);

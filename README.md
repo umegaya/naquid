@@ -47,8 +47,8 @@
 #### tasks for 1.0.0
 - [ ] stream/rpc: unreliable packet sending (based on https://tools.ietf.org/html/draft-tiesel-quic-unreliable-streams-00)
 - [ ] stream/rpc: support tcp transport for QUIC fallback and internal datacenter usage
-- [ ] API: http2 plugin: extra library to make nq_client_t http2 compatible
-- [ ] API: grpc support: because some important backend services (eg. google cloud services or cockroachDB) expose API for that
+- [ ] API: http2 plugin (nqh2): extra library to make nq_client_t http2 compatible (nq_httpize(nq_client_t))
+- [ ] API: grpc support: because some important backend services (eg. google cloud services or cockroachDB) expose API via grpc
 - [ ] conn: optional faster network stack by by-passing kernel (like dpdk)
 
 

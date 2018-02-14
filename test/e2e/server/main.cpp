@@ -401,8 +401,16 @@ int main(int argc, char *argv[]){
   memset(g_index_conn_id_map, 0, sizeof(g_index_conn_id_map));
 #endif
   int n_threads = kThreads;
+  bool block_main = false;
+  int wait_sec = 60;
   if (argc > 1) {
     n_threads = nq::convert::Do(argv[1], kThreads);
+    if (argc > 2) {
+      block_main = nq::convert::Do(argv[2], 0) != 0;
+      if (argc > 3) {
+        wait_sec = nq::convert::Do(argv[3], 60);
+      }
+    }
   }
   nq::logger::info({
     {"msg", "launch server"},
@@ -432,10 +440,19 @@ int main(int argc, char *argv[]){
     setup_server(sv, 28443, &scf2);
   }
 
-  nq_server_start(sv, false);
+  if (block_main) {
+    auto t = std::thread([sv, wait_sec]() {
+      nq_time_sleep(nq_time_sec(wait_sec));
+      nq_server_join(sv);
+    });
 
-  nq_time_sleep(nq_time_sec(5));
-  nq_server_join(sv);
+    nq_server_start(sv, true);
+    t.join();
+  } else {
+    nq_server_start(sv, false);
+    nq_time_sleep(nq_time_sec(wait_sec));
+    nq_server_join(sv);
+  }
 
   return 0;
 }

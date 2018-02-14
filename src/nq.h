@@ -115,7 +115,7 @@ typedef enum {
 // Closure type
 //
 // --------------------------
-#define NQ_CLOSURE_TYPE(__typename, __return_type, ...) \
+#define NQ_CLOSURE_TYPE(__return_type, __typename, ...) \
   typedef struct { \
     void *arg; \
     __return_type (*proc)(void *, __VA_ARGS__); \
@@ -335,8 +335,11 @@ typedef struct {
   //allocation hint about max sessoin and max stream
   int max_session_hint, max_stream_hint;
 
-  //total handshake time limit / no input limit. default 1000ms/5000ms
-  nq_time_t handshake_timeout, idle_timeout; 
+  //if set to true, max_session_hint will be hard limit
+  bool use_max_session_hint_as_limit;
+
+  //total handshake time limit / no input limit / shutdown wait. default 1000ms/5000ms/5sec
+  nq_time_t handshake_timeout, idle_timeout, shutdown_wait; 
 } nq_svconf_t;
 
 //create server which has n_worker of workers

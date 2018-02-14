@@ -20,6 +20,9 @@ std::unique_ptr<ProofVerifier> NqClientConfig::NewProofVerifier() const {
 const char NqServerConfig::kDefaultQuicSecret[] = "e3f0f228cd0517a1a303ca983184f5ef";
 void NqServerConfig::Setup() { //init other variables from client_
   ConfigureSelf(server_);
+  if (server_.shutdown_wait <= 0) {
+    server_.shutdown_wait = nq_time_sec(5);
+  }
 }
 std::unique_ptr<QuicCryptoServerConfig> 
 NqServerConfig::NewCryptoConfig(QuicClock *clock) const {

@@ -35,8 +35,9 @@ class NqDispatcher : public QuicDispatcher,
   typedef NqAlarm::Allocator AlarmAllocator;
   
   int port_, accept_per_loop_; 
-  uint32_t index_, n_worker_;
+  uint32_t index_, n_worker_, session_limit_;
   NqServer &server_;
+  const NqServerConfig &config_;
   std::unique_ptr<QuicCryptoServerConfig> crypto_config_;
   InvokeQueue *invoke_queues_; //only owns index_ th index. 
   NqServerLoop &loop_;
@@ -53,6 +54,9 @@ class NqDispatcher : public QuicDispatcher,
   NqDispatcher(int port, const NqServerConfig& config, 
                std::unique_ptr<QuicCryptoServerConfig> crypto_config, 
                NqWorker &worker);
+  void Shutdown();
+  bool ShutdownFinished(nq_time_t shutdown_start) const;
+  inline void Accept() { ProcessBufferedChlos(accept_per_loop_); }
   inline void Process(NqPacket *p) {
     {
       //get NqServerSession's mutex, which is corresponding to this packet's connection id
@@ -74,7 +78,7 @@ class NqDispatcher : public QuicDispatcher,
     }
     reader_.Pool(const_cast<char *>(p->data()), p);
   }
-  inline void Accept() { ProcessBufferedChlos(accept_per_loop_); }
+
   inline QuicCompressedCertsCache *cert_cache() { return &cert_cache_; }
   inline const QuicCryptoServerConfig *crypto_config() const { return crypto_config_.get(); }
   inline NqLoop *loop() { return &loop_; }

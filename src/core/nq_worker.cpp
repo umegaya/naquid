@@ -49,12 +49,27 @@ void NqWorker::Run(PacketQueue &pq) {
     }
     loop_.Poll();
   }
-  //last consume queue
-  //TODO(iyatomi): packet from another worker may dropped.
-  //somehow checking all the thread breaks main loop, before entering this last loop
-  while (pq.try_dequeue(p)) {
-    //pass packet to corresponding session
-    Process(p);
+  //shutdown proc
+  for (int i = 0; i < n_dispatcher; i++) {
+    ds[i]->Shutdown(); //send connection close for all sessions handled by this worker
+  }
+  //last consume queue with checking all sessions are gone
+  bool need_wait_shutdown = true;
+  auto shutdown_start = nq_time_now();
+  while (need_wait_shutdown) {
+    while (pq.try_dequeue(p)) {
+      //pass packet to corresponding session
+      Process(p);
+    }
+    //wait and process incoming event
+    need_wait_shutdown = false;
+    for (int i = 0; i < n_dispatcher; i++) {
+      iq[i]->Poll(ds[i]);
+      if (!ds[i]->ShutdownFinished(shutdown_start)) {
+        need_wait_shutdown = true;
+      }
+    }
+    loop_.Poll();
   }
 }
 bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {

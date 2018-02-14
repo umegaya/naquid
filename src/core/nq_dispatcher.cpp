@@ -25,7 +25,8 @@ NqDispatcher::NqDispatcher(int port, const NqServerConfig& config,
 	port_(port), 
   accept_per_loop_(config.server().accept_per_loop <= 0 ? kNumSessionsToCreatePerSocketEvent : config.server().accept_per_loop),
   index_(worker.index()), n_worker_(worker.server().n_worker()), 
-  server_(worker.server()), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
+  session_limit_(config.server().use_max_session_hint_as_limit ? config.server().max_session_hint : 0), 
+  server_(worker.server()), config_(config), crypto_config_(std::move(crypto_config)), loop_(worker.loop()), reader_(worker.reader()), 
   cert_cache_(config.server().quic_cert_cache_size <= 0 ? kDefaultCertCacheSize : config.server().quic_cert_cache_size), 
   thread_id_(worker.thread_id()), server_map_(), alarm_map_(), 
   session_allocator_(config.server().max_session_hint), stream_allocator_(config.server().max_stream_hint),
@@ -39,7 +40,37 @@ void NqDispatcher::SetFromConfig(const NqServerConfig &config) {
     buffered_packets().SetConnectionLifeSpan(QuicTime::Delta::FromMicroseconds(nq::clock::to_us(config.server().idle_timeout)));
   }
 }
-  
+void NqDispatcher::Shutdown() {
+  nq::logger::info({
+    {"msg", "shutdown start"},
+    {"worker_index", index_},
+    {"port", port_},
+  });
+  for (auto &kv : session_map()) {
+    const_cast<NqSession *>(static_cast<const NqSession *>(kv.second.get()))->delegate()->Disconnect();
+  }
+}
+bool NqDispatcher::ShutdownFinished(nq_time_t shutdown_start) const { 
+  if (session_map().size() <= 0) {
+    nq::logger::info({
+      {"msg", "all session disconnected"},
+      {"worker_index", index_},
+      {"port", port_},
+    });
+    return true;
+  } else if ((shutdown_start + config_.server().shutdown_wait) < nq_time_now()) {
+    nq::logger::info({
+      {"msg", "shutdown timeout"},
+      {"worker_index", index_},
+      {"port", port_},
+      {"shutdown_start", shutdown_start},
+      {"shutdown_wait", config_.server().shutdown_wait},
+    });
+    return true;
+  } else {
+    return false;
+  }
+}
 
 
 
@@ -85,11 +116,18 @@ void NqDispatcher::OnRecv(NqPacket *packet) {
 
 //implements QuicCryptoServerStream::Helper
 bool NqDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                                            const QuicSocketAddress& self_address,
-                                            std::string* error_details) const {
+                                        const QuicSocketAddress& self_address,
+                                        std::string* error_details) const {
   //TODO(iyatomi): reject when number of connection is too much, getting the config and 
   //total connection number from server_.
   //TODO(iyatomi): if entering shutdown mode, always return false 
+  if (!server_.alive()) {
+    *error_details = "server entering graceful shutdown";
+    return false;
+  } else if (session_limit_ > 0 && session_map().size() >= session_limit_) {
+    *error_details = "session count exceeds limit";
+    return false;
+  }
   return true;
 }
 
