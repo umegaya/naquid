@@ -5,6 +5,7 @@
 #include "reconnect.h"
 #include "resolver.h"
 #include "task.h"
+#include "shutdown.h"
 
 using namespace nqtest;
 
@@ -20,6 +21,7 @@ extern bool is_packet_received(uint64_t cid) {
 
 
 void test_suites(const nq_addr_t &addr, bool skip = true) {
+  #if 1
   TRACE("==================== test_resolver ====================");
   {
     Test t(addr, test_resolver);
@@ -73,12 +75,13 @@ void test_suites(const nq_addr_t &addr, bool skip = true) {
     Test t(tmp, test_reconnect_server);
     if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_server fails"); }
   }//*/
-  /*{
-    auto tmp = addr;
-    tmp.port = 18443;
-    Test t(addr, test_reconnect_stress, 64);
-    if (!t.Run()) { ALERT_AND_EXIT("test_reconnect_stress fails"); }
+  #endif
+  TRACE("==================== test_shutdown ====================");
+  {
+    Test t(addr, test_shutdown);
+    if (!t.Run()) { ALERT_AND_EXIT("test_shutdown fails"); }
   }//*/
+
 }
 
 int main(int argc, char *argv[]){

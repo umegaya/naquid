@@ -9,6 +9,7 @@ using namespace nqtest;
 
 static const int kThreads = 1;  //1 thread server
 static const char NotifySuccess[] = "notify success";
+static bool g_shutdown_start = false;
 
 //#define STORE_DETAIL
 #if defined(STORE_DETAIL)
@@ -232,6 +233,11 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
 
       }
       break;
+    case RpcType::Shutdown:
+      {
+        g_shutdown_start = true;
+      }
+      break;
   }
 }
 void on_rpc_reply(void *p, nq_rpc_t rpc, nq_error_t result, const void *data, nq_size_t len) {
@@ -352,6 +358,7 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   conf.max_stream_hint = 1024 * 4;
   conf.handshake_timeout = nq_time_sec(120);
   conf.idle_timeout = nq_time_sec(60);
+  conf.shutdown_wait = nq_time_sec(5);
   CONFIG_CB(svconfig, on_server_conn_open, on_conn_open, conf.on_open);
   nq_closure_init(conf.on_close, on_server_conn_close, on_conn_close, nullptr);
 
@@ -393,6 +400,15 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   }
 }
 
+static void wait_shutdown(int sd_sec) {
+  if (sd_sec <= 0) {
+    while (!g_shutdown_start) {
+      nq_time_sleep(nq_time_msec(500));
+    }
+  } else {
+    nq_time_sleep(nq_time_sec(sd_sec));
+  }
+}
 
 
 /* main */
@@ -402,7 +418,7 @@ int main(int argc, char *argv[]){
 #endif
   int n_threads = kThreads;
   bool block_main = false;
-  int wait_sec = 60;
+  int wait_sec = 0;
   if (argc > 1) {
     n_threads = nq::convert::Do(argv[1], kThreads);
     if (argc > 2) {
@@ -442,7 +458,7 @@ int main(int argc, char *argv[]){
 
   if (block_main) {
     auto t = std::thread([sv, wait_sec]() {
-      nq_time_sleep(nq_time_sec(wait_sec));
+      wait_shutdown(wait_sec);
       nq_server_join(sv);
     });
 
@@ -450,7 +466,7 @@ int main(int argc, char *argv[]){
     t.join();
   } else {
     nq_server_start(sv, false);
-    nq_time_sleep(nq_time_sec(wait_sec));
+    wait_shutdown(wait_sec);
     nq_server_join(sv);
   }
 

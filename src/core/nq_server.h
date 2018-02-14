@@ -100,6 +100,7 @@ class NqServer {
 		return NQ_OK;
 	}
   void Join() {
+    if (!alive()) { return; }
     {
       std::unique_lock<std::mutex> lock(mutex_); //wait for Stop() call finished
       status_ = TERMINATING;

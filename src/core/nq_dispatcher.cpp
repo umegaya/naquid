@@ -53,14 +53,16 @@ void NqDispatcher::Shutdown() {
 bool NqDispatcher::ShutdownFinished(nq_time_t shutdown_start) const { 
   if (session_map().size() <= 0) {
     nq::logger::info({
-      {"msg", "all session disconnected"},
+      {"msg", "shutdown finished"},
+      {"reason", "all session closed"},
       {"worker_index", index_},
       {"port", port_},
     });
     return true;
   } else if ((shutdown_start + config_.server().shutdown_wait) < nq_time_now()) {
-    nq::logger::info({
-      {"msg", "shutdown timeout"},
+    nq::logger::error({
+      {"msg", "shutdown finished"},
+      {"reason", "timeout"},
       {"worker_index", index_},
       {"port", port_},
       {"shutdown_start", shutdown_start},

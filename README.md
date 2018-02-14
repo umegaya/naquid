@@ -28,7 +28,7 @@
 - [ ] API: provide different type for each closure (now unified as nq_closure_t)
 - [x] server: QuicAlarm should be more efficient
   - maybe better to more generalize NqLoop's alarm system and enable to directly call delegate object 
-- [ ] server: graceful shutdown
+- [x] server: graceful shutdown
   - stop accepting connection and wait until all request in the worker queue consumed
 - [x] test: high frequent reconnection test
 - [x] test: server side stream initiation

@@ -11,6 +11,7 @@ namespace nqtest {
     SetupReject = 7,
     BcastJoin = 8,
     BcastReply = 9,
+    Shutdown = 10,
 
     ServerRequest = 10000,
     BcastNotify = 10001,

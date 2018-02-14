@@ -50,7 +50,9 @@ void NqWorker::Run(PacketQueue &pq) {
     loop_.Poll();
   }
   //shutdown proc
+  bool per_worker_shutdown_state[n_dispatcher];
   for (int i = 0; i < n_dispatcher; i++) {
+    per_worker_shutdown_state[i] = false;
     ds[i]->Shutdown(); //send connection close for all sessions handled by this worker
   }
   //last consume queue with checking all sessions are gone
@@ -65,8 +67,11 @@ void NqWorker::Run(PacketQueue &pq) {
     need_wait_shutdown = false;
     for (int i = 0; i < n_dispatcher; i++) {
       iq[i]->Poll(ds[i]);
-      if (!ds[i]->ShutdownFinished(shutdown_start)) {
+      if (per_worker_shutdown_state[i]) {
+      } else if (!ds[i]->ShutdownFinished(shutdown_start)) {
         need_wait_shutdown = true;
+      } else {
+        per_worker_shutdown_state[i] = true;
       }
     }
     loop_.Poll();
