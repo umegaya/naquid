@@ -33,7 +33,7 @@ class NqServer {
     TERMINATED,
   };
  protected:
-  nq::atomic<uint32_t> status_;
+  nq::atomic<Status> status_;
   uint32_t n_worker_;
 	std::unique_ptr<PacketQueue[]> worker_queue_;
   std::map<int, std::unique_ptr<InvokeQueue[]>> invoke_queues_list_;

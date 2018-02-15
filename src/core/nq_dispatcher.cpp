@@ -45,9 +45,13 @@ void NqDispatcher::Shutdown() {
     {"msg", "shutdown start"},
     {"worker_index", index_},
     {"port", port_},
+    {"session_remain", session_map().size()},
   });
-  for (auto &kv : session_map()) {
-    const_cast<NqSession *>(static_cast<const NqSession *>(kv.second.get()))->delegate()->Disconnect();
+  auto it = session_map().begin();
+  for (; it != session_map().end(); ) {
+    auto it_prev = it;
+    it++;
+    const_cast<NqSession *>(static_cast<const NqSession *>(it_prev->second.get()))->delegate()->Disconnect();
   }
 }
 bool NqDispatcher::ShutdownFinished(nq_time_t shutdown_start) const { 
