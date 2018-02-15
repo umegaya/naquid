@@ -2,6 +2,8 @@
 #include <nq.h>
 #include <basis/defs.h>
 #include <basis/endian.h>
+#include <core/nq_closure.h>
+
 
 #include "rpctypes.h"
 
@@ -15,21 +17,16 @@
 
 namespace nqtest {
 
-class ClosureCallerBase {
- public:
-  virtual ~ClosureCallerBase() {};
-  virtual nq_closure_t closure() = 0;
-};
-
-class ReplyClosureCaller : public ClosureCallerBase {
+//specific purpose
+class ReplyClosureCaller {
  public:
   std::function<void (nq_rpc_t, nq_error_t, const void *, nq_size_t)> cb_;
  public:
   ReplyClosureCaller() : cb_() {}
-  ~ReplyClosureCaller() override {}
-  nq_closure_t closure() override {
-    nq_closure_t clsr;
-    nq_closure_init(clsr, on_rpc_reply, &ReplyClosureCaller::Call, this);
+  ~ReplyClosureCaller() {}
+  nq_on_rpc_reply_t reply_closure() {
+    nq_on_rpc_reply_t clsr;
+    nq_closure_init(clsr, &ReplyClosureCaller::Call, this);
     return clsr;
   }
   static void Call(void *arg, nq_rpc_t rpc, nq_error_t r, const void *p, nq_size_t l) {
@@ -37,6 +34,136 @@ class ReplyClosureCaller : public ClosureCallerBase {
     pcc->cb_(rpc, r, p, l);
     delete pcc;
   }
+};
+class AlarmClosureCaller {
+ public:
+  std::function<void (nq_time_t*)> cb_;
+ public:
+  AlarmClosureCaller() : cb_() {}
+  ~AlarmClosureCaller() {}
+  nq_on_alarm_t alarm_closure() {
+    nq_on_alarm_t clsr;
+    nq_closure_init(clsr, &AlarmClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_time_t *tm) { 
+    auto pcc = (AlarmClosureCaller *)arg;
+    auto ptm = *tm;
+    pcc->cb_(tm);
+    if (*tm != 0 && *tm <= ptm) {
+      delete pcc;
+    }
+  }  
+};
+class StreamTaskClosureCaller {
+ public:
+  bool is_stream_;
+  std::function<void (nq_rpc_t rpc)> cb_;
+  std::function<void (nq_stream_t s)> stream_cb_;
+ public:
+  StreamTaskClosureCaller() : cb_() {}
+  StreamTaskClosureCaller(std::function<void (nq_rpc_t)> cb) : is_stream_(false), cb_(cb) {}
+  StreamTaskClosureCaller(std::function<void (nq_stream_t)> cb) : is_stream_(true), stream_cb_(cb) {}
+  ~StreamTaskClosureCaller() {}
+  nq_on_rpc_task_t rpc_closure() {
+    nq_on_rpc_task_t clsr;
+    nq_closure_init(clsr, &StreamTaskClosureCaller::Call, this);
+    return clsr;
+  }
+  nq_on_stream_task_t stream_closure() {
+    nq_on_stream_task_t clsr;
+    nq_closure_init(clsr, &StreamTaskClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_stream_t s) { 
+    auto pcc = (StreamTaskClosureCaller *)arg;
+    return pcc->stream_cb_(s);
+  }  
+  static void Call(void *arg, nq_rpc_t rpc) { 
+    auto pcc = (StreamTaskClosureCaller *)arg;
+    return pcc->cb_(rpc);
+  }  
+  inline void InvokeTask(nq_rpc_t rpc) {
+    nq_rpc_task(rpc, rpc_closure());
+  }
+  inline void InvokeTask(nq_stream_t s) {
+    nq_stream_task(s, stream_closure());
+  }  
+};
+class ModifyHdmapClosureCaller {
+ public:
+  std::function<void (nq_hdmap_t hdmap)> cb_;
+ public:
+  ModifyHdmapClosureCaller(std::function<void (nq_hdmap_t hdmap)> cb) : cb_(cb) {}
+  ~ModifyHdmapClosureCaller() {}
+  nq_on_conn_modify_hdmap_t modify_hdmap_closure() {
+    nq_on_conn_modify_hdmap_t clsr;
+    nq_closure_init(clsr, &ModifyHdmapClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_hdmap_t hm) { 
+    auto pcc = (ModifyHdmapClosureCaller *)arg;
+    pcc->cb_(hm);
+    delete pcc;
+  }  
+};
+class ResolveHostClosureCaller {
+ public:
+  std::function<void (nq_error_t, const nq_error_detail_t *, const char *, nq_size_t)> cb_;
+ public:
+  ResolveHostClosureCaller(std::function<void (nq_error_t, const nq_error_detail_t *, const char *, nq_size_t)> cb) : cb_(cb) {}
+  ~ResolveHostClosureCaller() {}
+  nq_on_resolve_host_t resolve_host_closure() {
+    nq_on_resolve_host_t clsr;
+    nq_closure_init(clsr, &ResolveHostClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, nq_error_t r, const nq_error_detail_t *d, const char *p, nq_size_t l) { 
+    auto pcc = (ResolveHostClosureCaller *)arg;
+    pcc->cb_(r, d, p, l);
+    delete pcc;
+  }    
+};
+class StreamAckClosureCaller {
+ public:
+  std::function<void (int, nq_time_t)> cb_;
+ public:
+  StreamAckClosureCaller(std::function<void (int, nq_time_t)> cb) : cb_(cb) {}
+  ~StreamAckClosureCaller() {}
+  nq_on_stream_ack_t closure() {
+    nq_on_stream_ack_t clsr;
+    nq_closure_init(clsr, &StreamAckClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, int byte, nq_time_t delay_ns) { 
+    auto pcc = (StreamAckClosureCaller *)arg;
+    pcc->cb_(byte, delay_ns);
+    delete pcc;
+  }    
+};
+class StreamRetransmitClosureCaller {
+ public:
+  std::function<void (int)> cb_;
+ public:
+  StreamRetransmitClosureCaller(std::function<void (int)> cb) : cb_(cb) {}
+  ~StreamRetransmitClosureCaller() {}
+  nq_on_stream_retransmit_t closure() {
+    nq_on_stream_retransmit_t clsr;
+    nq_closure_init(clsr, &StreamRetransmitClosureCaller::Call, this);
+    return clsr;
+  }
+  static void Call(void *arg, int byte) { 
+    auto pcc = (StreamRetransmitClosureCaller *)arg;
+    pcc->cb_(byte);
+  }    
+};
+
+
+//for inserting into generic collection of callback closure
+class ClosureCallerBase {
+ public:
+  virtual ~ClosureCallerBase() {};
+  virtual nq_closure_t closure() = 0;
 };
 
 class RpcRequestClosureCaller : public ClosureCallerBase {
@@ -47,7 +174,7 @@ class RpcRequestClosureCaller : public ClosureCallerBase {
   ~RpcRequestClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_rpc_request, &RpcRequestClosureCaller::Call, this);
+    nq_dyn_closure_init(clsr, on_rpc_request, &RpcRequestClosureCaller::Call, this);
     return clsr;
   }
   static void Call(void *arg, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, const void *p, nq_size_t l) {
@@ -63,7 +190,7 @@ class RpcNotifyClosureCaller : public ClosureCallerBase {
   ~RpcNotifyClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_rpc_notify, &RpcNotifyClosureCaller::Call, this);
+    nq_dyn_closure_init(clsr, on_rpc_notify, &RpcNotifyClosureCaller::Call, this);
     return clsr;
   }
   static void Call(void *arg, nq_rpc_t rpc, uint16_t type, const void *p, nq_size_t l) {
@@ -79,7 +206,7 @@ class StreamRecordClosureCaller : public ClosureCallerBase {
   ~StreamRecordClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_stream_record, &StreamRecordClosureCaller::Call, this);
+    nq_dyn_closure_init(clsr, on_stream_record, &StreamRecordClosureCaller::Call, this);
     return clsr;
   }
   static void Call(void *arg, nq_stream_t s, const void * p, nq_size_t l) { 
@@ -100,9 +227,9 @@ class ConnOpenStreamClosureCaller : public ClosureCallerBase {
   nq_closure_t closure() override {
     nq_closure_t clsr;
     if (is_stream_) {
-      nq_closure_init(clsr, on_stream_open, &ConnOpenStreamClosureCaller::CallStream, this);
+      nq_dyn_closure_init(clsr, on_stream_open, &ConnOpenStreamClosureCaller::CallStream, this);
     } else {
-      nq_closure_init(clsr, on_rpc_open, &ConnOpenStreamClosureCaller::Call, this);
+      nq_dyn_closure_init(clsr, on_rpc_open, &ConnOpenStreamClosureCaller::Call, this);
     }
     return clsr;
   }
@@ -128,9 +255,9 @@ class ConnCloseStreamClosureCaller : public ClosureCallerBase {
   nq_closure_t closure() override {
     nq_closure_t clsr;
     if (is_stream_) {
-      nq_closure_init(clsr, on_stream_close, &ConnCloseStreamClosureCaller::CallStream, this);
+      nq_dyn_closure_init(clsr, on_stream_close, &ConnCloseStreamClosureCaller::CallStream, this);
     } else {
-      nq_closure_init(clsr, on_rpc_close, &ConnCloseStreamClosureCaller::Call, this);
+      nq_dyn_closure_init(clsr, on_rpc_close, &ConnCloseStreamClosureCaller::Call, this);
     }
     return clsr;
   }
@@ -151,7 +278,7 @@ class ConnOpenClosureCaller : public ClosureCallerBase {
   ~ConnOpenClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_client_conn_open, &ConnOpenClosureCaller::Call, this);
+    nq_dyn_closure_init(clsr, on_client_conn_open, &ConnOpenClosureCaller::Call, this);
     return clsr;
   }
   static void Call(void *arg, nq_conn_t conn, void **ppctx) { 
@@ -167,7 +294,7 @@ class ConnCloseClosureCaller : public ClosureCallerBase {
   ~ConnCloseClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_client_conn_close, &ConnCloseClosureCaller::Call, this);
+    nq_dyn_closure_init(clsr, on_client_conn_close, &ConnCloseClosureCaller::Call, this);
     return clsr;
   }
   static nq_time_t Call(void *arg, nq_conn_t conn, nq_error_t result, const nq_error_detail_t *detail, bool from_remote) { 
@@ -183,7 +310,7 @@ class ConnFinalizeClosureCaller : public ClosureCallerBase {
   ~ConnFinalizeClosureCaller() override {}
   nq_closure_t closure() override {
     nq_closure_t clsr;
-    nq_closure_init(clsr, on_client_conn_finalize, &ConnFinalizeClosureCaller::Call, this);
+    nq_dyn_closure_init(clsr, on_client_conn_finalize, &ConnFinalizeClosureCaller::Call, this);
     return clsr;
   }
   static void Call(void *arg, nq_conn_t conn, void *ctx) { 
@@ -191,127 +318,7 @@ class ConnFinalizeClosureCaller : public ClosureCallerBase {
     return pcc->cb_(conn, ctx);
   }
 };
-class AlarmClosureCaller : public ClosureCallerBase {
- public:
-  std::function<void (nq_time_t*)> cb_;
- public:
-  AlarmClosureCaller() : cb_() {}
-  ~AlarmClosureCaller() override {}
-  nq_closure_t closure() override {
-    nq_closure_t clsr;
-    nq_closure_init(clsr, on_alarm, &AlarmClosureCaller::Call, this);
-    return clsr;
-  }
-  static void Call(void *arg, nq_time_t *tm) { 
-    auto pcc = (AlarmClosureCaller *)arg;
-    auto ptm = *tm;
-    pcc->cb_(tm);
-    if (*tm != 0 && *tm <= ptm) {
-      delete pcc;
-    }
-  }  
-};
-class StreamTaskClosureCaller : public ClosureCallerBase {
- public:
-  bool is_stream_;
-  std::function<void (nq_rpc_t rpc)> cb_;
-  std::function<void (nq_stream_t s)> stream_cb_;
- public:
-  StreamTaskClosureCaller() : cb_() {}
-  StreamTaskClosureCaller(std::function<void (nq_rpc_t)> cb) : is_stream_(false), cb_(cb) {}
-  StreamTaskClosureCaller(std::function<void (nq_stream_t)> cb) : is_stream_(true), stream_cb_(cb) {}
-  ~StreamTaskClosureCaller() override {}
-  nq_closure_t closure() override {
-    nq_closure_t clsr;
-    if (is_stream_) {
-      nq_closure_init(clsr, on_stream_task, &StreamTaskClosureCaller::Call, this);
-    } else {
-      nq_closure_init(clsr, on_rpc_task, &StreamTaskClosureCaller::Call, this);
-    }
-    return clsr;
-  }
-  static void Call(void *arg, nq_stream_t s) { 
-    auto pcc = (StreamTaskClosureCaller *)arg;
-    return pcc->stream_cb_(s);
-  }  
-  static void Call(void *arg, nq_rpc_t rpc) { 
-    auto pcc = (StreamTaskClosureCaller *)arg;
-    return pcc->cb_(rpc);
-  }  
-  inline void InvokeTask(nq_rpc_t rpc) {
-    nq_rpc_task(rpc, closure());
-  }
-  inline void InvokeTask(nq_stream_t s) {
-    nq_stream_task(s, closure());
-  }  
-};
-class ModifyHdmapClosureCaller : public ClosureCallerBase {
- public:
-  std::function<void (nq_hdmap_t hdmap)> cb_;
- public:
-  ModifyHdmapClosureCaller(std::function<void (nq_hdmap_t hdmap)> cb) : cb_(cb) {}
-  ~ModifyHdmapClosureCaller() override {}
-  nq_closure_t closure() override {
-    nq_closure_t clsr;
-    nq_closure_init(clsr, on_conn_modify_hdmap, &ModifyHdmapClosureCaller::Call, this);
-    return clsr;
-  }
-  static void Call(void *arg, nq_hdmap_t hm) { 
-    auto pcc = (ModifyHdmapClosureCaller *)arg;
-    pcc->cb_(hm);
-    delete pcc;
-  }  
-};
-class StreamAckClosureCaller : public ClosureCallerBase {
- public:
-  std::function<void (int, nq_time_t)> cb_;
- public:
-  StreamAckClosureCaller(std::function<void (int, nq_time_t)> cb) : cb_(cb) {}
-  ~StreamAckClosureCaller() override {}
-  nq_closure_t closure() override {
-    nq_closure_t clsr;
-    nq_closure_init(clsr, on_stream_ack, &StreamAckClosureCaller::Call, this);
-    return clsr;
-  }
-  static void Call(void *arg, int byte, nq_time_t delay_ns) { 
-    auto pcc = (StreamAckClosureCaller *)arg;
-    pcc->cb_(byte, delay_ns);
-    delete pcc;
-  }    
-};
-class StreamRetransmitClosureCaller : public ClosureCallerBase {
- public:
-  std::function<void (int)> cb_;
- public:
-  StreamRetransmitClosureCaller(std::function<void (int)> cb) : cb_(cb) {}
-  ~StreamRetransmitClosureCaller() override {}
-  nq_closure_t closure() override {
-    nq_closure_t clsr;
-    nq_closure_init(clsr, on_stream_retransmit, &StreamRetransmitClosureCaller::Call, this);
-    return clsr;
-  }
-  static void Call(void *arg, int byte) { 
-    auto pcc = (StreamRetransmitClosureCaller *)arg;
-    pcc->cb_(byte);
-  }    
-};
-class ResolveHostClosureCaller : public ClosureCallerBase {
- public:
-  std::function<void (nq_error_t, const nq_error_detail_t *, const char *, nq_size_t)> cb_;
- public:
-  ResolveHostClosureCaller(std::function<void (nq_error_t, const nq_error_detail_t *, const char *, nq_size_t)> cb) : cb_(cb) {}
-  ~ResolveHostClosureCaller() override {}
-  nq_closure_t closure() override {
-    nq_closure_t clsr;
-    nq_closure_init(clsr, on_resolve_host, &ResolveHostClosureCaller::Call, this);
-    return clsr;
-  }
-  static void Call(void *arg, nq_error_t r, const nq_error_detail_t *d, const char *p, nq_size_t l) { 
-    auto pcc = (ResolveHostClosureCaller *)arg;
-    pcc->cb_(r, d, p, l);
-    delete pcc;
-  }    
-};
+
 
 
 
@@ -584,18 +591,18 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
 #define RPC(stream, type, buff, blen, callback) { \
   auto *pcc = new nqtest::ReplyClosureCaller(); \
   pcc->cb_ = callback; \
-  nq_rpc_call(stream, type, buff, blen, pcc->closure()); \
+  nq_rpc_call(stream, type, buff, blen, pcc->reply_closure()); \
 }
 #define ALARM(a, first, callback) {\
   auto *pcc = new nqtest::AlarmClosureCaller(); \
   pcc->cb_ = callback; \
-  nq_alarm_set(a, nq_time_now() + first, pcc->closure()); \
+  nq_alarm_set(a, nq_time_now() + first, pcc->alarm_closure()); \
 }
 #define RPCEX(stream, type, buff, blen, cb, to) { \
   auto *pcc = new nqtest::ReplyClosureCaller(); \
   pcc->cb_ = cb; \
   nq_rpc_opt_t opt; \
-  opt.callback = pcc->closure(); \
+  opt.callback = pcc->reply_closure(); \
   opt.timeout = to; \
   nq_rpc_call_ex(stream, type, buff, blen, &opt); \
 }
@@ -616,11 +623,11 @@ static inline std::string MakeString(const void *pvoid, nq_size_t length) {
 }
 #define MODIFY_HDMAP(conn, callback) { \
   auto *pcc = new nqtest::ModifyHdmapClosureCaller(callback); \
-  nq_conn_modify_hdmap(conn, pcc->closure()); \
+  nq_conn_modify_hdmap(conn, pcc->modify_hdmap_closure()); \
 }
 #define RESOLVE(client, family_pref, hostname, callback) { \
   auto *pcc = new nqtest::ResolveHostClosureCaller(callback); \
-  nq_client_resolve_host(client, family_pref, hostname, pcc->closure()); \
+  nq_client_resolve_host(client, family_pref, hostname, pcc->resolve_host_closure()); \
 }
 
 

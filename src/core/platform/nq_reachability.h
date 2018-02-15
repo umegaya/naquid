@@ -17,13 +17,13 @@ class NqReachability {
   virtual void Stop() = 0;
 
   //user must create/destroy instance via this function
-  static NqReachability *Create(nq_closure_t cb);
+  static NqReachability *Create(nq_on_reachability_change_t cb);
   static void Destroy(NqReachability *r) { delete r; }
  protected:
-  NqReachability(nq_closure_t cb) : observer_(cb) {}
+  NqReachability(nq_on_reachability_change_t cb) : observer_(cb) {}
   virtual ~NqReachability() {}
 
   Status current_state_;
-  nq_closure_t observer_;
+  nq_on_reachability_change_t observer_;
 };
 }

@@ -42,23 +42,22 @@ struct NqDnsQueryForClient : public NqDnsQuery {
     };
     //call on close with empty nq_conn_t. 
     nq_conn_t empty = {{{0}}, nullptr};
-    nq_closure_call(config_.client().on_close, on_client_conn_close, 
-      empty, NQ_ERESOLVE, &detail, false);
+    nq_closure_call(config_.client().on_close, empty, NQ_ERESOLVE, &detail, false);
   }
 };
 
 struct NqDnsQueryForClosure : public NqDnsQuery {
-  nq_closure_t cb_;
+  nq_on_resolve_host_t cb_;
   void OnComplete(int status, int timeouts, struct hostent *entries) override {
     if (ARES_SUCCESS == status) {
-      nq_closure_call(cb_, on_resolve_host, NQ_OK, nullptr, 
+      nq_closure_call(cb_, NQ_OK, nullptr, 
         entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype));
     } else {
       nq_error_detail_t detail = {
         .code = status,
         .msg = ares_strerror(status),
       };
-      nq_closure_call(cb_, on_resolve_host, NQ_ERESOLVE, &detail, nullptr, 0);
+      nq_closure_call(cb_, NQ_ERESOLVE, &detail, nullptr, 0);
     }
   }  
 };
@@ -103,7 +102,7 @@ bool NqClientLoop::Resolve(int family_pref, const std::string &host, int port, c
   async_resolver_.StartResolve(q);  
   return true;
 }
-bool NqClientLoop::Resolve(int family_pref, const std::string &host, nq_closure_t cb) {
+bool NqClientLoop::Resolve(int family_pref, const std::string &host, nq_on_resolve_host_t cb) {
   auto q = new NqDnsQueryForClosure;
   q->host_ = host;
   q->family_ = family_pref;

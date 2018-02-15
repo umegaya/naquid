@@ -88,16 +88,16 @@ class NqAlarmBase : public NqAlarmInterface {
   }
 };
 class NqAlarm : public NqAlarmBase {
-  nq_closure_t cb_;
+  nq_on_alarm_t cb_;
   NqBoxer *boxer_;
   NqSerial alarm_serial_;
  public:
   typedef nq::Allocator<NqAlarm> Allocator;
 
-  NqAlarm() : NqAlarmBase(), cb_(nq_closure_empty()), alarm_serial_() {}
+  NqAlarm() : NqAlarmBase(), alarm_serial_() { cb_ = nq_closure_empty(); }
   ~NqAlarm() override { alarm_serial_.Clear(); }
 
-  inline void Start(NqLoop *loop, nq_time_t first_invocation_ts, nq_closure_t cb) {
+  inline void Start(NqLoop *loop, nq_time_t first_invocation_ts, nq_on_alarm_t cb) {
     TRACE("NqAlarm Start:%p", this);
     cb_ = cb;
     NqAlarmBase::Start(loop, first_invocation_ts);

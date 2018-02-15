@@ -17,7 +17,7 @@ void Test::OnConnOpen(void *arg, nq_conn_t c, void **ppctx) {
     nq_closure_t clsr;
     if (tc->FindClosure(CallbackType::ConnOpen, clsr)) {
       TRACE("OnConnOpen: call closure, %d", tc->disconnect);
-      nq_closure_call(clsr, on_client_conn_open, c, ppctx);
+      nq_dyn_closure_call(clsr, on_client_conn_open, c, ppctx);
     }
     TRACE("OnConnOpen: no closure, %d", tc->disconnect);
     return; 
@@ -36,7 +36,7 @@ nq_time_t Test::OnConnClose(void *arg, nq_conn_t c, nq_error_t r, const nq_error
   nq_closure_t clsr;
   if (tc->FindClosure(CallbackType::ConnClose, clsr)) {
     TRACE("OnConnClose: call closure, %d %s", tc->disconnect, detail->msg);
-    return nq_closure_call(clsr, on_client_conn_close, c, r, detail, close_from_remote);
+    return nq_dyn_closure_call(clsr, on_client_conn_close, c, r, detail, close_from_remote);
   }
   TRACE("OnConnClose: no closure set yet, %d %s", tc->disconnect, detail->msg);
   return nq_time_sec(1);
@@ -46,7 +46,7 @@ void Test::OnConnFinalize(void *arg, nq_conn_t c, void *ctx) {
   tc->t->closed_conn_++;
   nq_closure_t clsr;
   if (tc->FindClosure(CallbackType::ConnFinalize, clsr)) {
-    nq_closure_call(clsr, on_client_conn_finalize, c, ctx);
+    nq_dyn_closure_call(clsr, on_client_conn_finalize, c, ctx);
   }
 }
 
@@ -58,12 +58,12 @@ bool Test::OnStreamOpen(void *arg, nq_stream_t s, void **ppctx) {
   if (*ppctx != nullptr) {
     auto cc = (ConnOpenStreamClosureCaller *)(*ppctx);
     *ppctx = nullptr;
-    nq_closure_call(cc->closure(), on_stream_open, s, ppctx);   
+    nq_dyn_closure_call(cc->closure(), on_stream_open, s, ppctx);   
     delete cc;
   }
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {
-    return nq_closure_call(clsr, on_stream_open, s, ppctx);   
+    return nq_dyn_closure_call(clsr, on_stream_open, s, ppctx);   
   }
   return true;
 }
@@ -71,7 +71,7 @@ void Test::OnStreamClose(void *arg, nq_stream_t s) {
   auto c = (Conn *)arg;
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnCloseStream, clsr)) {
-    nq_closure_call(clsr, on_stream_close, s);    
+    nq_dyn_closure_call(clsr, on_stream_close, s);    
   }
   c->RemoveStream(s);
 }
@@ -79,7 +79,7 @@ void Test::OnStreamRecord(void *arg, nq_stream_t s, const void *data, nq_size_t 
   auto c = (Conn *)arg;
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::StreamRecord, s, clsr)) {
-    nq_closure_call(clsr, on_stream_record, s, data, len);    
+    nq_dyn_closure_call(clsr, on_stream_record, s, data, len);    
   } else {
     c->records.push_back(MakeString(data, len));
   }
@@ -88,7 +88,7 @@ void Test::OnStreamRecordSimple(void *arg, nq_stream_t s, const void *data, nq_s
   auto c = (Conn *)arg;
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::StreamRecord, s, clsr)) {
-    nq_closure_call(clsr, on_stream_record, s, data, len);    
+    nq_dyn_closure_call(clsr, on_stream_record, s, data, len);    
   } else {
    c->records.push_back(MakeString(data, len));
   }
@@ -128,12 +128,12 @@ bool Test::OnRpcOpen(void *arg, nq_rpc_t rpc, void **ppctx) {
   if (*ppctx != nullptr) {
     auto cc = (ConnOpenStreamClosureCaller *)(*ppctx);
     *ppctx = nullptr;
-    nq_closure_call(cc->closure(), on_rpc_open, rpc, ppctx);   
+    nq_dyn_closure_call(cc->closure(), on_rpc_open, rpc, ppctx);   
     delete cc;
   }
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnOpenStream, clsr)) {
-    return nq_closure_call(clsr, on_rpc_open, rpc, ppctx);    
+    return nq_dyn_closure_call(clsr, on_rpc_open, rpc, ppctx);    
   }
   return true;
 }
@@ -141,7 +141,7 @@ void Test::OnRpcClose(void *arg, nq_rpc_t rpc) {
   auto c = (Conn *)arg;
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::ConnCloseStream, clsr)) {
-    nq_closure_call(clsr, on_rpc_close, rpc);    
+    nq_dyn_closure_call(clsr, on_rpc_close, rpc);    
   }
   c->RemoveStream(rpc);
 }
@@ -149,7 +149,7 @@ void Test::OnRpcRequest(void *arg, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid
   auto c = (Conn *)arg;
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::RpcRequest, rpc, clsr)) {
-    nq_closure_call(clsr, on_rpc_request, rpc, type, msgid, data, dlen);    
+    nq_dyn_closure_call(clsr, on_rpc_request, rpc, type, msgid, data, dlen);    
   } else {
     RequestData r = {
       .type = type,
@@ -163,7 +163,7 @@ void Test::OnRpcNotify(void *arg, nq_rpc_t rpc, uint16_t type, const void *data,
   auto c = (Conn *)arg;
   nq_closure_t clsr;
   if (c->FindClosure(CallbackType::RpcNotify, rpc, clsr)) {
-    nq_closure_call(clsr, on_rpc_notify, rpc, type, data, dlen);    
+    nq_dyn_closure_call(clsr, on_rpc_notify, rpc, type, data, dlen);    
   } else {
     NotifyData r = {
       .type = type,
@@ -179,28 +179,28 @@ void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
     auto ptc = &tc;
 
     nq_rpc_handler_t rh;
-    nq_closure_init(rh.on_rpc_open, on_rpc_open, &Test::OnRpcOpen, ptc);
-    nq_closure_init(rh.on_rpc_close, on_rpc_close, &Test::OnRpcClose, ptc);
-    nq_closure_init(rh.on_rpc_request, on_rpc_request, &Test::OnRpcRequest, ptc);
-    nq_closure_init(rh.on_rpc_notify, on_rpc_notify, &Test::OnRpcNotify, ptc);
+    nq_closure_init(rh.on_rpc_open, &Test::OnRpcOpen, ptc);
+    nq_closure_init(rh.on_rpc_close, &Test::OnRpcClose, ptc);
+    nq_closure_init(rh.on_rpc_request, &Test::OnRpcRequest, ptc);
+    nq_closure_init(rh.on_rpc_notify, &Test::OnRpcNotify, ptc);
     rh.use_large_msgid = false;
     rh.timeout = options.rpc_timeout;
     nq_hdmap_rpc_handler(hm, "rpc", rh);
     //tc.AddStream(nq_conn_rpc(tc.c, "rpc"));
 
     nq_stream_handler_t rsh;
-    nq_closure_init(rsh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
-    nq_closure_init(rsh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
-    nq_closure_init(rsh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
-    nq_closure_init(rsh.stream_reader, stream_reader, &Test::StreamReader, ptc);
-    nq_closure_init(rsh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
+    nq_closure_init(rsh.on_stream_open, &Test::OnStreamOpen, ptc);
+    nq_closure_init(rsh.on_stream_close, &Test::OnStreamClose, ptc);
+    nq_closure_init(rsh.on_stream_record, &Test::OnStreamRecord, ptc);
+    nq_closure_init(rsh.stream_reader, &Test::StreamReader, ptc);
+    nq_closure_init(rsh.stream_writer, &Test::StreamWriter, ptc);
     nq_hdmap_stream_handler(hm, "rst", rsh);
     //tc.AddStream(nq_conn_stream(tc.c, "rst"));
 
     nq_stream_handler_t ssh;
-    nq_closure_init(ssh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
-    nq_closure_init(ssh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
-    nq_closure_init(ssh.on_stream_record, on_stream_record, &Test::OnStreamRecordSimple, ptc);
+    nq_closure_init(ssh.on_stream_open, &Test::OnStreamOpen, ptc);
+    nq_closure_init(ssh.on_stream_close, &Test::OnStreamClose, ptc);
+    nq_closure_init(ssh.on_stream_record, &Test::OnStreamRecordSimple, ptc);
     ssh.stream_reader = nq_closure_empty();
     ssh.stream_writer = nq_closure_empty();
     nq_hdmap_stream_handler(hm, "sst", ssh);
@@ -208,11 +208,11 @@ void Test::RegisterCallback(Conn &tc, const RunOptions &options) {
 
     if (options.raw_mode) {
       nq_stream_handler_t rmh;
-      nq_closure_init(rmh.on_stream_open, on_stream_open, &Test::OnStreamOpen, ptc);
-      nq_closure_init(rmh.on_stream_close, on_stream_close, &Test::OnStreamClose, ptc);
-      nq_closure_init(rmh.on_stream_record, on_stream_record, &Test::OnStreamRecord, ptc);
-      nq_closure_init(rmh.stream_reader, stream_reader, &Test::StreamReader, ptc);
-      nq_closure_init(rmh.stream_writer, stream_writer, &Test::StreamWriter, ptc);
+      nq_closure_init(rmh.on_stream_open, &Test::OnStreamOpen, ptc);
+      nq_closure_init(rmh.on_stream_close, &Test::OnStreamClose, ptc);
+      nq_closure_init(rmh.on_stream_record, &Test::OnStreamRecord, ptc);
+      nq_closure_init(rmh.stream_reader, &Test::StreamReader, ptc);
+      nq_closure_init(rmh.stream_writer, &Test::StreamWriter, ptc);
       nq_hdmap_raw_handler(hm, rmh);
       return;
     }
@@ -234,9 +234,9 @@ bool Test::Run(const RunOptions *opt) {
 
   Conn *conns = new Conn[concurrency_];
   for (int i = 0; i < concurrency_; i++) {
-    nq_closure_init(conf.on_open, on_client_conn_open, &Test::OnConnOpen, conns + i);
-    nq_closure_init(conf.on_close, on_client_conn_close, &Test::OnConnClose, conns + i);
-    nq_closure_init(conf.on_finalize, on_client_conn_finalize, &Test::OnConnFinalize, conns + i);
+    nq_closure_init(conf.on_open, &Test::OnConnOpen, conns + i);
+    nq_closure_init(conf.on_close, &Test::OnConnClose, conns + i);
+    nq_closure_init(conf.on_finalize, &Test::OnConnFinalize, conns + i);
     if (!nq_client_connect(cl, &addr_, &conf)) {
       ASSERT(false);
       return false;

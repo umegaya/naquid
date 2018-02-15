@@ -15,12 +15,12 @@ class NqReachabilityNoop : public NqReachability {
   void Stop() override {
     nq::logger::fatal("current platform does not support automatic reachability change yet. call nq_conn_reachability_change manally");
   }
-  NqReachabilityNoop(nq_closure_t cb) : NqReachability(cb) {}
+  NqReachabilityNoop(nq_on_reachability_change_t cb) : NqReachability(cb) {}
  protected:
   ~NqReachabilityNoop() override {}
 };
 
-NqReachability *NqReachability::Create(nq_closure_t cb) {
+NqReachability *NqReachability::Create(nq_on_reachability_change_t cb) {
   return new NqReachabilityNoop(cb);
 }
 }

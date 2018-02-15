@@ -76,7 +76,7 @@ NqStreamIndex NqClient::NewStreamIndex() {
 }
 void NqClient::OnFinalize() {
   if (!nq_closure_is_empty(on_finalize_)) {
-    nq_closure_call(on_finalize_, on_client_conn_finalize, ToHandle(), context_);
+    nq_closure_call(on_finalize_, ToHandle(), context_);
     on_finalize_ = nq_closure_empty();
   }
   if (reachability_ != nullptr) {
@@ -111,8 +111,8 @@ bool NqClient::TrackReachability(const std::string &host) {
   if (reachability_ != nullptr) {
     return true;
   }
-  nq_closure_t observer;
-  nq_closure_init(observer, on_reachability_change, OnReachabilityChangeTranpoline, this);
+  nq_on_reachability_change_t observer;
+  nq_closure_init(observer, OnReachabilityChangeTranpoline, this);
   reachability_ = NqReachability::Create(observer);
 
   bool ret = reachability_->Start(host);
@@ -135,6 +135,7 @@ void NqClient::ScheduleDestroy() {
 void NqClient::Destroy() {
   OnFinalize();
   loop_->RemoveClient(this);
+  InvalidateSerial();
   delete this;
 }
 nq_conn_t NqClient::ToHandle() { 
@@ -185,7 +186,7 @@ NqLoop *NqClient::GetLoop() {
   return loop_; 
 }
 void NqClient::OnOpen() { 
-  nq_closure_call(on_open_, on_client_conn_open, ToHandle(), &context_); 
+  nq_closure_call(on_open_, ToHandle(), &context_); 
   //order is important because connect_state_ may change in above callback.
   if (connect_state_ == CONNECTING) {
     connect_state_ = CONNECTED;
@@ -199,7 +200,7 @@ void NqClient::OnClose(QuicErrorCode error,
     .code = error,
     .msg = error_details.c_str(),
   };
-  uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, on_client_conn_close, ToHandle(), 
+  uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, ToHandle(), 
                                               NQ_EQUIC, 
                                               &detail, 
                                               close_by_peer_or_self == ConnectionCloseSource::FROM_PEER));

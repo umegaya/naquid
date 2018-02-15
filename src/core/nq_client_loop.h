@@ -57,7 +57,7 @@ class NqClientLoop : public NqLoop,
   void RemoveClient(NqClient *cl);
   //af_first specifies first lookup address family
   bool Resolve(int family_pref, const std::string &host, int port, const nq_clconf_t *conf);
-  bool Resolve(int family_pref, const std::string &host, nq_closure_t cb);
+  bool Resolve(int family_pref, const std::string &host, nq_on_resolve_host_t cb);
   NqClient *Create(const std::string &host, 
                    const QuicServerId server_id,
                    const QuicSocketAddress server_address,  

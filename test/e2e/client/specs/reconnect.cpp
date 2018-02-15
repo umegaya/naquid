@@ -141,8 +141,8 @@ void test_reconnect_server(Test::Conn &conn) {
 				rpcs[i].s.data[0], rpcs[i].s.data[1]);
 
 			const char *reason;
-			nq_closure_t check_closure;
-			nq_closure_init(check_closure, on_rpc_validate, on_rpc_validate, &reason);
+			nq_on_rpc_validate_t check_closure;
+			nq_closure_init(check_closure, on_rpc_validate, &reason);
 
 			if (nq_rpc_equal(rpc, rpcs[i])) {
 				done(false);

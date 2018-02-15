@@ -80,7 +80,7 @@ NqStreamHandler *NqStream::CreateStreamHandler(const nq::HandlerMap::HandlerEntr
   NqStreamHandler *s;
   switch (he->type) {
   case nq::HandlerMap::FACTORY: {
-    s = (NqStreamHandler *)nq_closure_call(he->factory, create_stream, nq_session()->ToHandle());
+    s = (NqStreamHandler *)nq_closure_call(he->factory, nq_session()->ToHandle());
   } break;
   case nq::HandlerMap::STREAM: {
     if (nq_closure_is_empty(he->stream.stream_reader)) {
@@ -255,13 +255,13 @@ class AckHandler : public QuicAckListenerInterface {
   void OnPacketAcked(int acked_bytes,
                              QuicTime::Delta ack_delay_time) override {
     if (nq_closure_is_empty(opt_.on_ack)) { return; }
-    nq_closure_call(opt_.on_ack, on_stream_ack, acked_bytes, nq_time_usec(ack_delay_time.ToMicroseconds()));
+    nq_closure_call(opt_.on_ack, acked_bytes, nq_time_usec(ack_delay_time.ToMicroseconds()));
   }
   // Called when a packet is retransmitted.  Called once per packet.
   // |retransmitted_bytes| is the number of data bytes retransmitted.
   void OnPacketRetransmitted(int retransmitted_bytes) override {
     if (nq_closure_is_empty(opt_.on_retransmit)) { return; }
-    nq_closure_call(opt_.on_retransmit, on_stream_retransmit, retransmitted_bytes);
+    nq_closure_call(opt_.on_retransmit, retransmitted_bytes);
   }
 };
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
@@ -284,7 +284,7 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	size_t plen = parse_buffer_.length();
 	nq_size_t reclen = 0, read_ofs = nq::LengthCodec::Decode(&reclen, pstr, plen);
 	if (reclen > 0 && (reclen + read_ofs) <= plen) {
-	  nq_closure_call(on_recv_, on_stream_record, stream_->ToHandle<nq_stream_t>(), pstr + read_ofs, reclen);
+	  nq_closure_call(on_recv_, stream_->ToHandle<nq_stream_t>(), pstr + read_ofs, reclen);
 	  parse_buffer_.erase(0, reclen + read_ofs);
 	} else if (reclen == 0 && plen > len_buff_len) { //TODO(iyatomi): use unlikely
 		//broken payload. should resolve payload length
@@ -306,9 +306,9 @@ void NqSimpleStreamHandler::SendEx(const void *p, nq_size_t len, const nq_stream
 
 void NqRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
   int reclen;
-  void *rec = nq_closure_call(reader_, stream_reader, stream_->ToHandle<nq_stream_t>(), ToCStr(p), len, &reclen);
+  void *rec = nq_closure_call(reader_, stream_->ToHandle<nq_stream_t>(), ToCStr(p), len, &reclen);
   if (rec != nullptr) {
-    nq_closure_call(on_recv_, on_stream_record, stream_->ToHandle<nq_stream_t>(), rec, reclen);
+    nq_closure_call(on_recv_, stream_->ToHandle<nq_stream_t>(), rec, reclen);
   } else if (reclen < 0) {
     stream_->Disconnect();    
   }
@@ -316,7 +316,7 @@ void NqRawStreamHandler::OnRecv(const void *p, nq_size_t len) {
   
 
 
-void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_closure_t cb, nq_time_t timeout_duration_ts) {
+void NqSimpleRPCStreamHandler::EntryRequest(nq_msgid_t msgid, nq_on_rpc_reply_t cb, nq_time_t timeout_duration_ts) {
   if (stream()->stream_serial().IsEmpty()) {
     //if NqStreamHandler::WriteBytes fails, stream closed before returning it. 
     return;
@@ -361,7 +361,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
           auto req = it->second;
           req_map_.erase(it);
           //reply from serve side
-          nq_closure_call(req->on_data_, on_rpc_reply, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
+          nq_closure_call(req->on_reply_, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
           req->Destroy(loop_); //cancel firing alarm and free memory for req
         } else {
           //probably timedout. caller should already be received timeout error
@@ -373,12 +373,12 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
         //fprintf(stderr, "stream handler request: idx %u %llu\n", 
           //nq::Endian::NetbytesToHost<uint32_t>(pstr), 
           //nq::Endian::NetbytesToHost<uint64_t>(pstr + 4));
-        nq_closure_call(on_request_, on_rpc_request, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr), reclen);
+        nq_closure_call(on_request_, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr), reclen);
       }
     } else if (type > 0) {
       //notify
       //TRACE("stream handler notify: type %u", type);
-      nq_closure_call(on_notify_, on_rpc_notify, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
+      nq_closure_call(on_notify_, stream_->ToHandle<nq_rpc_t>(), type, ToPV(pstr), reclen);
     } else {
       ASSERT(false);
     }
@@ -399,7 +399,7 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
   memcpy(buffer + ofs, p, len);
   WriteBytes(buffer, ofs + len);  
 }
-void NqSimpleRPCStreamHandler::Call(uint16_t type, const void *p, nq_size_t len, nq_closure_t cb) {
+void NqSimpleRPCStreamHandler::Call(uint16_t type, const void *p, nq_size_t len, nq_on_rpc_reply_t cb) {
   //QuicConnection::ScopedPacketBundler bundler(
     //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   nq_msgid_t msgid = msgid_factory_.New();

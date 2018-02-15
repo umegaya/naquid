@@ -62,8 +62,8 @@ class NqServerConfig : public NqConfig {
   NqServerConfig(const nq_addr_t &addr) : 
     NqConfig(), addr_(addr), crypto_options_() {
     memset(&server_, 0, sizeof(server_));
-    nq_closure_init(server_.on_open, on_server_conn_open, NoopOnOpen, nullptr);
-    nq_closure_init(server_.on_close, on_server_conn_close, NoopOnClose, nullptr);
+    nq_closure_init(server_.on_open, NoopOnOpen, nullptr);
+    nq_closure_init(server_.on_close, NoopOnClose, nullptr);
     Setup();
   }
   NqServerConfig(const nq_addr_t &addr, const nq_svconf_t &conf) : 

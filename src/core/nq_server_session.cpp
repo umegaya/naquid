@@ -85,14 +85,14 @@ void NqServerSession::OnClose(QuicErrorCode error,
     .code = error,
     .msg = error_details.c_str(),
   };
-  nq_closure_call(port_config_.server().on_close, on_server_conn_close, ToHandle(), 
+  nq_closure_call(port_config_.server().on_close, ToHandle(), 
                   NQ_EQUIC, 
                   &detail, 
                   close_by_peer_or_self == ConnectionCloseSource::FROM_PEER);
   InvalidateSerial(); //now session pointer not valid
 }
 void NqServerSession::OnOpen() {
-  nq_closure_call(port_config_.server().on_open, on_server_conn_open, ToHandle(), &context_);
+  nq_closure_call(port_config_.server().on_open, ToHandle(), &context_);
 }
 void NqServerSession::Disconnect() {
   connection()->CloseConnection(QUIC_CONNECTION_CANCELLED, "server side close", 

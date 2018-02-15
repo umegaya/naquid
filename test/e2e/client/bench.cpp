@@ -31,13 +31,13 @@ struct closure_ctx {
 #endif
 };
 closure_ctx g_ctxs[N_CLIENT];
-nq_closure_t g_reps[N_CLIENT];
+nq_on_rpc_reply_t g_reps[N_CLIENT];
 
 
 
 
 /* helper */
-static void send_rpc(nq_rpc_t rpc, nq_closure_t reply_cb, int index) {
+static void send_rpc(nq_rpc_t rpc, nq_on_rpc_reply_t reply_cb, int index) {
   auto v = (closure_ctx *)reply_cb.arg;
   v->seed++;
   //fprintf(stderr, "rpc %d, seq = %llx\n", index, v->seed);
@@ -133,10 +133,10 @@ int main(int argc, char *argv[]){
   nq_hdmap_t hm;
   hm = nq_client_hdmap(cl);
   nq_rpc_handler_t handler;
-  nq_closure_init(handler.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
-  nq_closure_init(handler.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
-  nq_closure_init(handler.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
-  nq_closure_init(handler.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
+  nq_closure_init(handler.on_rpc_request, on_rpc_request, nullptr);
+  nq_closure_init(handler.on_rpc_notify, on_rpc_notify, nullptr);
+  nq_closure_init(handler.on_rpc_open, on_rpc_open, nullptr);
+  nq_closure_init(handler.on_rpc_close, on_rpc_close, nullptr);
   handler.use_large_msgid = false;
   handler.timeout = nq_time_sec(60);
   nq_hdmap_rpc_handler(hm, "rpc", handler);
@@ -151,19 +151,17 @@ int main(int argc, char *argv[]){
   conf.idle_timeout = nq_time_sec(60);
   conf.handshake_timeout = nq_time_sec(120);
 
-  nq_closure_t on_validate;
-  nq_closure_init(on_validate, on_rpc_validate, on_rpc_validate, nullptr);
   for (int i = 0; i < N_CLIENT; i++) {
     //reinitialize closure, with giving client index as arg
-    nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, (void *)(intptr_t)i);
-    nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, (void *)(intptr_t)i);
+    nq_closure_init(conf.on_open, on_conn_open, (void *)(intptr_t)i);
+    nq_closure_init(conf.on_close,  on_conn_close, (void *)(intptr_t)i);
     if (!nq_client_connect(cl, &addr, &conf)) {
       return -1;
     }
     g_ctxs[i].seed = 0;
     g_ctxs[i].last_recv = 0;
     g_ctxs[i].index = i;
-    nq_closure_init(g_reps[i], on_rpc_reply, on_rpc_reply, g_ctxs + i);
+    nq_closure_init(g_reps[i], on_rpc_reply, g_ctxs + i);
   }
 
   nq_time_t start = nq_time_now();

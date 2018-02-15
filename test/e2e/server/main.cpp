@@ -194,9 +194,9 @@ void on_rpc_request(void *p, nq_rpc_t rpc, uint16_t type, nq_msgid_t msgid, cons
     case RpcType::Sleep:
       {
         nq_time_t duration = nq::Endian::NetbytesToHost<nq_time_t>(data);
-        nq_closure_t cl;
+        nq_on_alarm_t cl;
         alarm_context *ac = (alarm_context *)malloc(sizeof(alarm_context));
-        nq_closure_init(cl, on_alarm, on_alarm, ac);
+        nq_closure_init(cl, on_alarm, ac);
         ac->start = nq_time_now();
         ac->invoke_time = ac->start + duration;
         ac->rpc = rpc;
@@ -322,16 +322,16 @@ void *stream_reader(void *arg, nq_stream_t s, const char *data, nq_size_t dlen, 
 /* setup server */
 struct server_config {
   const char *quic_secret;
-  nq_closure_t on_server_conn_open;
-  nq_closure_t on_stream_open, on_raw_stream_open;
-  nq_closure_t on_rpc_open;
+  nq_on_server_conn_open_t on_server_conn_open;
+  nq_on_stream_open_t on_stream_open, on_raw_stream_open;
+  nq_on_rpc_open_t on_rpc_open;
   bool raw_mode;
 };
 #define CONFIG_CB(conf, name, default_value, dest) { \
   if (conf != nullptr && !nq_closure_is_empty(conf->name)) { \
     dest = conf->name; \
   } else { \
-    nq_closure_init(dest, name, default_value, nullptr); \
+    nq_closure_init(dest, default_value, nullptr); \
   } \
 }
 #define CONFIG_VAL(conf, name, default_value, dest) {\
@@ -360,30 +360,30 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   conf.idle_timeout = nq_time_sec(60);
   conf.shutdown_timeout = nq_time_sec(5);
   CONFIG_CB(svconfig, on_server_conn_open, on_conn_open, conf.on_open);
-  nq_closure_init(conf.on_close, on_server_conn_close, on_conn_close, nullptr);
+  nq_closure_init(conf.on_close, on_conn_close, nullptr);
 
   nq_hdmap_t hm = nq_server_listen(sv, &addr, &conf);
 
   nq_rpc_handler_t rh;
   rh.timeout = 0; //use default
-  nq_closure_init(rh.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
-  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
+  nq_closure_init(rh.on_rpc_request, on_rpc_request, nullptr);
+  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, nullptr);
   CONFIG_CB(svconfig, on_rpc_open, on_rpc_open, rh.on_rpc_open);
-  nq_closure_init(rh.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
+  nq_closure_init(rh.on_rpc_close, on_rpc_close, nullptr);
   nq_hdmap_rpc_handler(hm, "rpc", rh);
 
   nq_stream_handler_t rsh;
   CONFIG_CB(svconfig, on_stream_open, on_stream_open, rsh.on_stream_open);
-  nq_closure_init(rsh.on_stream_close, on_stream_close, on_stream_close, nullptr);
-  nq_closure_init(rsh.on_stream_record, on_stream_record, on_stream_record, nullptr);
-  nq_closure_init(rsh.stream_reader, stream_reader, stream_reader, nullptr);
-  nq_closure_init(rsh.stream_writer, stream_writer, stream_writer, nullptr);
+  nq_closure_init(rsh.on_stream_close, on_stream_close, nullptr);
+  nq_closure_init(rsh.on_stream_record, on_stream_record, nullptr);
+  nq_closure_init(rsh.stream_reader, stream_reader, nullptr);
+  nq_closure_init(rsh.stream_writer, stream_writer, nullptr);
   nq_hdmap_stream_handler(hm, "rst", rsh);
 
   nq_stream_handler_t ssh;
   CONFIG_CB(svconfig, on_stream_open, on_stream_open, ssh.on_stream_open);
-  nq_closure_init(ssh.on_stream_close, on_stream_close, on_stream_close, nullptr);
-  nq_closure_init(ssh.on_stream_record, on_stream_record, on_stream_record, nullptr);
+  nq_closure_init(ssh.on_stream_close, on_stream_close, nullptr);
+  nq_closure_init(ssh.on_stream_record, on_stream_record, nullptr);
   ssh.stream_reader = nq_closure_empty();
   ssh.stream_writer = nq_closure_empty();
   nq_hdmap_stream_handler(hm, "sst", ssh);
@@ -391,11 +391,11 @@ void setup_server(nq_server_t sv, int port, server_config *svconfig) {
   //for testing raw handler ignores other handlers
   if (svconfig != nullptr && svconfig->raw_mode) {
     nq_stream_handler_t rmh;
-    nq_closure_init(rmh.on_stream_open, on_stream_open, on_stream_open, nullptr);
-    nq_closure_init(rmh.on_stream_close, on_stream_close, on_stream_close, nullptr);
-    nq_closure_init(rmh.on_stream_record, on_stream_record, on_stream_record, nullptr);
-    nq_closure_init(rmh.stream_reader, stream_reader, stream_reader, nullptr);
-    nq_closure_init(rmh.stream_writer, stream_writer, stream_writer, nullptr);
+    nq_closure_init(rmh.on_stream_open, on_stream_open, nullptr);
+    nq_closure_init(rmh.on_stream_close, on_stream_close, nullptr);
+    nq_closure_init(rmh.on_stream_record, on_stream_record, nullptr);
+    nq_closure_init(rmh.stream_reader, stream_reader, nullptr);
+    nq_closure_init(rmh.stream_writer, stream_writer, nullptr);
     nq_hdmap_raw_handler(hm, rmh);
   }
 }
@@ -442,10 +442,10 @@ int main(int argc, char *argv[]){
     1, 2, 1, 1,
   };
   scf.raw_mode = false;
-  nq_closure_init(scf.on_server_conn_open, on_server_conn_open, on_conn_open_reject, reject_counter + 0);
-  nq_closure_init(scf.on_rpc_open, on_rpc_open, on_rpc_open_reject, reject_counter + 1);
-  nq_closure_init(scf.on_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 2);
-  nq_closure_init(scf.on_raw_stream_open, on_stream_open, on_stream_open_reject, reject_counter + 3);
+  nq_closure_init(scf.on_server_conn_open, on_conn_open_reject, reject_counter + 0);
+  nq_closure_init(scf.on_rpc_open, on_rpc_open_reject, reject_counter + 1);
+  nq_closure_init(scf.on_stream_open, on_stream_open_reject, reject_counter + 2);
+  nq_closure_init(scf.on_raw_stream_open, on_stream_open_reject, reject_counter + 3);
   setup_server(sv, 18443, &scf);
 
   if (n_threads <= 1) {

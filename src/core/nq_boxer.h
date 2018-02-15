@@ -6,6 +6,7 @@
 
 #include "nq.h"
 #include "basis/allocator.h"
+#include "core/nq_closure.h"
 #include "core/nq_session.h"
 #include "core/nq_stream.h"
 #include "core/nq_alarm.h"
@@ -73,7 +74,7 @@ class NqBoxer {
     } data_;
     union {
       struct {
-        nq_closure_t on_reply_;
+        nq_on_rpc_reply_t on_reply_;
         uint16_t type_;
       } call_;
       struct {
@@ -92,7 +93,7 @@ class NqBoxer {
       } reply_;
       struct {
         nq_time_t invocation_ts_;
-        nq_closure_t callback_;
+        nq_on_alarm_t callback_;
       } alarm_;
       struct {
         char *name_;
@@ -108,7 +109,7 @@ class NqBoxer {
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {}
 
-    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, nq_time_t ts, nq_closure_t cb, 
+    Op(const nq_serial_t &serial, void *target_ptr, OpCode code, nq_time_t ts, nq_on_alarm_t cb, 
       OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       alarm_.invocation_ts_ = ts;
@@ -146,7 +147,7 @@ class NqBoxer {
     }
     
     Op(const nq_serial_t &serial, void *target_ptr, OpCode code, uint16_t type, const void *data, 
-       nq_size_t datalen, nq_closure_t on_reply, 
+       nq_size_t datalen, nq_on_rpc_reply_t on_reply, 
        OpTarget target = OpTarget::Stream) :
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_(data, datalen) {
       call_.type_ = type;
@@ -260,7 +261,7 @@ class NqBoxer {
       if (unboxed->SessionSerial() == serial) {
         ASSERT(code == ModifyHandlerMap);
         auto hm = unboxed->ResetHandlerMap()->ToHandle();
-        nq_closure_call(cb, on_conn_modify_hdmap, hm);
+        nq_dyn_closure_call(cb, on_conn_modify_hdmap, hm);
       } else {
         //already got invalid
       }
@@ -268,7 +269,7 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, cb, OpTarget::Conn));      
     }
   }
-  inline void InvokeAlarm(const nq_serial_t &serial, NqAlarm *unboxed, OpCode code, nq_time_t invocation_ts, nq_closure_t cb, bool from_queue = false) {
+  inline void InvokeAlarm(const nq_serial_t &serial, NqAlarm *unboxed, OpCode code, nq_time_t invocation_ts, nq_on_alarm_t cb, bool from_queue = false) {
     if (from_queue) {
       if (unboxed->alarm_serial() == serial) {
         ASSERT(code == Start);
@@ -352,7 +353,7 @@ class NqBoxer {
   }
   inline void InvokeStream(const nq_serial_t &serial, NqStream *unboxed, OpCode code,
                            uint16_t type, const void *data, 
-                           nq_size_t datalen, nq_closure_t on_reply, bool from_queue = false) {
+                           nq_size_t datalen, nq_on_rpc_reply_t on_reply, bool from_queue = false) {
     if (from_queue) {
       if (unboxed->stream_serial() == serial) {
         ASSERT(code == Call);

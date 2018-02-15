@@ -489,9 +489,9 @@ class NqReachabilityMac : public NqReachability {
   }
   void OnChange(SCNetworkReachabilityFlags flags) {
     current_state_ = ToNqReachability([reachability_ currentReachabilityStatus]);
-    nq_closure_call(observer_, on_reachability_change, current_state_);
+    nq_closure_call(observer_, current_state_);
   }
-  NqReachabilityMac(nq_closure_t cb) : NqReachability(cb), reachability_(nullptr) {}
+  NqReachabilityMac(nq_on_reachability_change_t cb) : NqReachability(cb), reachability_(nullptr) {}
  protected:
   ~NqReachabilityMac() override {
     if (reachability_) {
@@ -515,7 +515,7 @@ class NqReachabilityMac : public NqReachability {
   Reachability *reachability_;
 };
 
-NqReachability *NqReachability::Create(nq_closure_t cb) {
+NqReachability *NqReachability::Create(nq_on_reachability_change_t cb) {
   return new NqReachabilityMac(cb);
 }
 }

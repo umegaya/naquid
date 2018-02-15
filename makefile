@@ -83,5 +83,5 @@ testclean:
 	make -C test/e2e clean TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
 
 .PHONY: test
-test:
+test: testlib
 	make -C test/e2e test TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)

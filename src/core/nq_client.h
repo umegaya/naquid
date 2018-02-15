@@ -196,7 +196,9 @@ class NqClient : public QuicClientBase,
  private:
   NqClientLoop* loop_;
   std::unique_ptr<nq::HandlerMap> own_handler_map_;
-  nq_closure_t on_close_, on_open_, on_finalize_;
+  nq_on_client_conn_close_t on_close_;
+  nq_on_client_conn_open_t on_open_;
+  nq_on_client_conn_finalize_t on_finalize_;
   NqSerial session_serial_;
   StreamManager stream_manager_;
   uint64_t next_reconnect_us_ts_;

@@ -38,8 +38,8 @@ void test_resolver(Test::Conn &tc) {
   auto c = new context;
   c->latch = tc.NewLatch();
   nq_clconf_t conf;
-  nq_closure_init(conf.on_open, on_client_conn_open, on_conn_open, c);
-  nq_closure_init(conf.on_close, on_client_conn_close, on_conn_close, c);
+  nq_closure_init(conf.on_open, on_conn_open, c);
+  nq_closure_init(conf.on_close, on_conn_close, c);
   nq_addr_t addr = { "nosuchhost.nowhere2", nullptr, nullptr, nullptr, 8443};
   nq_client_connect(tc.t->current_client(), &addr, &conf);
 

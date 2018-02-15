@@ -42,7 +42,7 @@ void NqAlarm::Exec() {
   NqLoop *loop = boxer_->Loop();
   nq_time_t invoke = invocation_ts_;
   nq_time_t next = invoke;
-  nq_closure_call(cb_, on_alarm, &next);
+  nq_closure_call(cb_, &next);
   ClearInvocationTS();
   if (next > invoke) {
     NqAlarmBase::Start(loop, next);

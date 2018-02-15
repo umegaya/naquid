@@ -33,12 +33,12 @@ class NqReachabilityAndroid : public NqReachability {
   void Stop() override {
     nq::logger::fatal("android does not support automatic reachability change yet. call nq_conn_reachability_change manally");
   }
-  NqReachabilityAndroid(nq_closure_t cb) : NqReachability(cb) {}
+  NqReachabilityAndroid(nq_on_reachability_change_t cb) : NqReachability(cb) {}
  protected:
   ~NqReachabilityAndroid() override {}
 };
 
-NqReachability *NqReachability::Create(nq_closure_t cb) {
+NqReachability *NqReachability::Create(nq_on_reachability_change_t cb) {
   return new NqReachabilityAndroid(cb);
 }
 }

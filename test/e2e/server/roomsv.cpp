@@ -89,17 +89,17 @@ void setup_server(nq_server_t sv, int port) {
   conf.handshake_timeout = nq_time_sec(120);
   conf.idle_timeout = nq_time_sec(60);
   conf.shutdown_timeout = 0; //use default
-  nq_closure_init(conf.on_open, on_server_conn_open, on_conn_open, nullptr);
-  nq_closure_init(conf.on_close, on_server_conn_close, on_conn_close, nullptr);
+  nq_closure_init(conf.on_open, on_conn_open, nullptr);
+  nq_closure_init(conf.on_close, on_conn_close, nullptr);
 
   nq_hdmap_t hm = nq_server_listen(sv, &addr, &conf);
 
   nq_rpc_handler_t rh;
   rh.timeout = 0; //use default
-  nq_closure_init(rh.on_rpc_request, on_rpc_request, on_rpc_request, nullptr);
-  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, on_rpc_notify, nullptr);
-  nq_closure_init(rh.on_rpc_open, on_rpc_open, on_rpc_open, nullptr);
-  nq_closure_init(rh.on_rpc_close, on_rpc_close, on_rpc_close, nullptr);
+  nq_closure_init(rh.on_rpc_request, on_rpc_request, nullptr);
+  nq_closure_init(rh.on_rpc_notify, on_rpc_notify, nullptr);
+  nq_closure_init(rh.on_rpc_open, on_rpc_open, nullptr);
+  nq_closure_init(rh.on_rpc_close, on_rpc_close, nullptr);
   nq_hdmap_rpc_handler(hm, "rpc", rh);
 }
 
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]){
 
   nq_server_start(sv, false);
 
-  nq_time_sleep(nq_time_sec(5));
+  nq_time_sleep(nq_time_sec(60));
   nq_server_join(sv);
 
   return 0;
