@@ -49,7 +49,7 @@ class NqClientLoop : public NqLoop,
     worker_index_ = client_worker_index_factory_.New();
     set_main_thread();
   }
-  ~NqClientLoop() { Close(); }
+  ~NqClientLoop() {}
 
   void Poll();
   int Open(int max_nfd, const nq_dns_conf_t *dns_conf);

@@ -177,25 +177,27 @@ NQAPI_THREADSAFE const char *nq_error_detail_code2str(nq_error_t code, int detai
 // --------------------------
 NQAPI_THREADSAFE nq_client_t nq_client_create(int max_nfd, int max_stream_hint, const nq_dns_conf_t *dns_conf) {
   lib_init(true); //anchor
-	auto l = new NqClientLoop(max_nfd, max_stream_hint);
-	if (l->Open(max_nfd, dns_conf) < 0) {
-		return nullptr;
-	}
-	return l->ToHandle();
+  auto l = new NqClientLoop(max_nfd, max_stream_hint);
+  if (l->Open(max_nfd, dns_conf) < 0) {
+    return nullptr;
+  }
+  return l->ToHandle();
 }
 NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl) {
-	delete NqClientLoop::FromHandle(cl);
+  auto c = NqClientLoop::FromHandle(cl);
+  c->Close();
+  delete c;
 }
 NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl) {
-	NqClientLoop::FromHandle(cl)->Poll();
+  NqClientLoop::FromHandle(cl)->Poll();
 }
 NQAPI_BOOTSTRAP bool nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf) {
   auto loop = NqClientLoop::FromHandle(cl);
   //we are not smart aleck and wanna use ipv4 if possible 
-	return loop->Resolve(AF_INET, addr->host, addr->port, conf);
+  return loop->Resolve(AF_INET, addr->host, addr->port, conf);
 }
 NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl) {
-	return NqClientLoop::FromHandle(cl)->mutable_handler_map()->ToHandle();
+  return NqClientLoop::FromHandle(cl)->mutable_handler_map()->ToHandle();
 }
 NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl) {
   NqClientLoop::FromHandle(cl)->set_main_thread();
@@ -213,22 +215,22 @@ NQAPI_BOOTSTRAP bool nq_client_resolve_host(nq_client_t cl, int family_pref, con
 //
 // --------------------------
 NQAPI_THREADSAFE nq_server_t nq_server_create(int n_worker) {
-	lib_init(false); //anchor
+  lib_init(false); //anchor
   auto sv = new NqServer(n_worker);
-	return sv->ToHandle();
+  return sv->ToHandle();
 }
 nq_hdmap_t nq_server_listen(nq_server_t sv, const nq_addr_t *addr, const nq_svconf_t *conf) {
-	auto psv = NqServer::FromHandle(sv);
-	return psv->Open(addr, conf)->ToHandle();
+  auto psv = NqServer::FromHandle(sv);
+  return psv->Open(addr, conf)->ToHandle();
 }
 NQAPI_BOOTSTRAP void nq_server_start(nq_server_t sv, bool block) {
-	auto psv = NqServer::FromHandle(sv);
-	psv->Start(block);
+  auto psv = NqServer::FromHandle(sv);
+  psv->Start(block);
 }
 NQAPI_BOOTSTRAP void nq_server_join(nq_server_t sv) {
-	auto psv = NqServer::FromHandle(sv);
-	psv->Join();
-	delete psv;
+  auto psv = NqServer::FromHandle(sv);
+  psv->Join();
+  delete psv;
 }
 
 
@@ -239,13 +241,13 @@ NQAPI_BOOTSTRAP void nq_server_join(nq_server_t sv) {
 //
 // --------------------------
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler) {
-	return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
+  return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
 }
 NQAPI_BOOTSTRAP bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc_handler_t handler) {
-	return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
+  return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
 }
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t factory) {
-	return nq::HandlerMap::FromHandle(h)->AddEntry(name, factory);
+  return nq::HandlerMap::FromHandle(h)->AddEntry(name, factory);
 }
 NQAPI_BOOTSTRAP void nq_hdmap_raw_handler(nq_hdmap_t h, nq_stream_handler_t handler) {
   nq::HandlerMap::FromHandle(h)->SetRawHandler(handler);
@@ -513,18 +515,18 @@ NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_time_t nq_time_now() {
-	return nq::clock::now();
+  return nq::clock::now();
 }
 NQAPI_THREADSAFE nq_unix_time_t nq_time_unix() {
-	long s, us;
-	nq::clock::now(s, us);
-	return s;
+  long s, us;
+  nq::clock::now(s, us);
+  return s;
 }
 NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d) {
-	return nq::clock::sleep(d);
+  return nq::clock::sleep(d);
 }
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d) {
-	return nq::clock::pause(d);
+  return nq::clock::pause(d);
 }
 
 

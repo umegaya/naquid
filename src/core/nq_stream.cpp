@@ -343,7 +343,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
     if (tmp_ofs == 0) { break; }
     read_ofs += tmp_ofs;
     if ((read_ofs + reclen) > plen) {
-      TRACE("short of buffer %u %zu %zu\n", reclen, read_ofs, plen);
+      //TRACE("short of buffer %u %zu %zu\n", reclen, read_ofs, plen);
       break;
     }
     //TRACE("sid = %llx, msgid, type = %u %d", stream_->nq_session()->delegate()->SessionSerial(), msgid, type_tmp);

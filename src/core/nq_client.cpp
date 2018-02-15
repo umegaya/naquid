@@ -84,6 +84,13 @@ void NqClient::OnFinalize() {
     reachability_ = nullptr;
   }
 }
+void NqClient::ForceShutdown() {
+  if (connected()) {
+    session()->connection()->CloseConnection(
+        QUIC_PEER_GOING_AWAY, "Client being torn down",
+        ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  }
+}
 void NqClient::OnReachabilityChangeTranpoline(void *self, nq_reachability_t state) {
   auto cl = ((NqClient *)self);
   //let process in main thread of this client
@@ -134,6 +141,7 @@ void NqClient::ScheduleDestroy() {
 }
 void NqClient::Destroy() {
   OnFinalize();
+  ForceShutdown();
   loop_->RemoveClient(this);
   InvalidateSerial();
   delete this;

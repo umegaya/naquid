@@ -128,6 +128,7 @@ class NqClient : public QuicClientBase,
   void InitSerial();
   void ScheduleDestroy();
   void OnFinalize();
+  void ForceShutdown();
 
   bool TrackReachability(const std::string &host);
   

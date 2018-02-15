@@ -69,7 +69,9 @@ nq_time_t on_conn_close(void *arg, nq_conn_t c, nq_error_t e, const nq_error_det
   TRACE("on_conn_close:%ld, %d(from %s) reason:%s(%d)\n", idx, e, remote ? "remote": "local", detail->msg, detail->code);
   return nq_time_sec(2);
 }
-
+void on_conn_finalize(void *arg, nq_conn_t c, void *ctx) {
+  TRACE("on_conn_finalize %p", c.p);
+}
 
 
 /* rpc stream callback */
@@ -154,7 +156,8 @@ int main(int argc, char *argv[]){
   for (int i = 0; i < N_CLIENT; i++) {
     //reinitialize closure, with giving client index as arg
     nq_closure_init(conf.on_open, on_conn_open, (void *)(intptr_t)i);
-    nq_closure_init(conf.on_close,  on_conn_close, (void *)(intptr_t)i);
+    nq_closure_init(conf.on_close, on_conn_close, (void *)(intptr_t)i);
+    nq_closure_init(conf.on_finalize, on_conn_finalize, (void *)(intptr_t)i);
     if (!nq_client_connect(cl, &addr, &conf)) {
       return -1;
     }

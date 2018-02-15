@@ -23,12 +23,6 @@ NqNetworkHelper::NqNetworkHelper(
       client_(client) {}
 
 NqNetworkHelper::~NqNetworkHelper() {
-  if (client_->connected()) {
-    client_->session()->connection()->CloseConnection(
-        QUIC_PEER_GOING_AWAY, "Client being torn down",
-        ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
-  }
-
   CleanUpAllUDPSockets();
 }
 
