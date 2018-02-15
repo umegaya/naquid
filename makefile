@@ -7,6 +7,7 @@ LIB=nq
 TEST_OS=osx
 DEBUG=False
 TEST_DEBUG=True
+TEST_SVHOST=127.0.0.1
 JOB=4
 
 define ct_run
@@ -37,7 +38,7 @@ linux:
 	$(call ct_run,make linux_internal)
 
 linux_sh: 
-	docker run --name nqsh --rm -ti --privileged -v `pwd`:/naquid naquid/meta-builder bash || docker exec -ti nqsh bash
+	docker run --name nqsh --rm -ti --privileged --add-host test.qrpc.io:$(TEST_SVHOST) -v `pwd`:/naquid naquid/meta-builder bash || docker exec -ti nqsh bash
 
 ios:
 	-@mkdir -p build/ios.v7
