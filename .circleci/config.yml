@@ -12,4 +12,5 @@ jobs:
       - run: git clone https://github.com/umegaya/naquid
       - run: cd naquid && git submodule sync && git submodule update --init
       - run: cd naquid/tools/certs && bash ./generate-certs.sh
-      - run: cd naquid && make testlib testsv testcl test TEST_OS=linux      
+      - run: echo "127.0.0.1 test.qrpc.io" >> /etc/hosts
+      - run: cd naquid && make test TEST_OS=linux
