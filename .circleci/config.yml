@@ -1,0 +1,14 @@
+version: 2
+jobs:
+  build:
+    branches:
+      only:
+        - master
+        - /v[0-9\.]+/
+        - /rc-.*/
+    docker:
+      - image: naquid/meta-builder
+    steps:
+      - run: git clone https://github.com/umegaya/naquid
+      - run: cd naquid && git submodule sync && git submodule update --init
+      - run: cd naquid && make testlib testsv testcl test TEST_OS=linux      
