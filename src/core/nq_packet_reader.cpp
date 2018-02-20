@@ -5,7 +5,7 @@
 #include "core/nq_packet_reader.h"
 
 #include <errno.h>
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(WIN32)
 // This is a GNU header that is not present in /usr/include on MacOS
 #include <features.h>
 #endif

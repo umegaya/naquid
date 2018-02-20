@@ -36,10 +36,7 @@ struct NqDnsQueryForClient : public NqDnsQuery {
         status = ARES_ENOTFOUND;
       }
     } 
-    nq_error_detail_t detail = {
-      .code = status,
-      .msg = ares_strerror(status),
-    };
+    nq_error_detail_t detail = { status, ares_strerror(status) };
     //call on close with empty nq_conn_t. 
     nq_conn_t empty = {{{0}}, nullptr};
     nq_closure_call(config_.client().on_close, empty, NQ_ERESOLVE, &detail, false);
@@ -53,10 +50,7 @@ struct NqDnsQueryForClosure : public NqDnsQuery {
       nq_closure_call(cb_, NQ_OK, nullptr, 
         entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype));
     } else {
-      nq_error_detail_t detail = {
-        .code = status,
-        .msg = ares_strerror(status),
-      };
+	  nq_error_detail_t detail = { status, ares_strerror(status) };
       nq_closure_call(cb_, NQ_ERESOLVE, &detail, nullptr, 0);
     }
   }  

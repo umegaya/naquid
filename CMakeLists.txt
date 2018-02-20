@@ -56,9 +56,11 @@ set(lib_src
 	./src/core/compat/nq_string_util.cpp
 	./src/core/compat/nq_url_canon_icu.cpp
 
+	# platform specific sources
 	./src/core/platform/nq_jni_android.cpp
 	./src/core/platform/nq_reachability.cpp
 	./src/core/platform/nq_reachability_android.cpp
+	./src/core/platform/nq_platform_thread_win.cpp
 )
 set(lib_mm_src
 	./src/core/compat/nq_foundation_util.mm
@@ -79,14 +81,18 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/ssl.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/pb.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/cares.cmake)
 # setup group specific compiler flags
-set_source_files_properties(${cares_src} PROPERTIES COMPILE_FLAGS "-DHAVE_CONFIG_H -D_GNU_SOURCE")
+if (NQ_WINDOWS)
+	set_source_files_properties(${cares_src} PROPERTIES COMPILE_FLAGS "-D_GNU_SOURCE -DCARES_BUILDING_LIBRARY")
+else()
+	set_source_files_properties(${cares_src} PROPERTIES COMPILE_FLAGS "-DHAVE_CONFIG_H -D_GNU_SOURCE -DCARES_BUILDING_LIBRARY")
+endif()
 # define common sources
 set(src ${lib_src} ${net_src} ${common_src} ${zlib_src} ${ssl_src} ${pb_src} ${cares_src})
 
 
 
 # target settings
-if (IOS OR NQ_OSX_BUNDLE OR NQ_OSX)
+if (NQ_IOS OR NQ_OSX_BUNDLE OR NQ_OSX)
 	find_library(core_foundation CoreFoundation)
 	find_library(cocoa Cocoa)
 	find_library(iokit IOKit)
@@ -110,14 +116,19 @@ if (IOS OR NQ_OSX_BUNDLE OR NQ_OSX)
 		add_library(nq STATIC ${nqsrc})
 		target_link_libraries(nq ${core_foundation} ${cocoa} ${iokit} ${security} ${system_configuration})		
 	endif()
-elseif (ANDROID)
+elseif (NQ_ANDROID)
 	include_directories(ext/cares/config/linux)
 	set(nqsrc ${src} ${android_src})
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ENABLE_EPOLL__")
 	add_library(nq SHARED ${nqsrc})
 	target_link_libraries(nq "-lc++_static -llog")
-elseif (WINDOWS)
-	messsage(FATAL_ERROR, "TODO(iyatomi): add windows build instruction")
+elseif (NQ_WINDOWS)
+	include_directories(ext/cares/config/windows)
+	set(nqsrc ${src} ${win_src})
+	# windows seems to use CXX_FLAGS for .c files
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DOPENSSL_NO_ASM -D__ENABLE_IOCP__")
+	add_library(nq SHARED ${nqsrc})
+	target_link_libraries(nq wsock32 ws2_32 winmm imagehlp dbghelp)
 elseif (NQ_LINUX)
 	include_directories(ext/cares/config/linux)
 	set(nqsrc ${src} ${linux_src})

@@ -1,14 +1,9 @@
 #pragma once
 
-#include <unistd.h>
-#include <errno.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-
 #include <algorithm>
 
 #include "basis/defs.h"
+#include "basis/syscall.h"
 
 namespace nq {
 struct Endian {

@@ -392,7 +392,7 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
     nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   //pack and send buffer
-  char buffer[header_buff_len + len_buff_len + len];
+  ALLOCA(buffer, char, header_buff_len + len_buff_len + len);
   size_t ofs = 0;
   ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), 0, buffer, sizeof(buffer));
   ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
@@ -419,7 +419,7 @@ void NqSimpleRPCStreamHandler::Reply(nq_error_t result, nq_msgid_t msgid, const 
     //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);
   //pack and send buffer
-  char buffer[header_buff_len + len_buff_len + len];
+  ALLOCA(buffer, char, header_buff_len + len_buff_len + len);
   size_t ofs = 0;
   ofs = nq::HeaderCodec::Encode(result, msgid, buffer, sizeof(buffer));
   ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);

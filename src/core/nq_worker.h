@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <vector>
 #include <thread>
 
 #include "MoodyCamel/concurrentqueue.h"

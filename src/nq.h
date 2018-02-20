@@ -488,13 +488,13 @@ NQAPI_INLINE nq_time_t nq_time_usec(uint64_t n) { return ((n) * 1000); }
 
 NQAPI_INLINE nq_time_t nq_time_nsec(uint64_t n) { return (n); }
 
-NQAPI_INLINE double nq_time_to_sec(nq_time_t n) { return ((n) / (1000 * 1000 * 1000)); }
+NQAPI_INLINE double nq_time_to_sec(nq_time_t n) { return (((double)n) / (1000 * 1000 * 1000)); }
 
-NQAPI_INLINE double nq_time_to_msec(nq_time_t n) { return ((n) / (1000 * 1000)); }
+NQAPI_INLINE double nq_time_to_msec(nq_time_t n) { return (((double)n) / (1000 * 1000)); }
 
-NQAPI_INLINE double nq_time_to_usec(nq_time_t n) { return ((n) / 1000); }
+NQAPI_INLINE double nq_time_to_usec(nq_time_t n) { return (((double)n) / 1000); }
 
-NQAPI_INLINE double nq_time_to_nsec(nq_time_t n) { return (n); }
+NQAPI_INLINE double nq_time_to_nsec(nq_time_t n) { return ((double)n); }
 
 NQAPI_THREADSAFE nq_time_t nq_time_now();
 

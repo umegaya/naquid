@@ -1,28 +1,47 @@
 #pragma once
 
+#ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+typedef SSIZE_T ssize_t;
+#else
 #include <unistd.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <sys/uio.h>
+#include <sys/time.h>
+#endif
 
 #include "net/quic/platform/api/quic_logging.h"
 
 #include "basis/defs.h"
 
 namespace nq {
-
-#if defined(__ENABLE_EPOLL__) || defined(__ENABLE_KQUEUE__)
-typedef int Fd;
-constexpr Fd INVALID_FD = -1; 
-#elif defined(__ENABLE_IOCP__)
-//TODO(iyatomi): windows definition
+#if defined(WIN32)
+typedef SOCKET Fd;
+constexpr Fd INVALID_FD = -1;
 #else
+typedef int Fd;
+constexpr Fd INVALID_FD = -1;
+#endif
+
+#if defined(WIN32)
+#define ALLOCA(varname, ptr_type, n_elem) ptr_type *varname = reinterpret_cast<ptr_type *>(alloca(sizeof(ptr_type) * n_elem))
+#else
+#define ALLOCA(varname, ptr_type, n_elem) ptr_type varname[n_elem]
 #endif
 
 class Syscall {
 public:
+#if defined(WIN32)
+	static inline int Close(Fd fd) { return ::closesocket(fd); }
+#else
 	static inline int Close(Fd fd) { return ::close(fd); }
+#endif
 	static inline int Errno() { return errno; }
 	static inline bool EAgain() {
 		int eno = Errno();

@@ -187,7 +187,7 @@ class NqSimpleStreamHandler : public NqStreamHandler {
     NqStreamHandler(stream), on_recv_(on_recv), parse_buffer_() {};
 
   inline void SendCommon(const void *p, nq_size_t len, const nq_stream_opt_t *opt) {
-    char buffer[len_buff_len + len];
+    ALLOCA(buffer, char, len_buff_len + len);
     auto enc_len = nq::LengthCodec::Encode(len, buffer, sizeof(buffer));
     memcpy(buffer + enc_len, p, len);
     if (opt != nullptr) {
@@ -307,7 +307,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   inline void SendCommon(uint16_t type, nq_msgid_t msgid, const void *p, nq_size_t len) {
     ASSERT(type > 0);
     //pack and send buffer
-    char buffer[header_buff_len + len_buff_len + len];
+    ALLOCA(buffer, char, header_buff_len + len_buff_len + len);
     size_t ofs = 0;
     ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), msgid, buffer, sizeof(buffer));
     ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);

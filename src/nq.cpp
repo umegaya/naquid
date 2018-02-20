@@ -332,9 +332,9 @@ NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn) {
 // --------------------------
 static inline void conn_stream_common(nq_conn_t conn, const char *name, void *ctx, const char *purpose) {
   NqSession::Delegate *d;
-  UNWRAP_CONN(conn, d, ({
+  UNWRAP_CONN(conn, d, {
     d->InitStream(name, ctx);
-  }), purpose);
+  }, purpose);
 }
 
 
@@ -343,9 +343,9 @@ NQAPI_THREADSAFE void nq_conn_stream(nq_conn_t conn, const char *name, void *ctx
 }
 NQAPI_THREADSAFE nq_conn_t nq_stream_conn(nq_stream_t s) {
   NqStream *st;
-  UNWRAP_STREAM(s, st, ({
+  UNWRAP_STREAM(s, st, {
     return NqUnwrapper::Stream2Conn(s.s, st);
-  }), "nq_stream_conn");
+  }, "nq_stream_conn");
   return INVALID_HANDLE<nq_conn_t>(IHR_CONN_NOT_FOUND);
 }
 NQAPI_THREADSAFE nq_alarm_t nq_stream_alarm(nq_stream_t s) {
@@ -428,9 +428,9 @@ NQAPI_THREADSAFE void nq_conn_rpc(nq_conn_t conn, const char *name, void *ctx) {
 }
 NQAPI_THREADSAFE nq_conn_t nq_rpc_conn(nq_rpc_t rpc) {
   NqStream *st;
-  UNWRAP_STREAM(rpc, st, ({
+  UNWRAP_STREAM(rpc, st, {
     return NqUnwrapper::Stream2Conn(rpc.s, st);
-  }), "nq_rpc_conn");
+  }, "nq_rpc_conn");
   return INVALID_HANDLE<nq_conn_t>(IHR_CONN_NOT_FOUND);
 }
 NQAPI_THREADSAFE nq_alarm_t nq_rpc_alarm(nq_rpc_t rpc) {

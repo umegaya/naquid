@@ -1,10 +1,5 @@
 #pragma once
 
-#include <netinet/in.h>
-// Include here to guarantee this header gets included (for MSG_WAITFORONE)
-// regardless of how the below transitive header include set may change.
-#include <sys/socket.h>
-
 #include <stack>
 
 #include "base/macros.h"
@@ -14,6 +9,7 @@
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
 
 #include "basis/endian.h"
+#include "basis/syscall.h"
 
 #if defined(__linux__)
 #define MMSG_MORE 1

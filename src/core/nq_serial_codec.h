@@ -70,7 +70,7 @@ class NqSerial : public nq_serial_t {
   }
   static inline const std::string Dump(const nq_serial_t &serial) {
     char buff[256];
-    auto sz = sprintf(buff, "%" PRIx64, serial.data[0]);
+    auto sz = snprintf(buff, sizeof(buff) - 1, "%" PRIx64, serial.data[0]);
     return std::string(buff, sz);
   }
   static inline bool Compare(const nq_serial_t &s1, const nq_serial_t &s2) {
