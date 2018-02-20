@@ -2,6 +2,7 @@ set(common_src
 	./src/chromium/base/at_exit.cc
 	./src/chromium/base/base64.cc
 	./src/chromium/base/callback_internal.cc
+	./src/chromium/base/cpu.cc
 	./src/chromium/base/debug/alias.cc
 	./src/chromium/base/debug/debugger.cc
 	./src/chromium/base/debug/stack_trace.cc
@@ -17,7 +18,6 @@ set(common_src
 	./src/chromium/base/strings/string_split.cc
 	./src/chromium/base/strings/string_util.cc
 	./src/chromium/base/strings/string_util_constants.cc
-	./src/chromium/base/strings/string16.cc
 	./src/chromium/base/strings/stringprintf.cc
 	./src/chromium/base/strings/utf_offset_string_conversions.cc
 	./src/chromium/base/strings/utf_string_conversions.cc

@@ -6,6 +6,7 @@ set(linux_src
 	./src/chromium/base/posix/safe_strerror.cc
 	./src/chromium/base/process/process_handle_posix.cc
 	./src/chromium/base/rand_util_posix.cc
+	./src/chromium/base/strings/string16.cc
 	./src/chromium/base/synchronization/lock_impl_posix.cc
 	./src/chromium/base/threading/platform_thread_internal_posix.cc
 	./src/chromium/base/threading/platform_thread_linux.cc

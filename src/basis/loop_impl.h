@@ -160,7 +160,71 @@ namespace internal {
 }
 typedef internal::Kqueue LoopImpl;
 }
+#elif defined(__ENABLE_IOCP__)
+namespace nq {
+namespace internal {
+	class IOCP {
+	protected:
+		HANDLE fd_;
+	public:
+		constexpr static uint32_t EV_READ = 0x01;
+		constexpr static uint32_t EV_WRITE = 0x02;
+		typedef struct {
+			Fd fd;
+			uint32_t flags;
+			const char *rb;
+			socklen_t rb_size;
+		} Event;
+		typedef ULONGLONG Timeout;
 
+		IOCP() : fd_(INVALID_HANDLE_VALUE) {}
+
+		//instance method
+		inline int Open(int max_nfd) {
+			fd_ = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE, 0, 0);
+			return fd_ != INVALID_HANDLE_VALUE ? NQ_ESYSCALL : NQ_OK;
+	}
+		inline void Close() {
+			if (fd_ != INVALID_HANDLE_VALUE) {
+				CloseHandle(fd_);
+				fd_ = INVALID_HANDLE_VALUE;
+			}
+		}
+		inline int Errno() { return Syscall::Errno(); }
+		inline bool EAgain() { return Syscall::EAgain(); }
+		inline int Add(Fd d, uint32_t flag) {
+			ASSERT(false);
+			return NQ_OK;
+		}
+		inline int Mod(Fd d, uint32_t flag) {
+			ASSERT(false);
+			return NQ_OK;
+		}
+		inline int Del(Fd d) {
+			ASSERT(false);
+			return NQ_OK;
+		}
+		inline int Wait(Event *ev, int size, Timeout &to) {
+			ASSERT(false);
+			return NQ_OK;
+		}
+
+		//static method
+		static inline void InitEvent(Event &e, Fd fd = INVALID_FD) {
+			e.fd = fd; e.flags = 0;
+		}
+		static inline Fd From(const Event &e) { return e.fd; }
+		static inline bool Readable(const Event &e) { return false; }
+		static inline bool Writable(const Event &e) { return false; }
+		/* TODO: not sure about this check */
+		static inline bool Closed(const Event &e) { return false; }
+		static inline void ToTimeout(uint64_t timeout_ns, Timeout &to) {
+			to = timeout_ns / (1000 * 1000);
+		}
+	};
+}
+typedef internal::IOCP LoopImpl;
+}
 #else //TODO: windows
-#error no suitable poller function
+//#error no suitable poller function
 #endif

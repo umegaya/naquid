@@ -9,6 +9,7 @@ DEBUG=False
 TEST_DEBUG=True
 TEST_SVHOST=127.0.0.1
 JOB=4
+WINDOWS_GENERATOR=Visual Studio 15 2017
 
 define ct_run
 docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) sh -c "cd /naquid && $1"
@@ -40,6 +41,10 @@ linux:
 linux_sh: 
 	docker run --name nqsh --rm -ti --privileged --add-host test.qrpc.io:$(TEST_SVHOST) -v `pwd`:/naquid naquid/meta-builder bash || docker exec -ti nqsh bash
 
+windows:
+	-@mkdir -p build/windows
+	cd build/windows && cmake -G '$(WINDOWS_GENERATOR)' -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/windows.cmake $(RELATIVE_PROJECT_ROOT)
+
 ios:
 	-@mkdir -p build/ios.v7
 	-@mkdir -p build/ios.64
@@ -53,8 +58,8 @@ android:
 	-@mkdir -p build/android.v7
 	-@mkdir -p build/android.64
 	-@mkdir -p build/android
-	cd build/android.v7 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
-	cd build/android.64 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	cd build/android.v7 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DNQ_ANDROID:BOOLEAN=True -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	cd build/android.64 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DNQ_ANDROID:BOOLEAN=True -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
 	mv build/android.v7/lib$(LIB).so build/android/lib$(LIB)-armv7.so
 	mv build/android.64/lib$(LIB).so build/android/lib$(LIB)-arm64.so
 

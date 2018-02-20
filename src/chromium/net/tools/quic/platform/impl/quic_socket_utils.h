@@ -7,9 +7,13 @@
 #ifndef NET_TOOLS_QUIC_PLATFORM_IMPL_QUIC_SOCKET_UTILS_H_
 #define NET_TOOLS_QUIC_PLATFORM_IMPL_QUIC_SOCKET_UTILS_H_
 
+#if defined(WIN32)
+#include <time.h>
+#else
 #include <netinet/in.h>
 #include <stddef.h>
 #include <sys/socket.h>
+#endif
 
 #include <string>
 

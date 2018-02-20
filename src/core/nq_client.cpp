@@ -1,9 +1,5 @@
 #include "core/nq_client.h"
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-
 #include "net/quic/platform/api/quic_ptr_util.h"
 #include "net/quic/core/quic_crypto_client_stream.h"
 
@@ -204,10 +200,7 @@ void NqClient::OnOpen() {
 void NqClient::OnClose(QuicErrorCode error,
              const std::string& error_details,
              ConnectionCloseSource close_by_peer_or_self) {
-  nq_error_detail_t detail = {
-    .code = error,
-    .msg = error_details.c_str(),
-  };
+  nq_error_detail_t detail = { error, error_details.c_str() };
   uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, ToHandle(), 
                                               NQ_EQUIC, 
                                               &detail, 

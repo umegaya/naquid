@@ -13,6 +13,9 @@ set(net_verify_src
 	./src/chromium/net/cert/multi_log_ct_verifier.cc
 	./src/chromium/net/cert/ocsp_verify_result.cc
 	./src/chromium/net/ssl/ssl_config_service.cc
+	./src/chromium/net/http/http_security_headers.cc
+	./src/chromium/net/http/transport_security_state.cc
+	./src/chromium/net/http/transport_security_state_source.cc
 )
 
 set(net_src
@@ -55,10 +58,6 @@ set(net_src
 	./src/chromium/net/der/parser.cc
 	./src/chromium/net/der/parse_values.cc
 	./src/chromium/net/der/tag.cc
-	./src/chromium/net/dns/dns_util.cc
-	./src/chromium/net/http/http_security_headers.cc
-	./src/chromium/net/http/transport_security_state.cc
-	./src/chromium/net/http/transport_security_state_source.cc
 	./src/chromium/net/quic/core/congestion_control/bandwidth_sampler.cc
 	./src/chromium/net/quic/core/congestion_control/bbr_sender.cc
 	./src/chromium/net/quic/core/congestion_control/cubic.cc

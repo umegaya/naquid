@@ -1,3 +1,5 @@
+#include "core/platform/nq_platform.h"
+
 #include "base/posix/eintr_wrapper.h"
 #include "base/files/file_path.h"
 
@@ -5,13 +7,16 @@
 #include <limits>
 #endif
 
-#include <stddef.h>
+#if !defined(OS_WINDOWS)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
+#endif
+
+#include "basis/syscall.h"
 
 namespace base {	
+#if !defined(WIN32)
 bool ReadFromFD(int fd, char* buffer, size_t bytes) {
   size_t total_read = 0;
   while (total_read < bytes) {
@@ -38,7 +43,6 @@ bool WriteFileDescriptor(const int fd, const char* data, int size) {
 
   return true;
 }
-
 int WriteFile(const FilePath& filename, const char* data, int size) {
   int fd = HANDLE_EINTR(creat(filename.value().c_str(), 0666));
   if (fd < 0)
@@ -56,6 +60,15 @@ bool DirectoryExists(const FilePath& path) {
     return false;
   return S_ISDIR(file_info.st_mode);
 }
+#else
+int WriteFile(const FilePath& filename, const char* data, int size) {
+  return 0;
+}
+
+bool DirectoryExists(const FilePath& path) {
+  return false;
+}
+#endif
 
 //minimum file IO
 const FilePath::CharType kStringTerminator = FILE_PATH_LITERAL('\0');
@@ -103,7 +116,11 @@ bool ReadFileToStringWithMaxSize(const FilePath& path,
   // omit check path contained parent path (..)
   // if (path.ReferencesParent())
   //  return false; 
+#if defined(WIN32)
+  FILE* file = fopen((const char *)path.value().c_str(), "rb");
+#else
   FILE* file = fopen(path.value().c_str(), "rb");
+#endif
   if (!file) {
     return false;
   }

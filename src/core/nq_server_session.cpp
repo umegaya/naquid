@@ -81,10 +81,7 @@ NqLoop *NqServerSession::GetLoop() {
 void NqServerSession::OnClose(QuicErrorCode error,
                      const std::string& error_details,
                      ConnectionCloseSource close_by_peer_or_self) {
-  nq_error_detail_t detail = {
-    .code = error,
-    .msg = error_details.c_str(),
-  };
+  nq_error_detail_t detail = { error, error_details.c_str() };
   nq_closure_call(port_config_.server().on_close, ToHandle(), 
                   NQ_EQUIC, 
                   &detail, 

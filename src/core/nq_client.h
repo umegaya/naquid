@@ -7,11 +7,10 @@
 #include <stack>
 #include <functional>
 
-#include <arpa/inet.h>
-
 #include "net/tools/quic/quic_client_base.h"
 
 #include "basis/allocator.h"
+#include "basis/syscall.h"
 #include "core/nq_alarm.h"
 #include "core/nq_client_session.h"
 #include "core/nq_config.h"

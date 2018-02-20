@@ -1,11 +1,6 @@
+#if !defined(WIN32)
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
 
-#include <errno.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/uio.h>
-#include <unistd.h>
 #include <string>
 
 #ifdef OS_LINUX
@@ -340,3 +335,4 @@ int QuicSocketUtils::CreateUDPSocket(const QuicSocketAddress& address,
 }
 
 } //net
+#endif

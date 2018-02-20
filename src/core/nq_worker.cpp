@@ -18,8 +18,8 @@ void NqWorker::Process(NqPacket *p) {
 }
 void NqWorker::Run(PacketQueue &pq) {
   int n_dispatcher = server_.port_configs().size();
-  InvokeQueue *iq[n_dispatcher];
-  NqDispatcher *ds[n_dispatcher];
+  ALLOCA(iq, InvokeQueue *, n_dispatcher);
+  ALLOCA(ds, NqDispatcher *, n_dispatcher);
   if (!Listen(iq, ds)) {
     nq::logger::fatal("fail to listen");
     exit(1);
@@ -50,7 +50,7 @@ void NqWorker::Run(PacketQueue &pq) {
     loop_.Poll();
   }
   //shutdown proc
-  bool per_worker_shutdown_state[n_dispatcher];
+  ALLOCA(per_worker_shutdown_state, bool, n_dispatcher);
   for (int i = 0; i < n_dispatcher; i++) {
     per_worker_shutdown_state[i] = false;
     ds[i]->Shutdown(); //send connection close for all sessions handled by this worker
@@ -127,7 +127,12 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
   }
 
   //set socket resuable
-  int flag = 1, rc = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
+#if defined(WIN32)
+  constexpr int opt_reuseport = SO_REUSEADDR;
+#else
+  constexpr int opt_reuseport = SO_REUSEPORT;
+#endif
+  int flag = 1, rc = setsockopt(fd, SOL_SOCKET, opt_reuseport, reinterpret_cast<const char *>(&flag), sizeof(flag));
   if (rc < 0) {
     QUIC_LOG(ERROR) << "setsockopt(SO_REUSEPORT) failed: " << strerror(errno);
     nq::Syscall::Close(fd);

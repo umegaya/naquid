@@ -20,11 +20,18 @@ class NqProofSource : public ProofSourceChromium {
   bool Initialize(const nq_addr_t &a) {
     bool inited = false;
     if (a.cert != nullptr && a.key != nullptr) {
+#if defined(OS_WIN)
+  	  inited = ProofSourceChromium::Initialize(
+        base::FilePath(base::FilePath::StringPieceType((wchar_t *)a.cert)),
+        base::FilePath(base::FilePath::StringPieceType((wchar_t *)a.key)),
+        base::FilePath());
+#else
       inited = ProofSourceChromium::Initialize(
         base::FilePath(base::FilePath::StringPieceType(a.cert)), 
         base::FilePath(base::FilePath::StringPieceType(a.key)), 
         base::FilePath());
-    }
+#endif
+	}
 #if defined(OS_LINUX)
     if (!inited) {
       auto basepath = base::FilePath::StringType("/etc/letsencrypt/live/") + 

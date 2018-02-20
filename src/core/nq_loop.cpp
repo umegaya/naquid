@@ -1,7 +1,7 @@
 #include "core/nq_loop.h"
 
-#include <sys/time.h>
-
+#include "basis/syscall.h"
+#include "basis/timespec.h"
 #include "core/nq_alarm.h"
 
 namespace net {
@@ -31,9 +31,9 @@ QuicTime NqLoop::ConvertWallTimeToQuicTime(
          QuicTime::Delta::FromMicroseconds(walltime.ToUNIXMicroseconds());
 }
 uint64_t NqLoop::NowInUsec() const {
-  struct timeval tv;
-  gettimeofday(&tv, nullptr);
-  return ((uint64_t)tv.tv_usec) + (((uint64_t)tv.tv_sec) * 1000 * 1000);
+  long sec, nsec;
+  nq::clock::now(sec, nsec);
+  return ((uint64_t)nsec / 1000) + (((uint64_t)sec) * 1000 * 1000);
 }
 /* static */
 QuicTime NqLoop::ToQuicTime(uint64_t from_us) {

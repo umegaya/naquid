@@ -43,7 +43,7 @@ namespace logger {
       long sec, nsec;
       clock::now(sec, nsec);
       char tsbuff[32];
-      sprintf(tsbuff, "%ld.%09ld", sec, nsec);
+      snprintf(tsbuff, sizeof(tsbuff), "%ld.%09ld", sec, nsec);
       mj["_ts"] = tsbuff; //((double)sec) + (((double)nsec) / (1000 * 1000 * 1000));
       mj["_id"] = id();
       mj["_lv"] = log_level_[lv];

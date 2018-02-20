@@ -1,11 +1,5 @@
 #include "core/nq_packet_writer.h"
 
-#include <errno.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/uio.h>
-#include <unistd.h>
 #include <string>
 
 #include "net/quic/core/quic_packets.h"
@@ -15,9 +9,40 @@
 #include "net/quic/platform/api/quic_socket_address.h"
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
 
+#include "basis/syscall.h"
+
 extern bool chaos_write();
 
 namespace net {
+#if defined(WIN32)
+// static
+WriteResult NqPacketWriter::WritePacket(
+    int fd,
+    const char* buffer,
+    size_t buf_len,
+    const QuicIpAddress& self_address,
+    const QuicSocketAddress& peer_address,
+    bool reachability_tracked) {
+    return WriteResult(WRITE_STATUS_ERROR, 49);
+}
+
+WriteResult NqPacketWriter::WritePacket(
+    const char* buffer,
+    size_t buf_len,
+    const QuicIpAddress& self_address,
+    const QuicSocketAddress& peer_address,
+    PerPacketOptions* options) {
+  DCHECK(!IsWriteBlocked());
+  DCHECK(nullptr == options)
+      << "QuicDefaultPacketWriter does not accept any options.";
+  WriteResult result = WritePacket(fd(), buffer, buf_len,
+                                   self_address, peer_address, reachability_tracked_);
+  if (result.status == WRITE_STATUS_BLOCKED) {
+    set_write_blocked(true);
+  }
+  return result;
+}
+#else
 // static
 WriteResult NqPacketWriter::WritePacket(
     int fd,
@@ -112,4 +137,5 @@ WriteResult NqPacketWriter::WritePacket(
   }
   return result;
 }
+#endif
 }

@@ -18,7 +18,7 @@ bool LockImpl::Try() {
 }
 
 void LockImpl::Lock() {
-  base::debug::ScopedLockAcquireActivity lock_activity(this);
+  //base::debug::ScopedLockAcquireActivity lock_activity(this);
   ::AcquireSRWLockExclusive(&native_handle_);
 }
 

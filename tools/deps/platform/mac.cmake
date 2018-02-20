@@ -5,6 +5,7 @@ set(mac_src
 	./src/chromium/base/mac/scoped_mach_port.cc
 	./src/chromium/base/posix/safe_strerror.cc
 	./src/chromium/base/rand_util_posix.cc
+	./src/chromium/base/strings/string16.cc
 	./src/chromium/base/strings/sys_string_conversions_mac.mm	
 	./src/chromium/base/synchronization/lock_impl_posix.cc
 	./src/chromium/base/time/time_conversion_posix.cc
