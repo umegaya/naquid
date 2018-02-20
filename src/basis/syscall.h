@@ -67,7 +67,7 @@ public:
 			return false;
 		}
 	}
-	static socklen_t GetSockAddrLen(int address_family) {
+	static inline socklen_t GetSockAddrLen(int address_family) {
 		switch(address_family) {
 		case AF_INET:
 			return sizeof(struct sockaddr_in);
@@ -81,7 +81,7 @@ public:
 			return 0;
 		}
 	}
-	static socklen_t GetIpAddrLen(int address_family) {
+	static inline socklen_t GetIpAddrLen(int address_family) {
 		switch(address_family) {
 		case AF_INET:
 			return sizeof(struct in_addr);
@@ -95,16 +95,23 @@ public:
 			return 0;
 		}
 	}
-	static void *Memdup(const void *p, nq_size_t sz) {
+	static inline void *Memdup(const void *p, nq_size_t sz) {
 		void *r = malloc(sz);
 		memcpy(r, p, sz);
 		return r;
 	}
-	static void MemFree(void *p) {
+	static inline void MemFree(void *p) {
 		free(p);
 	}
-	static void *MemAlloc(nq_size_t sz) {
+	static inline void *MemAlloc(nq_size_t sz) {
 		return malloc(sz);
+	}
+	static inline char *StrDup(const char *src) {
+#if defined(WIN32)
+		return _strdup(src);
+#else
+		return strdup(src);
+#endif
 	}
 };
 }

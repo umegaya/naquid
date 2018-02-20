@@ -1,8 +1,16 @@
+#include "core/platform/nq_platform.h"
+
 #include "base/posix/eintr_wrapper.h"
 #include "base/files/file_path.h"
 
 #if defined(OS_LINUX)
 #include <limits>
+#endif
+
+#if !defined(OS_WINDOWS)
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #endif
 
 #include "basis/syscall.h"

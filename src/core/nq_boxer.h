@@ -125,7 +125,7 @@ class NqBoxer {
       OpTarget target) : 
       serial_(serial), target_ptr_(target_ptr), code_(code), target_(target), data_() {
       if (*name != 0) {
-        stream_.name_ = _strdup(name);
+        stream_.name_ = nq::Syscall::StrDup(name);
         stream_.ctx_ = ctx;
       }
     }
