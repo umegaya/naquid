@@ -1,4 +1,4 @@
-FROM ubuntu:16.10
+FROM ubuntu:xenial
 
 RUN apt-get update && \
 	apt-get install -y zlib1g-dev libssl1.0.0 gcc g++ cmake git pkg-config build-essential autoconf libtool gdb curl unzip && \

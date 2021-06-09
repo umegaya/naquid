@@ -2,6 +2,14 @@
 - now basic client/server communication done. more test for ensure stability and performance improvement is required
 
 
+#### build
+``` sh
+# meta-builder/builder only required for first build or tools/builder/Dockerfile changes
+$ make meta-builder builder 
+# it may stalled for 1st run, quit and rerun test in that case
+$ make test
+```
+
 #### tasks for 0.1.0
 - [x] rpc: reduce frame number (unify length header/msgid/type to one frame)
 - [x] rpc: add header byte to indicate msgid/type size
