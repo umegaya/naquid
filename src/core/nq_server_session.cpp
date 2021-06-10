@@ -50,14 +50,14 @@ NqStream *NqServerSession::FindStreamBySerial(const nq_serial_t &s, bool include
     for (auto &e : closed_list) {
       auto st = static_cast<NqStream *>(e.get());
       TRACE("FindStreamBySerial: %p(c), s = %s, sts = %s %p", this, NqSerial::Dump(s).c_str(), st->stream_serial().Dump().c_str(), st);
-    if (st->stream_serial() == s) {
-        return st;
+      if (st->stream_serial() == s) {
+          return st;
       }
     }
     for (auto &kv : zombie_streams()) {
       auto st = static_cast<NqStream *>(kv.second.get());
       TRACE("FindStreamBySerial: %p(z), s = %s, sts = %s %p", this, NqSerial::Dump(s).c_str(), st->stream_serial().Dump().c_str(), st);
-    if (st->stream_serial() == s) {
+      if (st->stream_serial() == s) {
         return st;
       }      
     }

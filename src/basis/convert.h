@@ -27,7 +27,7 @@ static bool Conv(const std::string &src, T *dst) {
 
 
 //wrapper
-//try to vonvert. if error, returns error and dst not initialized.
+//try to convert. if error, returns error and dst not initialized.
 template <class F, class T>
 static bool Try(F src, T *dst) {
   return Conv(src, dst);

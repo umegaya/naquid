@@ -29,14 +29,14 @@ namespace nq {
 		inline void Close() {
 			if (processors_ != nullptr) {
 				delete []processors_;
-        processors_ = nullptr;
+		    processors_ = nullptr;
 			}
 			LoopImpl::Close();
 		}
 		inline int Add(Fd fd, IoProcessor *h, uint32_t flags) {
 			int r = h->OnOpen(fd);
 			if (r < 0) { return r; }
-      CheckAndGrow(fd);
+	    CheckAndGrow(fd);
 			ASSERT(processors_[fd] == nullptr);
 			processors_[fd] = h;
 			return LoopImpl::Add(fd, flags);
@@ -92,13 +92,13 @@ namespace nq {
 
 		inline void CheckAndGrow(Fd fd) {
 			if ((int)fd >= max_nfd_) {
-        int old = max_nfd_;
-        do {
-          max_nfd_ <<= 1;
-        } while (max_nfd_ < (int)fd);
-        processors_ = (IoProcessor**)std::realloc(processors_, max_nfd_ * sizeof(IoProcessor*));
-        memset(processors_ + old, 0, sizeof(IoProcessor*) * (max_nfd_ - old));
-      }
+				int old = max_nfd_;
+				do {
+					max_nfd_ <<= 1;
+				} while (max_nfd_ < (int)fd);
+				processors_ = (IoProcessor**)std::realloc(processors_, max_nfd_ * sizeof(IoProcessor*));
+				memset(processors_ + old, 0, sizeof(IoProcessor*) * (max_nfd_ - old));
+			}
 		}
 	};
 }

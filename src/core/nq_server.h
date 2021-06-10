@@ -112,7 +112,7 @@ class NqServer {
       std::unique_lock<std::mutex> lock(mutex_); 
       //finailized should evaluated before first actual wait operation, so never deadlock.
       //if reach here earlier than Stop() finished, this thread should be waken up by the thread calls Stop(),
-      //otherwise, Stop() is already finished here and finalized() returns true
+      //otherwise, Stop() is already finished here and terminated() returns true
       cond_.wait(lock, [this]() { return terminated(); });
       if (shutdown_thread_.joinable()) {
         shutdown_thread_.join(); //ensure shutdown thread finished

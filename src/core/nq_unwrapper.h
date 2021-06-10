@@ -16,7 +16,7 @@ namespace net {
 //especially, keep following restriction in mind.
 //  1. member p can be cast to NqSession::Delegate* or NqStream* (and its derived classes, NqServerStream, NqClientStream, NqClient, NqServerSession)
 //     but none of its virtual function can be called. because its vtbl may become invalid already.
-//  2. validity should be check serial stored in pointer of casted object and handle (nq_conn_t.s, nq_rpc_t.s, nq_stream_t.s, nq_alarm_t.s),
+//  2. validity should be checked serial stored in pointer of casted object and handle (nq_conn_t.s, nq_rpc_t.s, nq_stream_t.s, nq_alarm_t.s),
 //     with locking mutex which is returned by StaticMutex(nq_conn_t/nq_rpc_t/nq_stream_t/nq_alarm_t)
 //
 //caller should be use following functions with following step. for convenience, UNWRAP_CONN and UNWRAP_STREAM is provided.
