@@ -4,7 +4,7 @@
 #include <vector>
 #include <memory>
 
-#include "base/memory/manual_constructor.h"
+#include "memory.h"
 
 #include "defs.h"
 
@@ -16,12 +16,12 @@ struct BlockTrait {
   STATIC_ASSERT((sizeof(E) % 8) == 0, "allocator target type should have 8 byte alignment");
   STATIC_ASSERT((sizeof(B) % 8) == 0, "allocator bss type should have 8 byte alignment");
   typedef struct BlockTag {
-    char p[sizeof(E)];
-    base::ManualConstructor<B> bss;
+    alignas(E) char p[sizeof(E)];
+    ManualConstructedOf<B> bss;
     inline void Init() { bss.Init(); }
     inline void Destroy() { bss.Destroy(); }
     static inline B *Bss(void *ptr) {
-      return reinterpret_cast<B *>(reinterpret_cast<char *>(ptr) + sizeof(E)); 
+      return reinterpret_cast<B *>(reinterpret_cast<char *>(ptr) + sizeof(p)); 
     }
   } Block;
 };
@@ -37,10 +37,11 @@ struct BlockTrait<E, EmptyBSS> {
     }
   } Block;  
 };
+// allocator that each block has 'BSS' section that never be destructed by freeing user region of the block
 template <class E, class B = EmptyBSS>
 class Allocator {
   typedef typename BlockTrait<E, B>::Block Block;
-  //TODO(iyatoim): it may be more fast by custom allocator
+  //TODO(iyatoim): it may be faster by custom allocator
   std::vector<std::unique_ptr<Block[]>> chunks_;
   size_t total_block_, chunk_size_;
   std::stack<Block*> pool_;

@@ -3,7 +3,7 @@
 #if !defined(ASSERT)
   #if !defined(NDEBUG)
     #include <assert.h>
-    #define ASSERT(cond) assert(cond)
+    #define ASSERT(cond) assert((cond))
   #else
     #define ASSERT(cond)
   #endif
