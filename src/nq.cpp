@@ -2,12 +2,12 @@
 
 #include <ares.h>
 
-#include "base/at_exit.h"
-#include "base/logging.h"
+#include "basis/logger.h"
 
 #include "basis/defs.h"
 #include "basis/timespec.h"
 
+#include "core/nq_at_exit.h"
 #include "core/nq_closure.h"
 #include "core/nq_client_loop.h"
 #include "core/nq_server.h"
@@ -15,8 +15,8 @@
 #include "core/nq_network_helper.h"
 
 //at exit manager seems optimized out and causes linkder error without following anchor
-extern base::AtExitManager *nq_at_exit_manager();
-static base::AtExitManager *g_at_exit_manager;
+extern nq_at_exit_manager_t nq_at_exit_manager();
+static nq_at_exit_manager_t g_at_exit_manager;
 
 #if defined(NQAPI_THREADSAFE)
 #undef NQAPI_THREADSAFE
@@ -204,6 +204,13 @@ NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl) {
 }
 NQAPI_BOOTSTRAP bool nq_client_resolve_host(nq_client_t cl, int family_pref, const char *hostname, nq_on_resolve_host_t cb) {
   return NqClientLoop::FromHandle(cl)->Resolve(family_pref, hostname, cb);
+}
+NQAPI_THREADSAFE const char *nq_ntop(const char *src, nq_size_t srclen, char *dst, nq_size_t dstlen) {
+  if (NqAsyncResolver::NtoP(src, srclen, dst, dstlen) < 0) {
+    return nullptr;
+  } else {
+    return dst;
+  }
 }
 
 

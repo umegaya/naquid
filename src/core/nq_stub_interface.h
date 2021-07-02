@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/nq_loop.h"
+#include "backends/compats/nq_loop.h"
 #include "core/nq_dispatcher.h"
 
 namespace net {

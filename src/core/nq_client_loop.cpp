@@ -1,7 +1,5 @@
 #include "core/nq_client_loop.h"
 
-#include "net/base/sockaddr_storage.h"
-
 #include "core/nq_client.h"
 
 namespace net {
@@ -174,51 +172,4 @@ NqClient *NqClientLoop::Create(const std::string &host,
   c->InitSerial(); //insert c into client_map_
   return c;
 }
-/* static */
-/*bool NqClientLoop::ParseUrl(const std::string &host, int port, int address_family, 
-                            QuicServerId& server_id, QuicSocketAddress &address, QuicConfig &config) {
-  if (host.empty()) {
-    return false;
-  } else if (port == 0) {
-    port = 443;
-  }
-  const int AF_COUNT = 2;
-  int *af_order, af_order_sorted[AF_COUNT], default_af_order[AF_COUNT] = {
-    AF_INET, AF_INET6,
-  };
-  if (address_family == 0) {
-    af_order = default_af_order;
-  } else {
-    int cnt = 0;
-    af_order_sorted[cnt++] = address_family;
-    for (int i = 0; i < AF_COUNT && cnt < AF_COUNT; i++) {
-      if (default_af_order[i] != address_family) {
-        af_order_sorted[cnt++] = default_af_order[i];
-      }
-    }
-    af_order = af_order_sorted;
-  }
-  for (int i = 0; i < AF_COUNT; i++) {
-    struct addrinfo filter, *resolved;
-    filter.ai_socktype = SOCK_DGRAM;
-    filter.ai_family = af_order[i];
-    filter.ai_protocol = 0;
-    filter.ai_flags = 0;
-    if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &filter, &resolved) != 0) {
-      continue;
-    }
-    try {
-      SockaddrStorage ss;
-      memcpy(ss.addr, resolved->ai_addr, resolved->ai_addrlen);
-      server_id = QuicServerId(host, port, PRIVACY_MODE_ENABLED); //TODO: control privacy mode from url
-      address = QuicSocketAddress(ss.addr_storage);
-      freeaddrinfo(resolved);
-      return true;
-    } catch (...) {
-      freeaddrinfo(resolved);
-      return false;
-    }
-  }
-  return false;
-}	*/
 } //net

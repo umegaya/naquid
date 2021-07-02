@@ -90,5 +90,24 @@ class NqAsyncResolver {
       return -1;
     }
   }
+  static inline int NtoP(const void *src, nq_size_t srclen, char *dst, nq_size_t dstlen) {
+    const char *converted = nullptr;
+    if (srclen == nq::Syscall::GetIpAddrLen(AF_INET)) {
+      converted = ares_inet_ntop(AF_INET, src, dst, dstlen);
+    } else if (srclen == nq::Syscall::GetIpAddrLen(AF_INET6)) {
+      converted = ares_inet_ntop(AF_INET6, src, dst, dstlen);
+    } else {
+      TRACE("invalid srclen:%u", srclen);
+      ASSERT(false);
+      return -1;
+    }
+    if (converted != nullptr) {
+      return 0;
+    } else {
+      int eno = nq::Syscall::Errno();
+      TRACE("failure ntop: %d", eno);
+      return -1;
+    }
+  }
 };
 }

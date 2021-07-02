@@ -1,7 +1,7 @@
 #include "core/nq_stream.h"
 
 #include "basis/endian.h"
-#include "core/nq_loop.h"
+#include "backends/compats/nq_loop.h"
 #include "core/nq_session.h"
 #include "core/nq_client.h"
 #include "core/nq_server_session.h"

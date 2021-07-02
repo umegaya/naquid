@@ -3,6 +3,23 @@
 #include "core/nq_boxer.h"
 
 namespace net {
+// NqAlarmBase
+void NqAlarmBase::Start(NqLoop *loop, nq_time_t first_invocation_ts) {
+  Stop(loop);
+  ASSERT(invocation_ts_ == 0);
+  invocation_ts_ = first_invocation_ts;
+  loop->SetAlarm(this, nq::clock::to_us(invocation_ts_));
+}
+void NqAlarmBase::Stop(NqLoop *loop) {
+  if (invocation_ts_ != 0) {
+    loop->CancelAlarm(this, nq::clock::to_us(invocation_ts_));
+    invocation_ts_ = 0;
+  }
+}
+
+
+
+// NqAlarm
 NqAlarmIndex NqAlarm::alarm_index() const {
   if (NqSerial::IsClient(alarm_serial_)) {
     return NqAlarmSerialCodec::ClientAlarmIndex(alarm_serial_);
@@ -33,7 +50,7 @@ void NqAlarm::operator delete(void *p) noexcept {
 void NqAlarm::operator delete(void *p, NqBoxer *b) noexcept {
   b->GetAlarmAllocator()->Free(p);
 }
-void NqAlarm::OnFire(NqLoop *loop) {
+void NqAlarm::OnFire() {
   boxer_->InvokeAlarm(alarm_serial_, this, NqBoxer::OpCode::Exec);
   //ClearInvocationTS();
 }

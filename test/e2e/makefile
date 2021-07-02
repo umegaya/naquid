@@ -4,6 +4,7 @@ CLIENT_BUILD_DIR=$(BUILD_ROOT)/client
 SERVER_BUILD_DIR=$(BUILD_ROOT)/server
 RELATIVE_ROOT_DIR=../../..
 TEST_OS=osx
+BACKEND=
 
 .PHONY: client
 client:

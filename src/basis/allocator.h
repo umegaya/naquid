@@ -28,7 +28,7 @@ struct BlockTrait {
 template <class E>
 struct BlockTrait<E, EmptyBSS> {
   STATIC_ASSERT((sizeof(E) % 8) == 0, "allocator target type should have 8 byte alignment");
-  typedef struct {
+  typedef struct BlockTag {
     char p[sizeof(E)];
     inline void Init() {}
     inline void Destroy() {}

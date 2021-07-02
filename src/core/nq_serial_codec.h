@@ -7,6 +7,7 @@
 #include <inttypes.h>
 
 #include "nq.h"
+#include "backends/compats/nq_quic_types.h"
 #include "basis/id_factory.h"
 
 namespace net {
@@ -143,8 +144,8 @@ class NqStreamSerialCodec {
     NqSerial::Encode(out_serial, stream_index, true);
   }
 
-  static inline QuicStreamId ClientStreamIndex(const nq_serial_t &s) { return NqSerial::ObjectIndex<QuicStreamId>(s); }
-  static inline QuicStreamId ServerStreamIndex(const nq_serial_t &s) { return NqSerial::ObjectIndex<QuicStreamId>(s); }
+  static inline NqQuicStreamId ClientStreamIndex(const nq_serial_t &s) { return NqSerial::ObjectIndex<NqQuicStreamId>(s); }
+  static inline NqQuicStreamId ServerStreamIndex(const nq_serial_t &s) { return NqSerial::ObjectIndex<NqQuicStreamId>(s); }
 };
 template <class S, typename INDEX>
 class NqSessiontMap : protected std::map<INDEX, S*> {

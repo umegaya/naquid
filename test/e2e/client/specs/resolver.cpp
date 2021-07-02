@@ -1,5 +1,4 @@
 #include "resolver.h"
-#include "net/quic/platform/api/quic_ip_address.h"
 
 using namespace nqtest;
 
@@ -48,12 +47,14 @@ void test_resolver(Test::Conn &tc) {
       done(false);
       return;
     }
-    net::QuicIpAddress ip;
-    if (!ip.FromPackedString(p, sz)) {
+    char addr[256];
+    const char *result = nq_ntop(p, sz, addr, sizeof(addr));
+    if (result == nullptr) {
+      TRACE("error resolve");
       done(false);
       return;
     }
-    TRACE("resolve success: as %s", ip.ToString().c_str());
+    TRACE("resolve success: as %s", result);
     done(true);
   }));
   RESOLVE(cl, AF_UNSPEC, "nosuchhost.nowhere", ([done2](nq_error_t r, const nq_error_detail_t *d, const char *p, nq_size_t sz) {
@@ -69,12 +70,14 @@ void test_resolver(Test::Conn &tc) {
       done3(false);
       return;
     }
-    net::QuicIpAddress ip;
-    if (!ip.FromPackedString(p, sz)) {
+    char addr[256];
+    const char *result = nq_ntop(p, sz, addr, sizeof(addr));
+    if (result == nullptr) {
+      TRACE("error resolve");
       done3(false);
       return;
     }
-    TRACE("resolve success: as %s", ip.ToString().c_str());
+    TRACE("resolve success: as %s", result);
     done3(true);
   }));
 }

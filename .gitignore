@@ -1,3 +1,4 @@
+.vscode
 test/lab/*
 test/e2e/build/*
 test/e2e/server.pid

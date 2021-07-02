@@ -4,13 +4,13 @@
 #include <thread>
 
 #include "net/quic/core/quic_server_id.h"
-#include "net/quic/core/quic_version_manager.h"
 
 #include "basis/allocator.h"
-#include "core/nq_loop.h"
+#include "backends/compats/nq_loop.h"
 #include "core/nq_alarm.h"
 #include "core/nq_async_resolver.h"
 #include "core/nq_config.h"
+#include "backends/compats/nq_quic_version_manager.h"
 #include "core/nq_boxer.h"
 #include "core/nq_client.h"
 #include "core/nq_stream.h"
@@ -32,7 +32,7 @@ class NqClientLoop : public NqLoop,
   ClientMap client_map_;
   AlarmMap alarm_map_;
   NqBoxer::Processor processor_;
-  QuicVersionManager versions_;
+  NqQuicVersionManager versions_;
   std::thread::id thread_id_;
   ClientAllocator client_allocator_;
   StreamAllocator stream_allocator_;
@@ -43,7 +43,7 @@ class NqClientLoop : public NqLoop,
 
  public:
   NqClientLoop(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
-    processor_(), versions_(net::AllSupportedVersions()),
+    processor_(), versions_(),
     client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint),
     async_resolver_(), stream_index_factory_(0x7FFFFFFF) {
     worker_index_ = client_worker_index_factory_.New();
@@ -77,12 +77,6 @@ class NqClientLoop : public NqLoop,
   inline NqAsyncResolver &async_resolver() { return async_resolver_; }
 
   static inline NqClientLoop *FromHandle(nq_client_t cl) { return (NqClientLoop *)cl; }
-  static bool ParseUrl(const std::string &host, 
-                       int port, 
-                       int address_family,
-                       QuicServerId& server_id, 
-                       QuicSocketAddress &address, 
-                       QuicConfig &config);
 
   //implements QuicStreamAllocator
   void *Alloc(size_t sz) override { return stream_allocator_.Alloc(sz); }

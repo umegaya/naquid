@@ -10,7 +10,7 @@
 #include "basis/id_factory.h"
 #include "basis/timespec.h"
 #include "core/nq_closure.h"
-#include "core/nq_loop.h"
+#include "backends/compats/nq_loop.h"
 #include "core/nq_alarm.h"
 #include "core/nq_serial_codec.h"
 
@@ -247,7 +247,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
             NqAlarmBase(), 
             stream_handler_(stream_handler), on_reply_(on_reply), msgid_(msgid) {}
     ~Request() {}
-    void OnFire(NqLoop *) override { 
+    void OnFire() override { 
       auto it = stream_handler_->req_map_.find(msgid_);
       if (it != stream_handler_->req_map_.end()) {
         nq_closure_call(on_reply_, stream_handler_->stream()->ToHandle<nq_rpc_t>(), NQ_ETIMEOUT, "", 0);

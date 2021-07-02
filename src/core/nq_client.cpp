@@ -171,7 +171,7 @@ void NqClient::InitializeSession() {
 
 
 // implements NqAlarmBase
-void NqClient::OnFire(NqLoop *l) { 
+void NqClient::OnFire() { 
   ASSERT(connect_state_ == RECONNECTING);
   boxer()->InvokeConn(session_serial_, this, NqBoxer::OpCode::DoReconnect);
   ClearInvocationTS();

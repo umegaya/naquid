@@ -9,9 +9,14 @@ DEBUG=False
 TEST_DEBUG=True
 TEST_SVHOST=127.0.0.1
 JOB=4
+# chromium(legacy)/default(quiche)
+BACKEND=
 
 define ct_run
 docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) sh -c "cd /naquid && $1"
+endef
+define cmaker
+cmake -DDEBUG:BOOLEAN=$(TEST_DEBUG) -DBACKEND:STRING=$(BACKEND) $1 && make -j$(JOB)
 endef
 
 meta-builder:
@@ -24,15 +29,15 @@ rebuild-builder: meta-builder builder
 
 bundle:
 	-@mkdir -p build/osx
-	cd build/osx && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/bundle.cmake $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	cd build/osx && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/bundle.cmake $(RELATIVE_PROJECT_ROOT))
 
 testlib:
 	-@mkdir -p build/t/$(TEST_OS)
-	cd build/t/$(TEST_OS) && cmake -DDEBUG:BOOLEAN=$(TEST_DEBUG) -DCMAKE_TOOLCHAIN_FILE=../$(BUILD_SETTING_PATH)/$(TEST_OS).cmake $(RELATIVE_PROJECT_ROOT)/.. && make -j$(JOB)
+	cd build/t/$(TEST_OS) && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=../$(BUILD_SETTING_PATH)/$(TEST_OS).cmake $(RELATIVE_PROJECT_ROOT)/..)
 
 linux_internal: 
 	-@mkdir -p build/linux
-	cd build/linux && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/linux.cmake $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	cd build/linux && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/linux.cmake $(RELATIVE_PROJECT_ROOT))
 
 linux:
 	$(call ct_run,make linux_internal)
@@ -44,8 +49,8 @@ ios:
 	-@mkdir -p build/ios.v7
 	-@mkdir -p build/ios.64
 	-@mkdir -p build/ios
-	cd build/ios.v7 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/ios.cmake -DIOS_PLATFORM=iPhoneOS -DIOS_ARCH=armv7 $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
-	cd build/ios.64 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/ios.cmake -DIOS_PLATFORM=iPhoneOS -DIOS_ARCH=arm64 $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	cd build/ios.v7 && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/ios.cmake -DIOS_PLATFORM=iPhoneOS -DIOS_ARCH=armv7 $(RELATIVE_PROJECT_ROOT))
+	cd build/ios.64 && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=$(BUILD_SETTING_PATH)/ios.cmake -DIOS_PLATFORM=iPhoneOS -DIOS_ARCH=arm64 $(RELATIVE_PROJECT_ROOT))
 	lipo build/ios.v7/lib$(LIB).a build/ios.64/lib$(LIB).a -create -output build/ios/lib$(LIB).a
 	strip -S build/ios/lib$(LIB).a
 
@@ -53,8 +58,8 @@ android:
 	-@mkdir -p build/android.v7
 	-@mkdir -p build/android.64
 	-@mkdir -p build/android
-	cd build/android.v7 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
-	cd build/android.64 && cmake -DDEBUG:BOOLEAN=$(DEBUG) -DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT) && make -j$(JOB)
+	cd build/android.v7 && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="armeabi-v7a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT))
+	cd build/android.64 && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=$(ANDROID_NDK)/build/cmake/android.toolchain.cmake -DANDROID_ABI="arm64-v8a" -DANDROID_NATIVE_API_LEVEL=android-16 -DANDROID_STL=c++_static $(RELATIVE_PROJECT_ROOT))
 	mv build/android.v7/lib$(LIB).so build/android/lib$(LIB)-armv7.so
 	mv build/android.64/lib$(LIB).so build/android/lib$(LIB)-arm64.so
 
@@ -74,15 +79,15 @@ patch:
 sync: inject patch
 
 testsv:
-	make -C test/e2e server TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
+	make -C test/e2e server TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG) BACKEND=$(BACKEND)
 
 testcl:
-	make -C test/e2e client TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
+	make -C test/e2e client TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG) BACKEND=$(BACKEND)
 
 testclean:
 	-@rm -r build/t/$(TEST_OS)
-	make -C test/e2e clean TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
+	make -C test/e2e clean TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG) BACKEND=$(BACKEND)
 
 .PHONY: test
 test: testlib
-	make -C test/e2e test TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG)
+	make -C test/e2e test TEST_OS=$(TEST_OS) DEBUG=$(TEST_DEBUG) BACKEND=$(BACKEND)

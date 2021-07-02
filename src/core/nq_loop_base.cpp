@@ -1,52 +1,17 @@
-#include "core/nq_loop.h"
+#include "core/nq_loop_base.h"
 
 #include <sys/time.h>
 
 #include "core/nq_alarm.h"
 
 namespace net {
-//implements QuicTime
-QuicTime NqLoop::ApproximateNow() const {
-  if (approx_now_in_usec_ == 0) {
-    return Now(); //not yet initialized
-  }
-  return QuicTime::Zero() + QuicTime::Delta::FromMicroseconds(approx_now_in_usec_);
-}
-
-QuicTime NqLoop::Now() const {
-  return QuicTime::Zero() +
-         QuicTime::Delta::FromMicroseconds(NowInUsec());
-}
-
-QuicWallTime NqLoop::WallNow() const {
-  if (approx_now_in_usec_ == 0) {
-    return QuicWallTime::FromUNIXMicroseconds(NowInUsec()); //not yet initialized
-  }
-  return QuicWallTime::FromUNIXMicroseconds(approx_now_in_usec_);
-}
-
-QuicTime NqLoop::ConvertWallTimeToQuicTime(
-    const QuicWallTime& walltime) const {
-  return QuicTime::Zero() +
-         QuicTime::Delta::FromMicroseconds(walltime.ToUNIXMicroseconds());
-}
-uint64_t NqLoop::NowInUsec() const {
-  struct timeval tv;
-  gettimeofday(&tv, nullptr);
-  return ((uint64_t)tv.tv_usec) + (((uint64_t)tv.tv_sec) * 1000 * 1000);
-}
-/* static */
-QuicTime NqLoop::ToQuicTime(uint64_t from_us) {
-  return QuicTime::Zero() + QuicTime::Delta::FromMicroseconds(from_us);
-}
-
-
-void NqLoop::SetAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
+// handling alarm
+void NqLoopBase::SetAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
   alarm_map_.emplace(std::piecewise_construct, 
                     std::forward_as_tuple(timeout_in_us), 
                     std::forward_as_tuple(a));
 }
-void NqLoop::CancelAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
+void NqLoopBase::CancelAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
   auto p = alarm_map_.equal_range(timeout_in_us);
   auto it = p.first;
   for (; it != p.second; ++it) {
@@ -63,25 +28,15 @@ void NqLoop::CancelAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
   ASSERT(false);
 }
 
-//implements QuicAlarmFactory
-QuicAlarm* NqLoop::CreateAlarm(QuicAlarm::Delegate* delegate) {
-  return new NqQuicAlarm(this, QuicArenaScopedPtr<QuicAlarm::Delegate>(delegate));
-}
-
-QuicArenaScopedPtr<QuicAlarm> NqLoop::CreateAlarm(
-    QuicArenaScopedPtr<QuicAlarm::Delegate> delegate,
-    QuicConnectionArena* arena) {
-  if (arena != nullptr) {
-    return arena->New<NqQuicAlarm>(this, std::move(delegate));
-  } else {
-    return QuicArenaScopedPtr<NqQuicAlarm>(new NqQuicAlarm(this, std::move(delegate)));
-  }
-}
-
 
 
 // polling
-void NqLoop::Poll() {
+uint64_t NqLoopBase::NowInUsec() const {
+  struct timeval tv;
+  gettimeofday(&tv, nullptr);
+  return ((uint64_t)tv.tv_usec) + (((uint64_t)tv.tv_sec) * 1000 * 1000);
+}
+void NqLoopBase::Poll() {
   nq::Loop::Poll();
   approx_now_in_usec_ = NowInUsec();
   alarm_process_us_ts_ = approx_now_in_usec_;
@@ -104,7 +59,7 @@ void NqLoop::Poll() {
     }
     NqAlarmInterface* cb = static_cast<NqAlarmInterface*>(it->second.ptr_);
     //TRACE("invoke alarm %p(%s) at %llu", cb, cb->IsNonQuicAlarm() ? "reconn" : "",it->first);
-    cb->OnFire(this);
+    cb->OnFire();
     it++;
     //add small duration to avoid infinite loop 
     //(eg. OnAlarm adds new alarm that adds new alarm on OnAlarm again)

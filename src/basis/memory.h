@@ -9,13 +9,15 @@
 #include <stdlib.h>
 #endif
 
+#include "basis/defs.h"
+
 namespace nq {
 
 // borrowed from chromium source 'base/memory/aligned_memory.h'
-export void* AlignedAlloc(size_t size, size_t alignment);
+void* AlignedAlloc(size_t size, size_t alignment);
 
 inline void AlignedFree(void* ptr) {
-#if defined(_MSC_VER)
+#if defined(OS_WIN)
   _aligned_free(ptr);
 #else
   free(ptr);

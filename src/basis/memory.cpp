@@ -14,11 +14,11 @@ void* AlignedAlloc(size_t size, size_t alignment) {
   ASSERT(alignment & (alignment - 1) == 0U);
   ASSERT(alignment % sizeof(void*) == 0U);
   void* ptr = nullptr;
-#if defined(_MSC_VER)
+#if defined(OS_WIN)
   ptr = _aligned_malloc(size, alignment);
   // 2021/6/25 iyatomi: __ANDROID_API__ >= 16 seems to provide posix_memalign
   // https://stackoverflow.com/questions/44852378/android-ndk-r15b-posix-memalign-undeclared-identifier
-#elif !defined(__ANDROID_API__) || __ANDROID_API__ < 16
+#elif defined(OS_ANDROID) && __ANDROID_API__ < 16
   // Android technically supports posix_memalign(), but does not expose it in
   // the current version of the library headers used by Chrome.  Luckily,
   // memalign() on Android returns pointers which can safely be used with
@@ -33,8 +33,11 @@ void* AlignedAlloc(size_t size, size_t alignment) {
   // crash if we encounter a failed allocation; maintaining consistent behavior
   // with a normal allocation failure in Chrome.
   if (!ptr) {
-    TRACE("If you crashed here, your aligned allocation is incorrect: "
-                << "size=" << size << ", alignment=" << alignment;
+    TRACE({
+        {"msg", "If you crashed here, your aligned allocation is incorrect"},
+        {"size", size},
+        {"alignment", alignment}
+    });
     ASSERT(false);
   }
   // Sanity check alignment just to be safe.

@@ -5,11 +5,12 @@ project(naquid C CXX)
 
 # global compile options
 set(DEBUG false CACHE BOOL "do debug build")
+set(BACKEND "" CACHE STRING "quic protocol implementation used. chromium(legacy)/quiche(default)")
 set(CHROMIUM_VERSION "63.0.3222.1")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -DHAVE_PTHREAD -DDISABLE_HISTOGRAM")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11 -DOPENSSL_NO_ASM -DOSATOMIC_USE_INLINED=1 -DPB_NO_PACKED_STRUCTS")
-include_directories(src src/chromium src/chromium/third_party/icu/source/common ext ext/cares)
-include_directories(SYSTEM src/chromium/third_party/protobuf/src src/chromium/third_party/boringssl/src/include ext/cares/src)
+include_directories(src ext ext/cares)
+include_directories(SYSTEM ext/cares/src ext/json/include)
 if (DEBUG)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -DDEBUG")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -DDEBUG")
@@ -17,7 +18,11 @@ else()
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -DNDEBUG")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O2 -DNDEBUG")
 endif()	
-
+if (BACKEND STREQUAL "chromium")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNQ_CHROMIUM_BACKEND")
+	include_directories(src/backends/chromium src/chromium/backends/third_party/icu/source/common)
+	include_directories(SYSTEM src/backends/chromium/third_party/protobuf/src src/backends/chromium/third_party/boringssl/src/include)
+endif()
 
 
 # srcs
@@ -37,7 +42,7 @@ set(lib_src
 	./src/core/nq_client_session.cpp
 	./src/core/nq_config.cpp
 	./src/core/nq_dispatcher.cpp
-	./src/core/nq_loop.cpp
+	./src/core/nq_loop_base.cpp
 	./src/core/nq_network_helper.cpp
 	./src/core/nq_packet_reader.cpp
 	./src/core/nq_packet_writer.cpp
@@ -49,21 +54,29 @@ set(lib_src
 	./src/core/nq_stream.cpp 
 	./src/core/nq_worker.cpp
 
-	./src/core/compat/nq_file_util.cpp
-	./src/core/compat/nq_quic_socket_utils.cpp 
-	./src/core/compat/nq_ref_counted.cpp
-	./src/core/compat/nq_spdy_protocol.cpp 
-	./src/core/compat/nq_string_util.cpp
-	./src/core/compat/nq_url_canon_icu.cpp
+	./src/backends/compats/nq_loop.cpp
+	./src/backends/compats/nq_quic_alarm.cpp
 
 	./src/core/platform/nq_jni_android.cpp
 	./src/core/platform/nq_reachability.cpp
 	./src/core/platform/nq_reachability_android.cpp
 )
 set(lib_mm_src
-	./src/core/compat/nq_foundation_util.mm
+	./src/backends/compats/chromium/nq_foundation_util.mm
 	./src/core/platform/nq_reachability_mac.mm
 )
+if (BACKEND STREQUAL "chromium")
+set(compats_src
+	./src/backends/compats/chromium/nq_file_util.cpp
+	./src/backends/compats/chromium/nq_quic_socket_utils.cpp 
+	./src/backends/compats/chromium/nq_ref_counted.cpp
+	./src/backends/compats/chromium/nq_spdy_protocol.cpp 
+	./src/backends/compats/chromium/nq_string_util.cpp
+	./src/backends/compats/chromium/nq_url_canon_icu.cpp
+)
+else()
+set(compats_src)
+endif()
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/net.cmake)
 # platforms
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/platform/common.cmake)
@@ -81,7 +94,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/cares.cmake)
 # setup group specific compiler flags
 set_source_files_properties(${cares_src} PROPERTIES COMPILE_FLAGS "-DHAVE_CONFIG_H -D_GNU_SOURCE")
 # define common sources
-set(src ${lib_src} ${net_src} ${common_src} ${zlib_src} ${ssl_src} ${pb_src} ${cares_src})
+set(src ${lib_src} ${compats_src} ${net_src} ${common_src} ${zlib_src} ${ssl_src} ${pb_src} ${cares_src})
 
 
 

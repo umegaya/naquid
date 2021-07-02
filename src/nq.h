@@ -264,7 +264,7 @@ NQAPI_BOOTSTRAP nq_client_t nq_client_create(int max_nfd, int max_stream_hint, c
 NQAPI_BOOTSTRAP void nq_client_poll(nq_client_t cl);
 // close connection and destroy client object. after call this, do not call nq_client_* API.
 NQAPI_BOOTSTRAP void nq_client_destroy(nq_client_t cl);
-// create conn from client. server side can get from argument of on_accept handler
+// create conn from client. can get nq_conn_t via argument of nq_clconf_t::on_open
 // return invalid conn on error, can check with nq_conn_is_valid. 
 // TODO(iyatomi): make it NQAPI_THREADSAFE
 NQAPI_BOOTSTRAP bool nq_client_connect(nq_client_t cl, const nq_addr_t *addr, const nq_clconf_t *conf);
@@ -275,7 +275,11 @@ NQAPI_BOOTSTRAP nq_hdmap_t nq_client_hdmap(nq_client_t cl);
 NQAPI_BOOTSTRAP void nq_client_set_thread(nq_client_t cl);
 // resolve host. nq_client_t need to be polled by nq_client_poll to work correctly
 // family_pref can be AF_INET or AF_INET6, and control which address family searched first. 
-NQAPI_BOOTSTRAP bool nq_client_resolve_host(nq_client_t, int family_pref, const char *hostname, nq_on_resolve_host_t cb);
+NQAPI_BOOTSTRAP bool nq_client_resolve_host(nq_client_t cl, int family_pref, const char *hostname, nq_on_resolve_host_t cb);
+// for subsequent use of nq_client_resolve_host. passing 3rd and 4th argument of nq_on_resolve_host_t to this function,
+// as src and srcsz. and passing buffer for dst and dstsz, to store string converted result of src/srcsz.
+// return dst if succeed otherwise nullptr returned.
+NQAPI_THREADSAFE const char *nq_ntop(const char *src, nq_size_t srcsz, char *dst, nq_size_t dstsz);
 
 
 
@@ -513,7 +517,7 @@ NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d);
 // --------------------------
 #define STOP_INVOKE_NQ_TIME (0)
 //configure alarm to invoke cb after current time exceeds first, 
-//at thread which handle receive callback of nq_rpc/stream_t that creates this alarm.
+//at thread which handle receive callback of nq_rpc/stream_t that creates the alarm.
 //if you set next invocation timestamp value(>= input value) to 3rd argument of cb, alarm scheduled to run that time, 
 //if you set the value to 0(STOP_INVOKE_NQ_TIME), it stopped (still valid and can reactivate with nq_alarm_set). 
 //otherwise alarm remove its memory, further use of nq_alarm_t is not possible (silently ignored)

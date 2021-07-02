@@ -148,7 +148,7 @@ class NqClient : public QuicClientBase,
 
 
   // implements NqAlarmBase
-  void OnFire(NqLoop *loop) override;
+  void OnFire() override;
   bool IsNonQuicAlarm() const override { return true  ; }
   // implements QuicCryptoClientStream::ProofHandler
   // Called when the proof in |cached| is marked valid.  If this is a secure
