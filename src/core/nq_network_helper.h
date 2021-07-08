@@ -9,7 +9,7 @@
 //#include "net/tools/quic/quic_packet_reader.h"
 
 #include "basis/io_processor.h"
-#include "backends/compats/nq_loop.h"
+#include "core/compat/nq_loop.h"
 #include "core/nq_packet_reader.h"
 
 namespace net {

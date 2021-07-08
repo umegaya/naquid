@@ -54,28 +54,31 @@ set(lib_src
 	./src/core/nq_stream.cpp 
 	./src/core/nq_worker.cpp
 
-	./src/backends/compats/nq_loop.cpp
-	./src/backends/compats/nq_quic_alarm.cpp
+	./src/core/compat/nq_loop.cpp
+	./src/core/compat/nq_quic_alarm.cpp
 
 	./src/core/platform/nq_jni_android.cpp
 	./src/core/platform/nq_reachability.cpp
 	./src/core/platform/nq_reachability_android.cpp
 )
 set(lib_mm_src
-	./src/backends/compats/chromium/nq_foundation_util.mm
 	./src/core/platform/nq_reachability_mac.mm
 )
 if (BACKEND STREQUAL "chromium")
-set(compats_src
-	./src/backends/compats/chromium/nq_file_util.cpp
-	./src/backends/compats/chromium/nq_quic_socket_utils.cpp 
-	./src/backends/compats/chromium/nq_ref_counted.cpp
-	./src/backends/compats/chromium/nq_spdy_protocol.cpp 
-	./src/backends/compats/chromium/nq_string_util.cpp
-	./src/backends/compats/chromium/nq_url_canon_icu.cpp
+set(compat_src
+	./src/backends/chromium/stub/nq_file_util.cpp
+	./src/backends/chromium/stub/nq_quic_socket_utils.cpp 
+	./src/backends/chromium/stub/nq_ref_counted.cpp
+	./src/backends/chromium/stub/nq_spdy_protocol.cpp 
+	./src/backends/chromium/stub/nq_string_util.cpp
+	./src/backends/chromium/stub/nq_url_canon_icu.cpp
+)
+set(compat_mm_src
+	./src/backends/chromium/stub/nq_foundation_util.mm
 )
 else()
 set(compats_src)
+set(compat_mm_src)
 endif()
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/net.cmake)
 # platforms
@@ -94,7 +97,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/tools/deps/third_party/cares.cmake)
 # setup group specific compiler flags
 set_source_files_properties(${cares_src} PROPERTIES COMPILE_FLAGS "-DHAVE_CONFIG_H -D_GNU_SOURCE")
 # define common sources
-set(src ${lib_src} ${compats_src} ${net_src} ${common_src} ${zlib_src} ${ssl_src} ${pb_src} ${cares_src})
+set(src ${lib_src} ${compat_src} ${net_src} ${common_src} ${zlib_src} ${ssl_src} ${pb_src} ${cares_src})
 
 
 
@@ -105,7 +108,7 @@ if (IOS OR NQ_OSX_BUNDLE OR NQ_OSX)
 	find_library(iokit IOKit)
 	find_library(security Security)
 	find_library(system_configuration SystemConfiguration)
-	set(nqsrc ${src} ${lib_mm_src} ${mac_src})
+	set(nqsrc ${src} ${lib_mm_src} ${compat_mm_src} ${mac_src})
 	include_directories(ext/cares/config/darwin)
 	if (IOS)
 		# workaround for problem detailed in https://karp.id.au/a/2015/09/15/xcode-7s-new-linker-rules/

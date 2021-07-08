@@ -1,6 +1,6 @@
 #include "core/nq_async_resolver.h"
 
-#include "backends/compats/nq_loop.h"
+#include "core/compat/nq_loop.h"
 
 namespace net {
 // optmask, server_list, flags, timeout, lookups are member of the class

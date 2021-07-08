@@ -7,7 +7,7 @@
 #include <inttypes.h>
 
 #include "nq.h"
-#include "backends/compats/nq_quic_types.h"
+#include "core/compat/nq_quic_types.h"
 #include "basis/id_factory.h"
 
 namespace net {

@@ -6,11 +6,11 @@
 #include "net/quic/core/quic_server_id.h"
 
 #include "basis/allocator.h"
-#include "backends/compats/nq_loop.h"
+#include "core/compat/nq_loop.h"
 #include "core/nq_alarm.h"
 #include "core/nq_async_resolver.h"
 #include "core/nq_config.h"
-#include "backends/compats/nq_quic_version_manager.h"
+#include "core/compat/nq_quic_version_manager.h"
 #include "core/nq_boxer.h"
 #include "core/nq_client.h"
 #include "core/nq_stream.h"

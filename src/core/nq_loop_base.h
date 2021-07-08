@@ -7,7 +7,7 @@
 #include "basis/handler_map.h"
 #include "core/nq_serial_codec.h"
 
-#include "backends/compats/nq_quic_alarm.h"
+#include "core/compat/nq_quic_alarm.h"
 
 namespace net {
 class NqAlarmInterface;
