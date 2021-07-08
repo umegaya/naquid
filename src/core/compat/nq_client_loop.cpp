@@ -7,12 +7,12 @@ struct NqDnsQuery : public NqAsyncResolver::Query {
   static bool ConvertToIpAddress(struct hostent *entries, QuicIpAddress &ip) {
     return ip.FromPackedString(entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype));
   }
-  static bool ConvertToSocketAddress(struct hostent *entries, int port, QuicSocketAddress &address) {
+  static bool ConvertToSocketAddress(struct hostent *entries, int port, NqQuicSocketAddress &address) {
     QuicIpAddress ip;
     if (!ConvertToIpAddress(entries, ip)) {
       return false;
     }
-    address = QuicSocketAddress(ip, port);
+    address = NqQuicSocketAddress(ip, port);
     return true;
   }
 };
@@ -25,7 +25,7 @@ struct NqDnsQueryForClient : public NqDnsQuery {
   NqDnsQueryForClient(const nq_clconf_t &conf) : NqDnsQuery(), config_(conf), port_(0) {}
   void OnComplete(int status, int timeouts, struct hostent *entries) override {
     if (ARES_SUCCESS == status) {
-      QuicSocketAddress server_address;
+      NqQuicSocketAddress server_address;
       NqQuicServerId server_id = NqQuicServerId(host_, port_);
       if (ConvertToSocketAddress(entries, port_, server_address)) {
         loop_->Create(host_, server_id, server_address, config_);
@@ -79,7 +79,7 @@ bool NqClientLoop::Resolve(int family_pref, const std::string &host, nq_on_resol
 }
 NqClient *NqClientLoop::Create(const std::string &host, 
                                const NqQuicServerId server_id,
-                               const QuicSocketAddress server_address,  
+                               const NqQuicSocketAddress server_address,
                                NqClientConfig &config) {
 
   auto supported_versions = AllSupportedVersions();//versions_.GetSupportedVersions();

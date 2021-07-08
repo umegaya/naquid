@@ -122,7 +122,7 @@ void NqDispatcher::OnRecv(NqPacket *packet) {
 
 //implements QuicCryptoServerStream::Helper
 bool NqDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                                        const QuicSocketAddress& self_address,
+                                        const NqQuicSocketAddress& self_address,
                                         std::string* error_details) const {
   //TODO(iyatomi): reject when number of connection is too much, getting the config and 
   //total connection number from server_.
@@ -140,7 +140,7 @@ bool NqDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& message,
 
 //implements QuicDispatcher
 QuicSession* NqDispatcher::CreateQuicSession(QuicConnectionId connection_id,
-                                             const QuicSocketAddress& client_address,
+                                             const NqQuicSocketAddress& client_address,
                                              QuicStringPiece alpn) {
   auto it = server_.port_configs().find(port_);
   if (it == server_.port_configs().end()) {

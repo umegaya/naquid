@@ -36,7 +36,7 @@ public:
   // acceptable according to the visitor's policy. Otherwise, returns false
   // and populates |error_details|.
   bool CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                                    const QuicSocketAddress& self_address,
+                                    const NqQuicSocketAddress& self_address,
                                     std::string* error_details) const override {
     return dispather_.CanAcceptClientHello(message, self_address, error_details);
   }

@@ -17,11 +17,11 @@
 
 namespace net {
 
-NqClient::NqClient(QuicSocketAddress server_address,
-                           const NqQuicServerId& server_id,
-                           const QuicVersionVector& supported_versions,
-                           const NqClientConfig &config,
-                           std::unique_ptr<ProofVerifier> proof_verifier)
+NqClient::NqClient(NqQuicSocketAddress server_address,
+                   const NqQuicServerId& server_id,
+                   const QuicVersionVector& supported_versions,
+                   const NqClientConfig &config,
+                   std::unique_ptr<ProofVerifier> proof_verifier)
   //FYI(iyatomi): loop_ should be initialized inside of placement new
   //TODO(iyatomi): turn of warning
   : QuicClientBase(

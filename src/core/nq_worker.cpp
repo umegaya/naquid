@@ -84,7 +84,7 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
   }
   int port_index = 0;
   for (auto &kv : server_.port_configs()) {
-    QuicSocketAddress address;
+    NqQuicSocketAddress address;
     if (!ToSocketAddress(kv.second.address_, address)) {
       ASSERT(false);
       return false;
@@ -119,7 +119,7 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
   return true;
 }
 //helper
-nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
+nq::Fd NqWorker::CreateUDPSocketAndBind(const NqQuicSocketAddress& address) {
   nq::Fd fd = QuicSocketUtils::CreateUDPSocket(address, &overflow_supported_);
   if (fd < 0) {
     QUIC_LOG(ERROR) << "CreateSocket() failed: " << strerror(errno);
@@ -150,7 +150,7 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const QuicSocketAddress& address) {
   return fd; 
 }
 /* static */
-bool NqWorker::ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &socket_address) {
+bool NqWorker::ToSocketAddress(const nq_addr_t &addr, NqQuicSocketAddress &socket_address) {
   char buffer[sizeof(struct sockaddr_storage)];
   int len, af;
   if ((len = NqAsyncResolver::PtoN(addr.host, &af, &buffer)) < 0) {
@@ -160,7 +160,7 @@ bool NqWorker::ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &socket_
   if (!ip.FromPackedString(buffer, len)) {
     return false;
   }
-  socket_address = QuicSocketAddress(ip, addr.port);
+  socket_address = NqQuicSocketAddress(ip, addr.port);
   return true;
 }
 }

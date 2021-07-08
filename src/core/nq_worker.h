@@ -49,7 +49,7 @@ class NqWorker {
   inline std::thread::id thread_id() const { return thread_.get_id(); }
 
  protected:
-  static bool ToSocketAddress(const nq_addr_t &addr, QuicSocketAddress &address);
-  nq::Fd CreateUDPSocketAndBind(const QuicSocketAddress& address);
+  static bool ToSocketAddress(const nq_addr_t &addr, NqQuicSocketAddress &address);
+  nq::Fd CreateUDPSocketAndBind(const NqQuicSocketAddress& address);
 };
 }

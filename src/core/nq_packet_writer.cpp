@@ -12,8 +12,9 @@
 #include "net/quic/platform/api/quic_bug_tracker.h"
 #include "net/quic/platform/api/quic_flags.h"
 #include "net/quic/platform/api/quic_logging.h"
-#include "net/quic/platform/api/quic_socket_address.h"
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
+
+#include "core/compat/nq_quic_types.h"
 
 extern bool chaos_write();
 
@@ -24,7 +25,7 @@ WriteResult NqPacketWriter::WritePacket(
     const char* buffer,
     size_t buf_len,
     const QuicIpAddress& self_address,
-    const QuicSocketAddress& peer_address,
+    const NqQuicSocketAddress& peer_address,
     bool reachability_tracked) {
   //TRACE("Write %zu bytes to %d from %s", buf_len, fd, self_address.ToString().c_str());
   sockaddr_storage raw_address = peer_address.generic_address();
@@ -100,7 +101,7 @@ WriteResult NqPacketWriter::WritePacket(
     const char* buffer,
     size_t buf_len,
     const QuicIpAddress& self_address,
-    const QuicSocketAddress& peer_address,
+    const NqQuicSocketAddress& peer_address,
     PerPacketOptions* options) {
   DCHECK(!IsWriteBlocked());
   DCHECK(nullptr == options)

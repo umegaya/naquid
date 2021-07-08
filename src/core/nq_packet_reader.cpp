@@ -14,13 +14,14 @@
 #include "net/quic/platform/api/quic_bug_tracker.h"
 #include "net/quic/platform/api/quic_flags.h"
 #include "net/quic/platform/api/quic_logging.h"
-#include "net/quic/platform/api/quic_socket_address.h"
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
 #include "net/tools/quic/quic_dispatcher.h"
 #include "net/tools/quic/quic_process_packet_interface.h"
 
 #include "basis/syscall.h"
 #include "basis/logger.h"
+
+#include "core/compat/nq_quic_types.h"
 
 #ifndef SO_RXQ_OVFL
 #define SO_RXQ_OVFL 40
@@ -165,7 +166,7 @@ bool NqPacketReader::ReadPackets(
     QuicPacketCount* packets_dropped) {
   char *buf = NewBuffer();
 
-  QuicSocketAddress client_address;
+  NqQuicSocketAddress client_address;
   QuicIpAddress server_ip;
   QuicWallTime walltimestamp = QuicWallTime::Zero();
   int bytes_read =

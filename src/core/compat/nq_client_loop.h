@@ -45,7 +45,7 @@ class NqClientLoop : public NqClientLoopCompat {
 
   NqClient *Create(const std::string &host, 
                    const NqQuicServerId server_id,
-                   const QuicSocketAddress server_address,  
+                   const NqQuicSocketAddress server_address,
                    NqClientConfig &config); 
 };
 } // net

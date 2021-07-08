@@ -100,7 +100,7 @@ class NqClient : public QuicClientBase,
   };
  public:
   // This will create its own QuicClientEpollNetworkHelper.
-  NqClient(QuicSocketAddress server_address,
+  NqClient(NqQuicSocketAddress server_address,
            const NqQuicServerId& server_id,
            const QuicVersionVector& supported_versions,
            const NqClientConfig &config,

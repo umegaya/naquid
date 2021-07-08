@@ -118,7 +118,7 @@ class NqDispatcher : public QuicDispatcher,
   // acceptable according to the visitor's policy. Otherwise, returns false
   // and populates |error_details|.
   bool CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                            const QuicSocketAddress& self_address,
+                            const NqQuicSocketAddress& self_address,
                             std::string* error_details) const override;
 
   //implements NqBoxer
@@ -148,7 +148,7 @@ class NqDispatcher : public QuicDispatcher,
   //implements QuicDispatcher
   QuicSession* CreateQuicSession(
     QuicConnectionId connection_id,
-    const QuicSocketAddress& client_address,
+    const NqQuicSocketAddress& client_address,
     QuicStringPiece alpn) override;
   void OnConnectionClosed(QuicConnectionId connection_id,
                           QuicErrorCode error,

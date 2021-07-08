@@ -10,10 +10,11 @@
 #include "basis/macros.h"
 #include "net/quic/core/quic_packets.h"
 #include "net/quic/platform/api/quic_clock.h"
-#include "net/quic/platform/api/quic_socket_address.h"
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
 
 #include "basis/endian.h"
+
+#include "core/compat/nq_quic_types.h"
 
 #if defined(__linux__)
 #define MMSG_MORE 1
@@ -31,7 +32,7 @@ const int kNumPacketsPerReadMmsgCall = 16;
 class NqPacketReader {
  public:
   class Packet : public QuicReceivedPacket {
-    QuicSocketAddress client_address_, server_address_;
+    NqQuicSocketAddress client_address_, server_address_;
     int port_;
    public:
     Packet(const char* buffer,
@@ -41,8 +42,8 @@ class NqPacketReader {
            bool ttl_valid, 
            struct sockaddr_storage client_sockaddr, 
            QuicIpAddress &server_ip, int server_port);
-    inline QuicSocketAddress &server_address() { return server_address_; }
-    inline QuicSocketAddress &client_address() { return client_address_; }
+    inline NqQuicSocketAddress &server_address() { return server_address_; }
+    inline NqQuicSocketAddress &client_address() { return client_address_; }
     inline void set_port(int port) { port_ = port; }
     inline int port() const { return port_; }
     inline uint64_t ConnectionId() const {

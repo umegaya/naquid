@@ -38,11 +38,11 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
 
   // implements NetworkHelper.
   void RunEventLoop() override;
-  bool CreateUDPSocketAndBind(QuicSocketAddress server_address,
+  bool CreateUDPSocketAndBind(NqQuicSocketAddress server_address,
                               QuicIpAddress bind_to_address,
                               int bind_to_port) override;
   void CleanUpAllUDPSockets() override;
-  QuicSocketAddress GetLatestClientAddress() const override;
+  NqQuicSocketAddress GetLatestClientAddress() const override;
   QuicPacketWriter* CreateQuicPacketWriter() override;
 
 
@@ -66,7 +66,7 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
   Fd fd_;
 
   // socket address
-  QuicSocketAddress address_;
+  NqQuicSocketAddress address_;
 
   // If overflow_supported_ is true, this will be the number of packets dropped
   // during the lifetime of the server.
