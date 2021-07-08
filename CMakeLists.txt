@@ -38,7 +38,7 @@ set(lib_src
 	./src/core/nq_at_exit.cpp
 	./src/core/nq_boxer.cpp
 	./src/core/nq_client.cpp
-	./src/core/nq_client_loop.cpp
+	./src/core/nq_client_loop_base.cpp
 	./src/core/nq_client_session.cpp
 	./src/core/nq_config.cpp
 	./src/core/nq_dispatcher.cpp
@@ -55,6 +55,7 @@ set(lib_src
 	./src/core/nq_worker.cpp
 
 	./src/core/compat/nq_loop.cpp
+	./src/core/compat/nq_client_loop.cpp
 	./src/core/compat/nq_quic_alarm.cpp
 
 	./src/core/platform/nq_jni_android.cpp

@@ -9,7 +9,7 @@
 
 #include "core/nq_at_exit.h"
 #include "core/nq_closure.h"
-#include "core/nq_client_loop.h"
+#include "core/compat/nq_client_loop.h"
 #include "core/nq_server.h"
 #include "core/nq_unwrapper.h"
 #include "core/nq_network_helper.h"

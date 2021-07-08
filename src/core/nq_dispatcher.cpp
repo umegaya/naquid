@@ -2,7 +2,7 @@
 
 #include "net/tools/quic/quic_default_packet_writer.h"
 
-#include "core/nq_client_loop.h"
+#include "core/compat/nq_client_loop.h"
 #include "core/nq_packet_writer.h"
 #include "core/nq_server_session.h"
 #include "core/nq_server.h"

@@ -14,7 +14,7 @@ public:
 #else
 #include <stdint.h>
 namespace net {
-typedef uint32_t NqQuicStreamId;
+typedef std::uint32_t NqQuicStreamId;
 typedef uint64_t NqQuicConnectionId;
 class NqQuicServerId {
   NqQuicServerId(const std::string &host, int port) {
