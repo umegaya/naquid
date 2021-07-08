@@ -3,14 +3,14 @@
 #include <string>
 #include <thread>
 
-#include "net/quic/core/quic_server_id.h"
+#include "core/compat/nq_quic_types.h"
+#include "core/compat/nq_quic_version_manager.h"
 
 #include "basis/allocator.h"
 #include "core/compat/nq_loop.h"
 #include "core/nq_alarm.h"
 #include "core/nq_async_resolver.h"
 #include "core/nq_config.h"
-#include "core/compat/nq_quic_version_manager.h"
 #include "core/nq_boxer.h"
 #include "core/nq_client.h"
 #include "core/nq_stream.h"
@@ -59,7 +59,7 @@ class NqClientLoop : public NqLoop,
   bool Resolve(int family_pref, const std::string &host, int port, const nq_clconf_t *conf);
   bool Resolve(int family_pref, const std::string &host, nq_on_resolve_host_t cb);
   NqClient *Create(const std::string &host, 
-                   const QuicServerId server_id,
+                   const NqQuicServerId server_id,
                    const QuicSocketAddress server_address,  
                    NqClientConfig &config);
 

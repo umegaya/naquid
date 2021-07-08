@@ -18,7 +18,7 @@
 namespace net {
 
 NqClient::NqClient(QuicSocketAddress server_address,
-                           const QuicServerId& server_id,
+                           const NqQuicServerId& server_id,
                            const QuicVersionVector& supported_versions,
                            const NqClientConfig &config,
                            std::unique_ptr<ProofVerifier> proof_verifier)

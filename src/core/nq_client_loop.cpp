@@ -26,7 +26,7 @@ struct NqDnsQueryForClient : public NqDnsQuery {
   void OnComplete(int status, int timeouts, struct hostent *entries) override {
     if (ARES_SUCCESS == status) {
       QuicSocketAddress server_address;
-      QuicServerId server_id = QuicServerId(host_, port_, PRIVACY_MODE_ENABLED);
+      NqQuicServerId server_id = NqQuicServerId(host_, port_);
       if (ConvertToSocketAddress(entries, port_, server_address)) {
         loop_->Create(host_, server_id, server_address, config_);
         return;
@@ -146,7 +146,7 @@ void NqClientLoop::RemoveClient(NqClient *cl) {
   client_map_.Remove(cl->session_index());
 }
 NqClient *NqClientLoop::Create(const std::string &host, 
-                               const QuicServerId server_id,
+                               const NqQuicServerId server_id,
                                const QuicSocketAddress server_address,  
                                NqClientConfig &config) {
 

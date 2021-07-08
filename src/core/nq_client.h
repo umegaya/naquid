@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 
 #include "net/tools/quic/quic_client_base.h"
+#include "core/compat/nq_quic_types.h"
 
 #include "basis/allocator.h"
 #include "core/nq_alarm.h"
@@ -19,7 +20,7 @@
 
 namespace net {
 
-class QuicServerId;
+class NqQuicServerId;
 class NqClientLoop;
 class NqClientStream;
 class NqBoxer;
@@ -100,7 +101,7 @@ class NqClient : public QuicClientBase,
  public:
   // This will create its own QuicClientEpollNetworkHelper.
   NqClient(QuicSocketAddress server_address,
-           const QuicServerId& server_id,
+           const NqQuicServerId& server_id,
            const QuicVersionVector& supported_versions,
            const NqClientConfig &config,
            std::unique_ptr<ProofVerifier> proof_verifier);
