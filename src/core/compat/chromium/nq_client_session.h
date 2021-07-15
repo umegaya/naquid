@@ -11,7 +11,6 @@ class NqClientSession : public NqSession {
                   Delegate* delegate,
                 	const QuicConfig& config)
   : NqSession(connection, owner, delegate, config) {
-    init_crypto_stream();
   }
 
   inline QuicCryptoClientStream *GetClientCryptoStream() {
@@ -36,5 +35,8 @@ class NqClientSession : public NqSession {
     return QuicSession::WillingAndAbleToWrite();
   }
 
+ private:
+  friend class NqQuicClient;
+  void InitCryptoStream(QuicCryptoStream *cs) { NqSession::SetCryptoStream(cs); }
 };
-}
+} // namespace net

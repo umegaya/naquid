@@ -27,6 +27,7 @@ class NqServerSession : public NqSession,
     std::unique_lock<std::mutex> lk(static_mutex());
     session_serial_.Clear(); 
   }
+  NqQuicCryptoStream *NewCryptoStream();
 
   std::mutex &static_mutex();
   NqBoxer *boxer();
@@ -56,12 +57,15 @@ class NqServerSession : public NqSession,
   bool IsConnected() const override { return true; }
   void InitStream(const std::string &name, void *ctx) override;
   void OpenStream(const std::string &name, void *ctx) override;
-  QuicCryptoStream *NewCryptoStream(NqSession *session) override;
+  int UnderlyingFd() override;
   const nq::HandlerMap *GetHandlerMap() const override;
   nq::HandlerMap *ResetHandlerMap() override;
   NqLoop *GetLoop() override;
   uint64_t ReconnectDurationUS() const override { return 0; }
-  QuicConnection *Connection() override { return connection(); }
+  NqQuicConnectionId ConnectionId() override { return connection()->connection_id(); }
+  void FlushWriteBuffer() override { 
+    QuicConnection::ScopedPacketBundler bundler(connection(), QuicConnection::SEND_ACK_IF_QUEUED); 
+  }
   const NqSerial &SessionSerial() const override { return session_serial(); }
 
  private:

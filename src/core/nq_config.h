@@ -8,6 +8,7 @@
 #include "basis/timespec.h"
 #include "core/nq_proof_verifier.h"
 #include "core/nq_proof_source.h"
+#include "core/compat/nq_protocol_manager.h"
 
 namespace net {
 
@@ -48,6 +49,7 @@ class NqClientConfig : public NqConfig {
     Setup();
   }
   void Setup(); //init other variables from client_
+  NqProtocolManager protocol_manager() const { return NqProtocolManager(client_.protocol); }
   const nq_clconf_t &client() const { return client_; }
   std::unique_ptr<ProofVerifier> NewProofVerifier() const;
 };

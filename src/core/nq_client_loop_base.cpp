@@ -1,4 +1,4 @@
-#include "core/compat/nq_client_loop.h"
+#include "core/nq_client_loop_base.h"
 #include "core/compat/nq_quic_types.h"
 
 #include "core/nq_client.h"

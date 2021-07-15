@@ -1,10 +1,10 @@
-#include "core/nq_network_helper.h"
+#include "core/compat/chromium/nq_network_helper.h"
 
 #include "net/tools/quic/quic_default_packet_writer.h"
 
 #include "basis/syscall.h"
-#include "core/compat/nq_client_loop.h"
-#include "core/nq_packet_writer.h"
+#include "core/nq_client_loop.h"
+#include "core/compat/chromium/nq_quic_client.h"
 
 namespace net {
 
@@ -14,7 +14,7 @@ const int kLoopFlags = NqLoop::EV_READ | NqLoop::EV_WRITE;
 
 NqNetworkHelper::NqNetworkHelper(
     NqLoop* loop,
-    NqClient* client)
+    NqClientCompat* client)
     : loop_(loop),
       fd_(-1),
       packets_dropped_(0),
@@ -41,7 +41,7 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
   }
 
   if (bind_to_address.IsInitialized()) {
-    address_ = NqQuicSocketAddress(bind_to_address, client_->local_port());
+    address_ = NqQuicSocketAddress(bind_to_address, client_->quic_client()->local_port());
   } else if (server_address.host().address_family() == IpAddressFamily::IP_V4) {
     address_ = NqQuicSocketAddress(QuicIpAddress::Any4(), bind_to_port);
   } else {
@@ -98,18 +98,19 @@ void NqNetworkHelper::RunEventLoop() {
 void NqNetworkHelper::OnClose(Fd /*fd*/) {}
 int NqNetworkHelper::OnOpen(Fd /*fd*/) {  return NQ_OK; }
 void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
+  auto quic_client = client_->quic_client();
   if (NqLoop::Readable(event)) {
     bool more_to_read = true;
-    while (client_->connected() && more_to_read) {
+    while (quic_client->connected() && more_to_read) {
       more_to_read = packet_reader_->Read(
           fd, GetLatestClientAddress().port(),
-          *client_->helper()->GetClock(), this,
+          *quic_client->helper()->GetClock(), this,
           overflow_supported_ ? &packets_dropped_ : nullptr);
     }
   }
-  if (client_->connected() && NqLoop::Writable(event)) {
-    client_->writer()->SetWritable();
-    client_->session()->connection()->OnCanWrite();
+  if (quic_client->connected() && NqLoop::Writable(event)) {
+    quic_client->writer()->SetWritable();
+    quic_client->session()->OnCanWrite();
   }
   if (NqLoop::Closed(event)) {
     TRACE("closed %d", fd);
@@ -131,14 +132,15 @@ NqQuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
 
 void NqNetworkHelper::OnRecv(NqPacketReader::Packet *p) {
   //self == server, peer == client
+  auto quic_client = client_->quic_client();
 #if !defined(USE_DIRECT_WRITE)
-  client_->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
+  quic_client->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
 #else
   auto m = &(client_->static_mutex());
   std::unique_lock<std::mutex> session_lock(*m);
   loop_->LockSession(client_->session_index());
   //TRACE("NqNetworkHelper try get static mutex success %p", m);
-  client_->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
+  quic_client->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
   loop_->UnlockSession();
 #endif
 }

@@ -214,7 +214,7 @@ class NqBoxer {
           unboxed->Destroy();
           break;
         case Flush: {
-          QuicConnection::ScopedPacketBundler bundler(unboxed->Connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+          unboxed->FlushWriteBuffer();
         } break;
         default:
           ASSERT(false);

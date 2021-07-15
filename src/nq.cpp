@@ -9,10 +9,10 @@
 
 #include "core/nq_at_exit.h"
 #include "core/nq_closure.h"
-#include "core/compat/nq_client_loop.h"
+#include "core/nq_client_loop.h"
 #include "core/nq_server.h"
 #include "core/nq_unwrapper.h"
-#include "core/nq_network_helper.h"
+#include "core/compat/chromium/nq_network_helper.h"
 
 //at exit manager seems optimized out and causes linkder error without following anchor
 extern nq_at_exit_manager_t nq_at_exit_manager();
@@ -316,7 +316,7 @@ NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn) {
 NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
-    return d->Connection()->connection_id();
+    return d->ConnectionId();
   }, "nq_conn_cid");
   return 0;
 }
@@ -326,8 +326,8 @@ NQAPI_THREADSAFE void nq_conn_reachability_change(nq_conn_t conn, nq_reachabilit
 NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn) {
   NqSession::Delegate *d;
   UNWRAP_CONN(conn, d, {
-    return static_cast<NqNetworkHelper *>(static_cast<NqClient *>(d)->network_helper())->fd();
-  }, "nq_conn_cid");
+    return d->UnderlyingFd();
+  }, "nq_conn_fd");
   return -1; 
 }
 

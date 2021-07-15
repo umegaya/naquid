@@ -2,12 +2,12 @@
 
 #include "net/tools/quic/quic_default_packet_writer.h"
 
-#include "core/compat/nq_client_loop.h"
-#include "core/nq_packet_writer.h"
+#include "core/nq_client_loop.h"
+#include "core/compat/chromium/nq_packet_writer.h"
 #include "core/nq_server_session.h"
 #include "core/nq_server.h"
-#include "core/nq_network_helper.h"
-#include "core/nq_stub_interface.h"
+#include "core/compat/chromium/nq_network_helper.h"
+#include "core/compat/chromium/nq_stub_interface.h"
 
 namespace net {
 NqDispatcher::NqDispatcher(int port, const NqServerConfig& config, 

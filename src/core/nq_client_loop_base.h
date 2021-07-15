@@ -4,7 +4,7 @@
 #include <thread>
 
 #include "core/compat/nq_quic_types.h"
-#include "core/compat/nq_quic_version_manager.h"
+#include "core/compat/nq_protocol_manager.h"
 #include "core/compat/nq_loop.h"
 
 #include "basis/allocator.h"
@@ -30,7 +30,7 @@ class NqClientLoopBase : public NqLoop,
 
  protected:
   NqClientLoopBase(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
-    processor_(), versions_(),
+    processor_(), protocols_(),
     client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint),
     async_resolver_(), stream_index_factory_(0x7FFFFFFF) {
     worker_index_ = client_worker_index_factory_.New();
@@ -77,7 +77,7 @@ class NqClientLoopBase : public NqLoop,
   ClientMap client_map_;
   AlarmMap alarm_map_;
   NqBoxer::Processor processor_;
-  NqQuicVersionManager versions_;
+  NqProtocolManager protocols_;
   std::thread::id thread_id_;
   ClientAllocator client_allocator_;
   StreamAllocator stream_allocator_;

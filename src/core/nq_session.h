@@ -8,11 +8,9 @@
 #include "net/quic/core/quic_crypto_client_stream.h"
 
 #include "basis/defs.h"
-#include "basis/handler_map.h"
 #include "basis/id_factory.h"
-#include "core/nq_serial_codec.h"
 #include "core/nq_static_section.h"
-
+#include "core/nq_session_delegate.h"
 
 namespace net {
 class NqLoop;
@@ -27,34 +25,7 @@ class NqSession : public QuicSession {
       CancelAllAlarms();
     }
   };
-  class Delegate {
-   public:
-    virtual ~Delegate() {}
-    virtual void *Context() const = 0;
-    virtual void Destroy() = 0;
-    virtual void OnClose(QuicErrorCode error,
-                         const std::string& error_details,
-                         ConnectionCloseSource close_by_peer_or_self) = 0;
-    virtual void OnOpen() = 0;
-    virtual void Disconnect() = 0;
-    virtual bool Reconnect() = 0; //only supported for client 
-    virtual void DoReconnect() = 0;
-    virtual void OnReachabilityChange(nq_reachability_t state) = 0;
-    virtual uint64_t ReconnectDurationUS() const = 0;
-    virtual bool IsClient() const = 0;
-    virtual bool IsConnected() const = 0;
-    virtual void InitStream(const std::string &name, void *ctx) = 0;
-    virtual void OpenStream(const std::string &name, void *ctx) = 0;
-    virtual QuicCryptoStream *NewCryptoStream(NqSession *session) = 0;
-    virtual const nq::HandlerMap *GetHandlerMap() const = 0;
-    virtual nq::HandlerMap *ResetHandlerMap() = 0;
-    virtual NqLoop *GetLoop() = 0;
-    virtual QuicConnection *Connection() = 0;
-    virtual const NqSerial &SessionSerial() const = 0;
-    inline NqSessionIndex SessionIndex() const { 
-      return NqSerial::ObjectIndex<NqSessionIndex>(SessionSerial());
-    }
-  };
+  typedef NqSessionDelegate Delegate;
  private:
   std::unique_ptr<QuicCryptoStream> crypto_stream_;
   Delegate *delegate_;
@@ -86,7 +57,6 @@ class NqSession : public QuicSession {
   //implements QuicSession
   QuicCryptoStream *GetMutableCryptoStream() override;
   const QuicCryptoStream *GetCryptoStream() const override;
-
-  void init_crypto_stream() { crypto_stream_.reset(delegate_->NewCryptoStream(this)); }
+  void SetCryptoStream(QuicCryptoStream *cs) { crypto_stream_.reset(cs); }
 };
 }

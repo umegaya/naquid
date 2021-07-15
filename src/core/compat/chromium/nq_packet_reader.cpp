@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "core/nq_packet_reader.h"
+#include "core/compat/chromium/nq_packet_reader.h"
 
 #include <errno.h>
 #ifndef __APPLE__

@@ -1,13 +1,14 @@
 #include "core/nq_worker.h"
 
 #include "basis/syscall.h"
-#include "core/compat/nq_client_loop.h"
+#include "core/nq_client_loop.h"
 #include "core/nq_dispatcher.h"
 #include "core/nq_server_session.h"
 #include "core/nq_server.h"
 
 namespace net {
 void NqWorker::Process(NqPacket *p) {
+  // usually size of dispatcher isn't large, simple for loop run faster
   for (size_t i = 0; i < dispatchers_.size(); i++) {
     if (dispatchers_[i].first == p->port()) {
       dispatchers_[i].second->Process(p);

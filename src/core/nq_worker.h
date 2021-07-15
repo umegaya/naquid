@@ -6,7 +6,7 @@
 #include "MoodyCamel/concurrentqueue.h"
 
 #include "core/nq_server_loop.h"
-#include "core/nq_packet_reader.h"
+#include "core/compat/chromium/nq_packet_reader.h"
 #include "core/nq_boxer.h"
 
 namespace net {

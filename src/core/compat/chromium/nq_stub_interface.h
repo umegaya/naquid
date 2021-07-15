@@ -8,6 +8,8 @@ class NqStubConnectionHelper : public QuicConnectionHelperInterface {
 	NqLoop &loop_;
  public:
   NqStubConnectionHelper(NqLoop &loop) : loop_(loop) {}
+  NqLoop *loop() { return &loop_; }
+
   const QuicClock* GetClock() const override { return &loop_; }
   QuicRandom* GetRandomGenerator() override { return loop_.GetRandomGenerator(); }
   QuicBufferAllocator* GetStreamFrameBufferAllocator() override { return loop_.GetStreamFrameBufferAllocator(); }

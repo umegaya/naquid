@@ -1,4 +1,4 @@
-#include "core/compat/nq_client_loop.h"
+#include "core/nq_client_loop.h"
 
 #include "core/nq_client.h"
 
@@ -85,10 +85,9 @@ NqClient *NqClientLoop::Create(const std::string &host,
   auto supported_versions = AllSupportedVersions();//versions_.GetSupportedVersions();
   auto c = new(this) NqClient(
     server_address,
+    *this,
     server_id, 
-    supported_versions,
-    config,
-    config.NewProofVerifier()
+    config
   );
   if (!c->Initialize()) {
     delete c;

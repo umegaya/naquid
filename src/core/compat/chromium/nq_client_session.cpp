@@ -1,9 +1,10 @@
-#include "core/nq_client_session.h"
+#include "core/compat/chromium/nq_client_session.h"
+#include "core/compat/chromium/nq_network_helper.h"
 
 #include "net/quic/platform/api/quic_ptr_util.h"
 
 #include "core/nq_stream.h"
-#include "core/compat/nq_client_loop.h"
+#include "core/nq_client_loop.h"
 
 namespace net {
 QuicStream* NqClientSession::CreateIncomingDynamicStream(QuicStreamId id) {

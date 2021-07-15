@@ -108,7 +108,11 @@ typedef enum {
   NQ_REACHABLE_WWAN = 1,
 } nq_reachability_t;
 
-
+typedef enum {
+  NQ_QUIC_NEGOTIATE, // only client side
+  NQ_QUIC_V1,
+  NQ_TCP // not supported now
+} nq_wire_proto_t;
 
 // --------------------------
 //
@@ -246,6 +250,9 @@ typedef struct {
   nq_on_client_conn_open_t on_open;
   nq_on_client_conn_close_t on_close;
   nq_on_client_conn_finalize_t on_finalize;
+
+  //protocol type/version
+  nq_wire_proto_t protocol;
 
   //set true to ignore proof verification
   bool insecure; 
@@ -385,7 +392,8 @@ NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn);
 NQAPI_INLINE bool nq_conn_equal(nq_conn_t c1, nq_conn_t c2) { return c1.s.data[0] == c2.s.data[0] && (c1.s.data[0] == 0 || c1.p == c2.p); }
 //manually set reachability change for current connection
 NQAPI_THREADSAFE void nq_conn_reachability_change(nq_conn_t conn, nq_reachability_t new_status);
-
+//get fd attached to the conn. client conn returns dedicated fd for the connection,
+//server side returns lister fd, which is shared among connections.sz
 NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn);
 
 

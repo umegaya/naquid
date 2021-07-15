@@ -12,7 +12,7 @@ NqSession::NqSession(QuicConnection* connection,
                      Delegate* delegate,
                      const QuicConfig& config) : 
   QuicSession(connection, owner, config), delegate_(delegate) {
-  //chromium implementation treat initial value (3) as special stream (header stream for SPDY)
+  //chromium implementation treats initial value (3) as special stream (header stream for SPDY)
   auto id = GetNextOutgoingStreamId();
   ASSERT(perspective() == Perspective::IS_SERVER || id == kHeadersStreamId);
 }

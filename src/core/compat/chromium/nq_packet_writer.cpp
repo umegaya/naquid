@@ -1,4 +1,4 @@
-#include "core/nq_packet_writer.h"
+#include "core/compat/chromium/nq_packet_writer.h"
 
 #include <errno.h>
 #include <netinet/in.h>

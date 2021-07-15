@@ -12,7 +12,7 @@ NqServerSession::NqServerSession(QuicConnection *connection,
                                  const NqServer::PortConfig &port_config)
   : NqSession(connection, dispatcher(), this, port_config), //dispatcher implements QuicSession::Visitor interface
   port_config_(port_config), own_handler_map_(), context_(nullptr) {
-  init_crypto_stream();
+  SetCryptoStream(NewCryptoStream());
 }
 nq_conn_t NqServerSession::ToHandle() { 
   return MakeHandle<nq_conn_t, NqSession::Delegate>(static_cast<NqSession::Delegate *>(this), session_serial_);
@@ -127,12 +127,16 @@ void NqServerSession::OpenStream(const std::string &name, void *ctx) {
     CloseStream(s->id());
   }
 }
-QuicCryptoStream *NqServerSession::NewCryptoStream(NqSession *session) {
+int NqServerSession::UnderlyingFd() {
+  ASSERT(false);
+  return -1;
+}
+QuicCryptoStream *NqServerSession::NewCryptoStream() {
   return new QuicCryptoServerStream(
     dispatcher()->crypto_config(),
     dispatcher()->cert_cache(),
     true,
-    session,
+    this,
     dispatcher()
   );
 }
