@@ -7,8 +7,6 @@
 #include "basis/handler_map.h"
 #include "core/nq_serial_codec.h"
 
-#include "core/compat/nq_quic_alarm.h"
-
 namespace net {
 class NqAlarmInterface;
 class NqLoopBase : public nq::Loop {

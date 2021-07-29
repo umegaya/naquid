@@ -13,12 +13,12 @@
 
 namespace net {
 class NqAlarmInterface;
-class NqLoop : public NqLoopBase,
+class NqLoopCompat : public NqLoopBase,
                public QuicConnectionHelperInterface,
                public QuicAlarmFactory,
                public QuicClock {
 public:
-  NqLoop() : NqLoopBase() {}
+  NqLoopCompat() : NqLoopBase() {}
 
   static QuicTime ToQuicTime(uint64_t from_us);
 
@@ -47,7 +47,6 @@ private:
 }
 #else
 namespace net {
-class NqLoop : public NqLoopBase {
-};
+typedef NqLoopBase NqLoopCompat;
 }
 #endif

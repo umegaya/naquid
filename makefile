@@ -16,6 +16,9 @@ define ct_run
 docker run --rm -v `pwd`:/naquid $(BUILDER_IMAGE) sh -c "cd /naquid && $1"
 endef
 define cmaker
+cmake -DDEBUG:BOOLEAN=$(DEBUG) -DBACKEND:STRING=$(BACKEND) $1 && make -j$(JOB)
+endef
+define tcmaker
 cmake -DDEBUG:BOOLEAN=$(TEST_DEBUG) -DBACKEND:STRING=$(BACKEND) $1 && make -j$(JOB)
 endef
 
@@ -33,7 +36,7 @@ bundle:
 
 testlib:
 	-@mkdir -p build/t/$(TEST_OS)
-	cd build/t/$(TEST_OS) && $(call cmaker,-DCMAKE_TOOLCHAIN_FILE=../$(BUILD_SETTING_PATH)/$(TEST_OS).cmake $(RELATIVE_PROJECT_ROOT)/..)
+	cd build/t/$(TEST_OS) && $(call tcmaker,-DCMAKE_TOOLCHAIN_FILE=../$(BUILD_SETTING_PATH)/$(TEST_OS).cmake $(RELATIVE_PROJECT_ROOT)/..)
 
 linux_internal: 
 	-@mkdir -p build/linux

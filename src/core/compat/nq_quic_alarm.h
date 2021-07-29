@@ -5,11 +5,13 @@
 #if defined(NQ_CHROMIUM_BACKEND)
 #include "net/quic/core/quic_alarm.h"
 
+#include "core/nq_loop_base.h"
+
 namespace net {
 class NqQuicAlarm : public QuicAlarm, 
                     public NqAlarmInterface {
  public:
-  NqQuicAlarm(NqLoop *loop, QuicArenaScopedPtr<Delegate> delegate)
+  NqQuicAlarm(NqLoopBase *loop, QuicArenaScopedPtr<Delegate> delegate)
       : QuicAlarm(std::move(delegate)), loop_(loop), timeout_in_us_(0) {}
   ~NqQuicAlarm() override {}
 
@@ -24,7 +26,7 @@ class NqQuicAlarm : public QuicAlarm,
   //TODO(iyatomi): there is a way to optimize update?
   //void UpdateImpl() override;
 
-  NqLoop* loop_;
+  NqLoopBase* loop_;
   uint64_t timeout_in_us_;
 };
 }

@@ -5,7 +5,7 @@
 
 #include "core/compat/nq_quic_types.h"
 #include "core/compat/nq_protocol_manager.h"
-#include "core/compat/nq_loop.h"
+#include "core/nq_loop.h"
 
 #include "basis/allocator.h"
 #include "core/nq_alarm.h"

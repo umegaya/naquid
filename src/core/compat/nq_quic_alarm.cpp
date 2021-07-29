@@ -1,5 +1,5 @@
 #include "core/compat/nq_quic_alarm.h"
-#include "core/compat/nq_loop.h"
+#include "core/nq_loop.h"
 
 #if defined(NQ_CHROMIUM_BACKEND)
 namespace net {

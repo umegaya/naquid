@@ -10,7 +10,7 @@
 #include "basis/id_factory.h"
 #include "basis/timespec.h"
 #include "core/nq_closure.h"
-#include "core/compat/nq_loop.h"
+#include "core/nq_loop.h"
 #include "core/nq_alarm.h"
 #include "core/nq_serial_codec.h"
 

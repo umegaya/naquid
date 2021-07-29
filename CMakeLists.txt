@@ -43,6 +43,7 @@ set(lib_src
 	./src/core/nq_client_loop_base.cpp
 	./src/core/nq_config.cpp
 	./src/core/nq_dispatcher.cpp
+	./src/core/nq_loop.cpp
 	./src/core/nq_loop_base.cpp
 	./src/core/nq_proof_verifier.cpp
 	./src/core/nq_server.cpp
@@ -52,9 +53,9 @@ set(lib_src
 	./src/core/nq_stream.cpp 
 	./src/core/nq_worker.cpp
 
-	./src/core/compat/nq_loop.cpp
 	./src/core/compat/nq_client_loop_compat.cpp
 	./src/core/compat/nq_client_compat.cpp
+	./src/core/compat/nq_loop_compat.cpp
 	./src/core/compat/nq_quic_alarm.cpp
 
 	./src/core/platform/nq_jni_android.cpp
