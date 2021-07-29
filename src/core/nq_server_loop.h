@@ -8,5 +8,8 @@ class NqServerLoop : public NqLoop {
  public:
   NqServerLoop() {}
   ~NqServerLoop() {}
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(NqServerLoop);
 };
 }

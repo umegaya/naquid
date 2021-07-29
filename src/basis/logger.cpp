@@ -24,7 +24,7 @@ namespace logger {
   static std::string id_ = "nq";
   static std::mutex mtx_;
   static bool manual_flush_ = false;
-    void configure(writer_cb_t cb, const std::string &id, bool manual_flush) {
+  void configure(writer_cb_t cb, const std::string &id, bool manual_flush) {
       if (cb != nullptr) {
       writer_ = cb;
     }

@@ -25,14 +25,14 @@ public:
       QuicConnectionArena* arena) override { return loop_.CreateAlarm(std::move(delegate), arena); }
 };
 class NqStubCryptoServerStreamHelper : public QuicCryptoServerStream::Helper {
-  NqDispatcher &dispather_;
+  NqQuicDispatcher &dispatcher_;
 public:
-  NqStubCryptoServerStreamHelper(NqDispatcher &dispather) : dispather_(dispather) {}
+  NqStubCryptoServerStreamHelper(NqQuicDispatcher &dispatcher_) : dispatcher_(dispatcher_) {}
   // Given the current connection_id, generates a new ConnectionId to
   // be returned with a stateless reject.
   QuicConnectionId GenerateConnectionIdForReject(
       QuicConnectionId connection_id) const override {
-    return dispather_.GenerateConnectionIdForReject(connection_id);
+    return dispatcher_.GenerateConnectionIdForReject(connection_id);
   }
   // Returns true if |message|, which was received on |self_address| is
   // acceptable according to the visitor's policy. Otherwise, returns false
@@ -40,7 +40,7 @@ public:
   bool CanAcceptClientHello(const CryptoHandshakeMessage& message,
                                     const NqQuicSocketAddress& self_address,
                                     std::string* error_details) const override {
-    return dispather_.CanAcceptClientHello(message, self_address, error_details);
+    return dispatcher_.CanAcceptClientHello(message, self_address, error_details);
   }
 };
 }

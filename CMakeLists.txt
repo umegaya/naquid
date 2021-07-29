@@ -42,6 +42,7 @@ set(lib_src
 	./src/core/nq_client_loop.cpp
 	./src/core/nq_client_loop_base.cpp
 	./src/core/nq_config.cpp
+	./src/core/nq_dispatcher_base.cpp
 	./src/core/nq_dispatcher.cpp
 	./src/core/nq_loop.cpp
 	./src/core/nq_loop_base.cpp
@@ -53,8 +54,9 @@ set(lib_src
 	./src/core/nq_stream.cpp 
 	./src/core/nq_worker.cpp
 
-	./src/core/compat/nq_client_loop_compat.cpp
 	./src/core/compat/nq_client_compat.cpp
+	./src/core/compat/nq_client_loop_compat.cpp
+	./src/core/compat/nq_dispatcher_compat.cpp
 	./src/core/compat/nq_loop_compat.cpp
 	./src/core/compat/nq_quic_alarm.cpp
 
@@ -72,6 +74,7 @@ set(compat_src
 	./src/core/compat/chromium/nq_packet_reader.cpp
 	./src/core/compat/chromium/nq_packet_writer.cpp
 	./src/core/compat/chromium/nq_quic_client.cpp
+	./src/core/compat/chromium/nq_quic_dispatcher.cpp
 
 	./src/backends/chromium/stub/nq_file_util.cpp
 	./src/backends/chromium/stub/nq_quic_socket_utils.cpp 

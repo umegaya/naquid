@@ -51,5 +51,8 @@ class NqWorker {
  protected:
   static bool ToSocketAddress(const nq_addr_t &addr, NqQuicSocketAddress &address);
   nq::Fd CreateUDPSocketAndBind(const NqQuicSocketAddress& address);
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(NqWorker);
 };
 }

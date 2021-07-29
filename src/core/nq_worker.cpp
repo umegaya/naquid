@@ -95,17 +95,13 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
       ASSERT(false);
       return false;
     }
-    auto cc = kv.second.NewCryptoConfig(&loop_);
-    if (cc == nullptr) {
-      ASSERT(false);
-      return false;      
-    }
     nq::logger::info({
       {"msg", "listen"},
       {"thread_index", index_}, 
       {"fd", listen_fd},
     });
-    auto d = new NqDispatcher(kv.first, kv.second, std::move(cc), *this);
+    auto d = new NqDispatcher(kv.first, kv.second, *this);
+    d->SetFromConfig(kv.second);
     if (loop_.Add(listen_fd, d, NqLoop::EV_READ | NqLoop::EV_WRITE) != NQ_OK) {
       nq::Syscall::Close(listen_fd);
       delete d;

@@ -101,7 +101,7 @@ class NqPacketReader {
       p = packet_pool_.top();
       packet_pool_.pop();
     } else {
-      p =new char[sizeof(Packet)];
+      p = new char[sizeof(Packet)];
     }
     return new(p) Packet(buffer, length, receipt_time, ttl, ttl_valid, client_sockaddr, server_ip, server_port);
   }
