@@ -41,7 +41,7 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
   }
 
   if (bind_to_address.IsInitialized()) {
-    address_ = NqQuicSocketAddress(bind_to_address, client_->quic_client()->local_port());
+    address_ = NqQuicSocketAddress(bind_to_address, client_->chromium()->local_port());
   } else if (server_address.host().address_family() == IpAddressFamily::IP_V4) {
     address_ = NqQuicSocketAddress(QuicIpAddress::Any4(), bind_to_port);
   } else {
@@ -98,19 +98,19 @@ void NqNetworkHelper::RunEventLoop() {
 void NqNetworkHelper::OnClose(Fd /*fd*/) {}
 int NqNetworkHelper::OnOpen(Fd /*fd*/) {  return NQ_OK; }
 void NqNetworkHelper::OnEvent(Fd fd, const Event& event) {
-  auto quic_client = client_->quic_client();
+  auto chromium_client = client_->chromium();
   if (NqLoop::Readable(event)) {
     bool more_to_read = true;
-    while (quic_client->connected() && more_to_read) {
+    while (chromium_client->connected() && more_to_read) {
       more_to_read = packet_reader_->Read(
           fd, GetLatestClientAddress().port(),
-          *quic_client->helper()->GetClock(), this,
+          *chromium_client->helper()->GetClock(), this,
           overflow_supported_ ? &packets_dropped_ : nullptr);
     }
   }
-  if (quic_client->connected() && NqLoop::Writable(event)) {
-    quic_client->writer()->SetWritable();
-    quic_client->session()->OnCanWrite();
+  if (chromium_client->connected() && NqLoop::Writable(event)) {
+    chromium_client->writer()->SetWritable();
+    chromium_client->session()->OnCanWrite();
   }
   if (NqLoop::Closed(event)) {
     TRACE("closed %d", fd);
@@ -132,15 +132,15 @@ NqQuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
 
 void NqNetworkHelper::OnRecv(NqPacketReader::Packet *p) {
   //self == server, peer == client
-  auto quic_client = client_->quic_client();
+  auto chromium_client = client_->chromium();
 #if !defined(USE_DIRECT_WRITE)
-  quic_client->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
+  chromium_client->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
 #else
   auto m = &(client_->static_mutex());
   std::unique_lock<std::mutex> session_lock(*m);
   loop_->LockSession(client_->session_index());
   //TRACE("NqNetworkHelper try get static mutex success %p", m);
-  quic_client->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
+  chromium_client->session()->ProcessUdpPacket(p->server_address(), p->client_address(), *p);
   loop_->UnlockSession();
 #endif
 }

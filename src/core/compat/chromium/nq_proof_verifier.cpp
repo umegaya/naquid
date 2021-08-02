@@ -1,4 +1,4 @@
-#include "core/nq_proof_verifier.h"
+#include "core/compat/chromium/nq_proof_verifier.h"
 
 #include "crypto/signature_verifier.h"
 #include "net/cert/asn1_util.h"

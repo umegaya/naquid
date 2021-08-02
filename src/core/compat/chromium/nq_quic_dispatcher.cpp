@@ -6,7 +6,7 @@ namespace net {
 NqQuicDispatcher::NqQuicDispatcher(
   NqDispatcherCompat &dispatcher, QuicCryptoServerConfig *crypto_config,
   const NqServerConfig& config, NqWorker &worker
-) : QuicDispatcher(config,
+) : QuicDispatcher(config.chromium(),
                    crypto_config,
                    new QuicVersionManager(net::AllSupportedVersions()),
                    //TODO(iyatomi): enable to pass worker.loop or this directory to QuicDispatcher ctor. 

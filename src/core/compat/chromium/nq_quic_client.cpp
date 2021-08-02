@@ -14,7 +14,7 @@ NqQuicClient::NqQuicClient(NqClientCompat *client,
   : QuicClientBase(
     server_id,
     config.protocol_manager().supported_versions(),
-    config,
+    config.chromium(),
     new NqStubConnectionHelper(loop),
     new NqStubAlarmFactory(loop),
     QuicWrapUnique(new NqNetworkHelper(&loop, client)),

@@ -1,5 +1,6 @@
 #include "core/nq_dispatcher.h"
 
+#if defined(NQ_CHROMIUM_BACKEND)
 #include "net/tools/quic/quic_default_packet_writer.h"
 
 #include "core/nq_server_loop.h"
@@ -141,4 +142,4 @@ QuicSession* NqDispatcherCompat::CreateQuicSession(QuicConnectionId connection_i
 }
 
 } // namespace net
-
+#endif

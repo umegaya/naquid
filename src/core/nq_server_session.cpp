@@ -11,7 +11,7 @@ namespace net {
 NqServerSession::NqServerSession(QuicConnection *connection,
                                  const NqServer::PortConfig &port_config)
   //quic_dispatcher implements QuicSession::Visitor interface                                 
-  : NqSession(connection, dispatcher()->quic_dispatcher(), this, port_config), 
+  : NqSession(connection, dispatcher()->chromium(), this, port_config.chromium()),
   port_config_(port_config), own_handler_map_(), context_(nullptr) {
   SetCryptoStream(NewCryptoStream());
 }
@@ -138,7 +138,7 @@ QuicCryptoStream *NqServerSession::NewCryptoStream() {
     dispatcher()->cert_cache(),
     true,
     this,
-    dispatcher()->quic_dispatcher()
+    dispatcher()->chromium()
   );
 }
 const nq::HandlerMap *NqServerSession::GetHandlerMap() const {

@@ -34,7 +34,7 @@ class NqClientCompat : public NqClientBase {
   }
 
   // get/set
-  NqQuicClient *quic_client() { return &client_; }
+  NqQuicClient *chromium() { return &client_; }
 
  private:
   friend class NqClient;

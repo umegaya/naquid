@@ -24,7 +24,7 @@ class NqDispatcherCompat : public NqDispatcherBase,
   // get/set
   inline QuicCompressedCertsCache *cert_cache() { return &cert_cache_; }
   inline const QuicCryptoServerConfig *crypto_config() const { return crypto_config_.get(); }
-  inline NqQuicDispatcher *quic_dispatcher() { return &dispatcher_; }
+  inline NqQuicDispatcher *chromium() { return &dispatcher_; }
 
   //implements NqDispatcherBase
   void Accept() override { dispatcher_.ProcessBufferedChlos(accept_per_loop_); }
