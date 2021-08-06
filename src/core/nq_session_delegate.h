@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "basis/handler_map.h"
 #include "core/nq_serial_codec.h"
 
@@ -12,9 +11,7 @@ class NqSessionDelegate {
   virtual ~NqSessionDelegate() {}
   virtual void *Context() const = 0;
   virtual void Destroy() = 0;
-  virtual void OnClose(QuicErrorCode error,
-                          const std::string& error_details,
-                          ConnectionCloseSource close_by_peer_or_self) = 0;
+  virtual void OnClose(int code, const std::string& details, bool close_by_peer_or_self) = 0;
   virtual void OnOpen() = 0;
   virtual void Disconnect() = 0;
   virtual bool Reconnect() = 0; //only supported for client 

@@ -50,7 +50,6 @@ set(lib_src
 	./src/core/nq_server.cpp
 	./src/core/nq_server_loop.cpp
 	./src/core/nq_server_session.cpp
-	./src/core/nq_session.cpp
 	./src/core/nq_stream.cpp 
 	./src/core/nq_worker.cpp
 
@@ -60,6 +59,8 @@ set(lib_src
 	./src/core/compat/nq_dispatcher_compat.cpp
 	./src/core/compat/nq_loop_compat.cpp
 	./src/core/compat/nq_quic_alarm.cpp
+	./src/core/compat/nq_server_session_compat.cpp
+	./src/core/compat/nq_session.cpp
 
 	./src/core/platform/nq_jni_android.cpp
 	./src/core/platform/nq_reachability.cpp

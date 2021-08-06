@@ -34,7 +34,7 @@ class NqQuicClient : public QuicClientBase,
 	int GetNumReceivedServerConfigUpdatesFromSession() override { return 0; }
 	void ResendSavedData() override {}
 	void ClearDataToResend() override {}
-	std::unique_ptr<QuicSession> CreateQuicClientSession(QuicConnection* connection) override;
+	std::unique_ptr<QuicSession> CreateQuicClientSession(NqQuicConnection* connection) override;
 	void InitializeSession() override;
 
 	// implements QuicCryptoClientStream::ProofHandler

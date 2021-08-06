@@ -7,7 +7,7 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
   while (try_dequeue(op)) {
     switch (op->target_) {
     case Conn: {
-      auto c = reinterpret_cast<NqSession::Delegate *>(op->target_ptr_);
+      auto c = reinterpret_cast<NqSessionDelegate *>(op->target_ptr_);
 #if defined(USE_DIRECT_WRITE)
       auto m = NqUnwrapper::UnsafeUnwrapMutex(NqConnSerialCodec::IsClient(op->serial_), c);
       std::unique_lock<std::mutex> lock(*m);
@@ -33,7 +33,7 @@ void NqBoxer::Processor::Poll(NqBoxer *p) {
     } break;
     case Stream: {
 #if defined(USE_DIRECT_WRITE)
-      auto c = reinterpret_cast<NqSession::Delegate *>(op->target_ptr_);
+      auto c = reinterpret_cast<NqSessionDelegate *>(op->target_ptr_);
       auto m = NqUnwrapper::UnsafeUnwrapMutex(NqStreamSerialCodec::IsClient(op->serial_), c);
       std::unique_lock<std::mutex> lock(*m);
       p->LockSession(c->SessionIndex());

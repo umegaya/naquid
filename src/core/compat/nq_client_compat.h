@@ -19,9 +19,6 @@ class NqClientCompat : public NqClientBase {
   NqClientStream *NewStream() override {
     return static_cast<NqClientStream *>(client_.nq_session()->CreateOutgoingDynamicStream());
   }
-  int UnderlyingFd() override { 
-    return static_cast<NqNetworkHelper *>(client_.network_helper())->fd();
-  }
 
 
   // implements NqSession::Delegate
@@ -29,8 +26,11 @@ class NqClientCompat : public NqClientBase {
     return client_.connection_id();
   }
   void FlushWriteBuffer() override {
-    QuicConnection::ScopedPacketBundler bundler(
-      client_.nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED); 
+    NqQuicConnection::ScopedPacketBundler bundler(
+      client_.nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED); 
+  }
+  int UnderlyingFd() override { 
+    return static_cast<NqNetworkHelper *>(client_.network_helper())->fd();
   }
 
   // get/set
@@ -60,17 +60,11 @@ class NqClientCompat : public NqClientBase {
   void StartDisconnect() override { ASSERT(false); }
   void ForceShutdown() override { ASSERT(false); }
   bool MigrateSocket() override { ASSERT(false); return false; }
-  NqClientStream *NewStream() override { ASSERT(false); return nullptr; }
-  int UnderlyingFd() override { ASSERT(false); return -1; }
 
   // implements NqSession::Delegate
-  NqQuicConnectionId ConnectionId() override {
-    ASSERT(false);
-    return 0LL;
-  }
-  void FlushWriteBuffer() override {
-    ASSERT(false);
-  }
+  NqQuicConnectionId ConnectionId() override { ASSERT(false); return 0LL; }
+  void FlushWriteBuffer() override { ASSERT(false); }
+  NqClientStream *NewStream() override { ASSERT(false); return nullptr; }
 
   // operation
   void StartConnect();

@@ -12,6 +12,7 @@
 #include "core/nq_client_loop.h"
 #include "core/nq_server.h"
 #include "core/nq_unwrapper.h"
+#include "core/nq_session_delegate.h"
 #include "core/compat/chromium/nq_network_helper.h"
 
 //at exit manager seems optimized out and causes linkder error without following anchor
@@ -89,8 +90,8 @@ const char *INVALID_REASON(const H &h) {
   }
 }
 
-static inline NqSession::Delegate *ToConn(nq_conn_t c) { 
-  return reinterpret_cast<NqSession::Delegate *>(c.p); 
+static inline NqSessionDelegate *ToConn(nq_conn_t c) { 
+  return reinterpret_cast<NqSessionDelegate *>(c.p); 
 }
 static inline NqStream *ToStream(nq_rpc_t c) { 
   return reinterpret_cast<NqStream *>(c.p); 
@@ -279,7 +280,7 @@ NQAPI_THREADSAFE bool nq_conn_is_client(nq_conn_t conn) {
   return NqSerial::IsClient(conn.s);
 }
 NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, nq_on_conn_validate_t cb) {
-  NqSession::Delegate *d;
+  NqSessionDelegate *d;
   UNWRAP_CONN(conn, d, {
     no_ret_closure_call_with_check(cb, conn, nullptr);
     return true;
@@ -288,7 +289,7 @@ NQAPI_THREADSAFE bool nq_conn_is_valid(nq_conn_t conn, nq_on_conn_validate_t cb)
   return false;
 }
 NQAPI_THREADSAFE void nq_conn_modify_hdmap(nq_conn_t conn, nq_on_conn_modify_hdmap_t modifier) {
-  NqSession::Delegate *d;
+  NqSessionDelegate *d;
   NqBoxer *b;
   UNWRAP_CONN_OR_ENQUEUE(conn, d, b, {
     auto hm = d->ResetHandlerMap()->ToHandle();
@@ -298,14 +299,14 @@ NQAPI_THREADSAFE void nq_conn_modify_hdmap(nq_conn_t conn, nq_on_conn_modify_hdm
   }, "nq_conn_modify_hdmap");
 }
 NQAPI_THREADSAFE nq_time_t nq_conn_reconnect_wait(nq_conn_t conn) {
-  NqSession::Delegate *d;
+  NqSessionDelegate *d;
   UNWRAP_CONN(conn, d, {
     return nq_time_usec(d->ReconnectDurationUS());
   }, "nq_conn_reconnect_wait");
   return 0;
 }
 NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn) {
-  NqSession::Delegate *d;
+  NqSessionDelegate *d;
   UNSAFE_UNWRAP_CONN(conn, d, {
     return d->Context();
   }, "nq_conn_ctx");
@@ -314,7 +315,7 @@ NQAPI_CLOSURECALL void *nq_conn_ctx(nq_conn_t conn) {
 //these are hidden API for test, because returned value is unstable
 //when used with client connection (under reconnection)
 NQAPI_THREADSAFE nq_cid_t nq_conn_cid(nq_conn_t conn) {
-  NqSession::Delegate *d;
+  NqSessionDelegate *d;
   UNWRAP_CONN(conn, d, {
     return d->ConnectionId();
   }, "nq_conn_cid");
@@ -324,7 +325,7 @@ NQAPI_THREADSAFE void nq_conn_reachability_change(nq_conn_t conn, nq_reachabilit
   NqUnwrapper::UnwrapBoxer(conn)->InvokeConn(conn.s, ToConn(conn), NqBoxer::OpCode::Reachability, state);
 }
 NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn) {
-  NqSession::Delegate *d;
+  NqSessionDelegate *d;
   UNWRAP_CONN(conn, d, {
     return d->UnderlyingFd();
   }, "nq_conn_fd");
@@ -338,7 +339,7 @@ NQAPI_THREADSAFE int nq_conn_fd(nq_conn_t conn) {
 //
 // --------------------------
 static inline void conn_stream_common(nq_conn_t conn, const char *name, void *ctx, const char *purpose) {
-  NqSession::Delegate *d;
+  NqSessionDelegate *d;
   UNWRAP_CONN(conn, d, ({
     d->InitStream(name, ctx);
   }), purpose);

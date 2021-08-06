@@ -1,8 +1,8 @@
 #include "core/nq_stream.h"
 
 #include "basis/endian.h"
+#include "core/compat/nq_session.h"
 #include "core/nq_loop.h"
-#include "core/nq_session.h"
 #include "core/nq_client.h"
 #include "core/nq_server_session.h"
 #include "core/nq_client_loop.h"
@@ -118,8 +118,8 @@ void NqStream::OnClose() {
   QuicStream::OnClose();
 }
 void NqStream::OnDataAvailable() {
-  QuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  NqQuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   //greedy read and called back
   struct iovec v[256];
   int n_blocks = sequencer()->GetReadableRegions(v, 256);
@@ -292,13 +292,13 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	}
 }
 void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
-  QuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  NqQuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   SendCommon(p, len, nullptr);
 }
 void NqSimpleStreamHandler::SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) {
-  QuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  NqQuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   SendCommon(p, len, &opt);
 }
 
@@ -388,8 +388,8 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   } while (parse_buffer_.length() > 0);
 }
 void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t len) {
-  QuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  NqQuicConnection::ScopedPacketBundler bundler(
+    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];
@@ -400,23 +400,23 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
   WriteBytes(buffer, ofs + len);  
 }
 void NqSimpleRPCStreamHandler::Call(uint16_t type, const void *p, nq_size_t len, nq_on_rpc_reply_t cb) {
-  //QuicConnection::ScopedPacketBundler bundler(
-    //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  //NqQuicConnection::ScopedPacketBundler bundler(
+    //nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   nq_msgid_t msgid = msgid_factory_.New();
   SendCommon(type, msgid, p, len);
   EntryRequest(msgid, cb, default_timeout_ts_);
 }
 void NqSimpleRPCStreamHandler::CallEx(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) {
-  //QuicConnection::ScopedPacketBundler bundler(
-    //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  //NqQuicConnection::ScopedPacketBundler bundler(
+    //nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   nq_msgid_t msgid = msgid_factory_.New();
   SendCommon(type, msgid, p, len);
   EntryRequest(msgid, opt.callback, opt.timeout);
 }
 
 void NqSimpleRPCStreamHandler::Reply(nq_error_t result, nq_msgid_t msgid, const void *p, nq_size_t len) {
-  //QuicConnection::ScopedPacketBundler bundler(
-    //nq_session()->connection(), QuicConnection::SEND_ACK_IF_QUEUED);
+  //NqQuicConnection::ScopedPacketBundler bundler(
+    //nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];

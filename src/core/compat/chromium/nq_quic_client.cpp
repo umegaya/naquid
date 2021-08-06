@@ -39,7 +39,7 @@ NqClientLoop *NqQuicClient::loop() {
 
 // implements QuicClientBase
 std::unique_ptr<QuicSession>
-NqQuicClient::CreateQuicClientSession(QuicConnection* connection) {
+NqQuicClient::CreateQuicClientSession(NqQuicConnection* connection) {
   auto cs = new NqClientSession(connection, loop(), client_, *config());
   cs->InitCryptoStream(
     new QuicCryptoClientStream(server_id(), cs, new ProofVerifyContext(), crypto_config(), this)

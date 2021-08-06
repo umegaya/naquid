@@ -6,8 +6,9 @@
 
 #include "nq.h"
 #include "basis/allocator.h"
+#include "core/compat/nq_session.h"
 #include "core/nq_closure.h"
-#include "core/nq_session.h"
+#include "core/nq_session_delegate.h"
 #include "core/nq_stream.h"
 #include "core/nq_alarm.h"
 #include "core/nq_serial_codec.h"
@@ -195,7 +196,7 @@ class NqBoxer {
   virtual void UnlockSession() = 0;
 
   //invoker
-  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, bool from_queue = false) {
+  inline void InvokeConn(const nq_serial_t &serial, NqSessionDelegate *unboxed, OpCode code, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
     if (from_queue) {
@@ -227,7 +228,7 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, OpTarget::Conn));      
     }
   }
-  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, const char *name, void *ctx, bool from_queue = false) {
+  inline void InvokeConn(const nq_serial_t &serial, NqSessionDelegate *unboxed, OpCode code, const char *name, void *ctx, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
     if (from_queue) {
@@ -240,7 +241,7 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, name, ctx, OpTarget::Conn));      
     }
   }
-  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, nq_reachability_t state, bool from_queue = false) {
+  inline void InvokeConn(const nq_serial_t &serial, NqSessionDelegate *unboxed, OpCode code, nq_reachability_t state, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
     if (from_queue) {
@@ -254,7 +255,7 @@ class NqBoxer {
       Enqueue(new Op(serial, unboxed, code, state, OpTarget::Conn));      
     }
   }
-  inline void InvokeConn(const nq_serial_t &serial, NqSession::Delegate *unboxed, OpCode code, nq_closure_t cb, bool from_queue = false) {
+  inline void InvokeConn(const nq_serial_t &serial, NqSessionDelegate *unboxed, OpCode code, nq_closure_t cb, bool from_queue = false) {
     //UnboxResult r = UnboxResult::Ok;
     //always enter queue to be safe when this call inside protocol handler
     if (from_queue) {
@@ -413,7 +414,7 @@ class NqBoxer {
 };
 template <>
 struct NqBoxer::unbox_result_trait<nq_conn_t> {
-  typedef NqSession::Delegate value;
+  typedef NqSessionDelegate value;
 };
 template <>
 struct NqBoxer::unbox_result_trait<nq_stream_t> {

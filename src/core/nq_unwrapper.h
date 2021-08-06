@@ -4,17 +4,18 @@
 
 #include "nq.h"
 #include "basis/allocator.h"
-#include "core/nq_client.h"
-#include "core/nq_server_session.h"
-#include "core/nq_stream.h"
 #include "core/nq_alarm.h"
+#include "core/nq_client.h"
 #include "core/nq_serial_codec.h"
+#include "core/nq_server_session.h"
+#include "core/nq_session_delegate.h"
+#include "core/nq_stream.h"
 
 namespace net {
 //these code does valid check of nq_conn_t, nq_stream_t, nq_rpc_t, nq_alarm_t even if related pointer (member p)
-//already freed, and return casted NqSession::Delegate* or NqStream* if valid. its really wild part of the codes, be careful to make change.
+//already freed, and return casted NqSessionDelegate* or NqStream* if valid. its really wild part of the codes, be careful to make change.
 //especially, keep following restriction in mind.
-//  1. member p can be cast to NqSession::Delegate* or NqStream* (and its derived classes, NqServerStream, NqClientStream, NqClient, NqServerSession)
+//  1. member p can be cast to NqSessionDelegate* or NqStream* (and its derived classes, NqServerStream, NqClientStream, NqClient, NqServerSession)
 //     but none of its virtual function can be called. because its vtbl may become invalid already.
 //  2. validity should be checked serial stored in pointer of casted object and handle (nq_conn_t.s, nq_rpc_t.s, nq_stream_t.s, nq_alarm_t.s),
 //     with locking mutex which is returned by StaticMutex(nq_conn_t/nq_rpc_t/nq_stream_t/nq_alarm_t)
@@ -22,13 +23,13 @@ namespace net {
 //caller should be use following functions with following step. for convenience, UNWRAP_CONN and UNWRAP_STREAM is provided.
 //  1. lock mutex which is returned by NqUnwrapper::UnwrapMutex. 
 //  2. get storead serial
-//  3. get NqSession::Delegate* or NqStream* or NqAlarm* by getting corresponding UnwrapXXX method
+//  3. get NqSessionDelegate* or NqStream* or NqAlarm* by getting corresponding UnwrapXXX method
 //  4. if non-null pointer returned, you can call any method as its synchronized. otherwise, handle(nq_conn_t/nq_rpc_t/nq_stream_t/nq_alarm_t) is 
 //     already invalid and do nothing 
 class NqUnwrapper {
  public:
   //unwrap boxer
-  static inline NqBoxer *UnwrapBoxer(bool is_client, NqSession::Delegate *p) { 
+  static inline NqBoxer *UnwrapBoxer(bool is_client, NqSessionDelegate *p) { 
     if (is_client) {
       auto cli = static_cast<NqClient *>(p);
       return cli->boxer();
@@ -47,7 +48,7 @@ class NqUnwrapper {
     }
   }
   static inline NqBoxer *UnwrapBoxer(nq_conn_t conn) {
-    return UnwrapBoxer(NqSerial::IsClient(conn.s), reinterpret_cast<NqSession::Delegate *>(conn.p));   
+    return UnwrapBoxer(NqSerial::IsClient(conn.s), reinterpret_cast<NqSessionDelegate *>(conn.p));   
   }
   static inline NqBoxer *UnwrapBoxer(nq_stream_t s) { 
     return UnwrapBoxer(NqSerial::IsClient(s.s), reinterpret_cast<NqStream *>(s.p)); 
@@ -61,7 +62,7 @@ class NqUnwrapper {
 
 
   //unwrap stored serial
-  static inline const nq_serial_t &UnwrapStoredSerial(bool is_client, NqSession::Delegate *delegate_ptr) {
+  static inline const nq_serial_t &UnwrapStoredSerial(bool is_client, NqSessionDelegate *delegate_ptr) {
     if (is_client) {
       auto cli = static_cast<NqClient *>(delegate_ptr);
       return cli->session_serial();
@@ -76,7 +77,7 @@ class NqUnwrapper {
 
   
   //unwrap mutex
-  static inline std::mutex *UnsafeUnwrapMutex(bool is_client, NqSession::Delegate *delegate_ptr) {
+  static inline std::mutex *UnsafeUnwrapMutex(bool is_client, NqSessionDelegate *delegate_ptr) {
     if (is_client) {
       auto cli = static_cast<NqClient *>(delegate_ptr);
       return &(cli->static_mutex());
@@ -101,7 +102,7 @@ class NqUnwrapper {
     if (b->MainThread()) {
       return nullptr; //avoid deadlock
     }
-    return UnsafeUnwrapMutex(NqSerial::IsClient(conn.s), reinterpret_cast<NqSession::Delegate *>(conn.p));
+    return UnsafeUnwrapMutex(NqSerial::IsClient(conn.s), reinterpret_cast<NqSessionDelegate *>(conn.p));
   }
 
 
@@ -122,7 +123,7 @@ class NqUnwrapper {
   if (NqSerial::IsEmpty(__handle.s)) { \
     TRACE("UNWRAP_CONN(%s): invalid handle: %s", __purpose, INVALID_REASON(__handle)); \
   } else { \
-    __d = reinterpret_cast<NqSession::Delegate *>(__handle.p); \
+    __d = reinterpret_cast<NqSessionDelegate *>(__handle.p); \
     auto m = NqUnwrapper::UnwrapMutex(__handle); \
     if (m != nullptr) { \
       std::unique_lock<std::mutex> lk(*m); \
@@ -140,7 +141,7 @@ class NqUnwrapper {
   } else { \
     __boxer = NqUnwrapper::UnwrapBoxer(__handle); \
     if (__boxer->MainThread()) { \
-      __d = reinterpret_cast<NqSession::Delegate *>(__handle.p); \
+      __d = reinterpret_cast<NqSessionDelegate *>(__handle.p); \
       if (__d->SessionSerial() == __handle.s) { \
         __code; \
       } \
@@ -150,7 +151,7 @@ class NqUnwrapper {
   } \
 }
 #define UNSAFE_UNWRAP_CONN(__handle, __d, __code, __purpose) { \
-  __d = reinterpret_cast<NqSession::Delegate *>(__handle.p); \
+  __d = reinterpret_cast<NqSessionDelegate *>(__handle.p); \
   __code; \
 }
 #define UNWRAP_STREAM(__handle, __s, __code, __purpose) { \

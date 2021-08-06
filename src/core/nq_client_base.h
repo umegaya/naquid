@@ -145,15 +145,13 @@ class NqClientBase : public NqSessionDelegate,
 
   // implements NqAlarmBase
   void OnFire() override;
-  bool IsNonQuicAlarm() const override { return true  ; }
+  bool IsNonQuicAlarm() const override { return true; }
 
-  // implements NqSession::Delegate
+  // implements NqSessionDelegate
   void *Context() const override { return context_; }
   void Destroy() override;
   void DoReconnect() override;
-  void OnClose(QuicErrorCode error,
-               const std::string& error_details,
-               ConnectionCloseSource close_by_peer_or_self) override;
+  void OnClose(int error, const std::string& error_details, bool close_by_peer_or_self) override;
   void OnOpen() override;
   bool IsClient() const override { return true; }
   bool IsConnected() const override { return connect_state_ == CONNECTED; }

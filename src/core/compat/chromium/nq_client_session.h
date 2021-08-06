@@ -1,14 +1,14 @@
 #pragma once
 
-#include "core/nq_session.h"
+#include "core/compat/nq_session.h"
 
 namespace net {
 class NqClientStream;
 class NqClientSession : public NqSession {
  public:
-  NqClientSession(QuicConnection *connection,
+  NqClientSession(NqQuicConnection *connection,
                   Visitor* owner,
-                  Delegate* delegate,
+                  NqSessionDelegate* delegate,
                 	const QuicConfig& config)
   : NqSession(connection, owner, delegate, config) {
   }

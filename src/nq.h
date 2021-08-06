@@ -60,7 +60,7 @@ typedef struct {
 
 typedef struct nq_conn_tag {
     nq_serial_t s; //see NqConnSerialCodec
-    void *p;    //NqSession::Delegate
+    void *p;    //NqSessionDelegate
 } nq_conn_t;
 
 typedef struct nq_stream_tag {

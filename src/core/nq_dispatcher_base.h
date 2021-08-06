@@ -8,6 +8,7 @@
 #include "core/nq_alarm.h"
 #include "core/nq_boxer.h"
 #include "core/nq_server_session.h"
+#include "core/nq_static_section.h"
 #include "core/nq_stream.h"
 #include "core/nq_serial_codec.h"
 

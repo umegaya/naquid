@@ -4,9 +4,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-#include "net/quic/platform/api/quic_ptr_util.h"
-#include "net/quic/core/quic_crypto_client_stream.h"
-
 #include "basis/timespec.h"
 #include "core/nq_stream.h"
 #include "core/compat/chromium/nq_network_helper.h"
@@ -113,7 +110,7 @@ void NqClientBase::Destroy() {
   delete this;
 }
 nq_conn_t NqClientBase::ToHandle() { 
-  return MakeHandle<nq_conn_t, NqSession::Delegate>(static_cast<NqSession::Delegate *>(this), session_serial_);
+  return MakeHandle<nq_conn_t, NqSessionDelegate>(static_cast<NqSessionDelegate *>(this), session_serial_);
 }
 std::mutex &NqClientBase::static_mutex() {
   return loop_->client_allocator().Bss(this)->mutex();
@@ -131,7 +128,7 @@ void NqClientBase::OnFire() {
 }
 
 
-//implements NqSession::Delegate
+//implements NqSessionDelegate
 NqLoop *NqClientBase::GetLoop() { 
   return loop_; 
 }
@@ -143,9 +140,7 @@ void NqClientBase::OnOpen() {
     stream_manager_.RecoverOutgoingStreams(this);
   }
 }
-void NqClientBase::OnClose(QuicErrorCode error,
-             const std::string& error_details,
-             ConnectionCloseSource close_by_peer_or_self) {
+void NqClientBase::OnClose(int error, const std::string& error_details, bool close_by_peer_or_self) {
   nq_error_detail_t detail = {
     .code = error,
     .msg = error_details.c_str(),
@@ -153,7 +148,7 @@ void NqClientBase::OnClose(QuicErrorCode error,
   uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, ToHandle(), 
                                               NQ_EQUIC, 
                                               &detail, 
-                                              close_by_peer_or_self == ConnectionCloseSource::FROM_PEER));
+                                              close_by_peer_or_self));
   if (destroyed()) {
     ScheduleDestroy();
     //cannot touch this client memory afterward. alarm invocation automatically delete the object,

@@ -129,7 +129,7 @@ QuicSession* NqDispatcherCompat::CreateQuicSession(QuicConnectionId connection_i
     return nullptr;
   }
 
-  QuicConnection* connection = new QuicConnection(
+  NqQuicConnection* connection = new NqQuicConnection(
     connection_id, client_address, &loop_, &loop_,
     dispatcher_.CreatePerConnectionWriterPublic(),
     /* owns_writer= */ true, Perspective::IS_SERVER, 
