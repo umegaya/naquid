@@ -11,21 +11,12 @@
 
 namespace net {
 
-NqStream::NqStream(QuicStreamId id, NqSession* nq_session, 
-                   bool establish_side, SpdyPriority priority) : 
-  QuicStream(id, nq_session), 
+NqStream::NqStream(NqQuicStreamId id, NqSession* nq_session, bool establish_side) : 
+  NqStreamCompat(id, nq_session),
   buffer_(),
   handler_(nullptr), 
-  priority_(priority), 
   establish_side_(establish_side),
   established_(false), proto_sent_(false) {
-  nq_session->RegisterStreamPriority(id, priority);
-}
-NqSession *NqStream::nq_session() { 
-  return static_cast<NqSession *>(session()); 
-}
-const NqSession *NqStream::nq_session() const { 
-  return static_cast<const NqSession *>(session()); 
 }
 bool NqStream::TryOpenRawHandler(bool *p_on_open_result) {
   auto rh = nq_session()->handler_map()->RawHandler();
@@ -115,68 +106,56 @@ void NqStream::OnClose() {
   if (handler_ != nullptr) {
     handler_->OnClose();
   }
-  QuicStream::OnClose();
+  NqStreamCompat::OnClose();
 }
-void NqStream::OnDataAvailable() {
-  NqQuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
-  //greedy read and called back
-  struct iovec v[256];
-  int n_blocks = sequencer()->GetReadableRegions(v, 256);
-  int i = 0; bool on_raw_open_result;
+bool NqStream::OnRecv(const void *p, nq_size_t len) {
+  bool on_raw_open_result;
   if (!established_) {
     //establishment
     if (establish_side()) {
       established_ = true;
+      //all received packet for establish side processes immediately
     } else if (TryOpenRawHandler(&on_raw_open_result)) {
       if (!on_raw_open_result) {
         Disconnect();
-        return;
+        return true;
       }
       set_proto_sent();
-      established_ = true;
+      // established_ = true; TryOpenRawHandler set established_ to true
+      //raw handler processes packet immediately without creating stream handler
     } else {
-      for (;i < n_blocks;) {
-        const char *vbuf = NqStreamHandler::ToCStr(v[i].iov_base);
-        size_t idx = 0;
-        for (;idx < v[i].iov_len; idx++) {
-          if (vbuf[idx] == 0) {
-            //FYI(iyatomi): this adds null terminate also.
-            buffer_.append(vbuf, idx + 1); 
-            break;
-          }
+      const char *vbuf = NqStreamHandler::ToCStr(p);
+      size_t idx = 0;
+      for (;idx < len; idx++) {
+        if (vbuf[idx] == 0) {
+          //FYI(iyatomi): this adds null terminate also.
+          buffer_.append(vbuf, idx + 1); 
+          break;
         }
-        if (idx >= v[i].iov_len) {
-          //FYI(iyatomi): entire buffer points part of string.
-          buffer_.append(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
-          sequencer()->MarkConsumed(v[i].iov_len);
-          i++;
-          continue;
-        }
-        //prevent send handshake message to client
-        set_proto_sent();
-        //create handler by initial establish string
-        if (!OpenHandler(buffer_, false)) {
-          Disconnect();
-          return;
-        }
-        if (v[i].iov_len > (idx + 1)) {
-          //v[i] may contains over-received payload
-          handler_->OnRecv(vbuf + idx + 1, v[i].iov_len - idx - 1);
-        }
-        established_ = true;
-        sequencer()->MarkConsumed(v[i].iov_len);
-        i++;
-        break;
       }
+      if (idx >= len) {
+        //FYI(iyatomi): entire buffer points part of string.
+        buffer_.append(NqStreamHandler::ToCStr(p), len);
+        return false;
+      }
+      //prevent send handshake message to client
+      set_proto_sent();
+      //create handler by initial establish string
+      if (!OpenHandler(buffer_, false)) {
+        Disconnect();
+        return true;
+      }
+      if (len > (idx + 1)) {
+        //v[i] may contains over-received payload
+        handler_->OnRecv(vbuf + idx + 1, len - idx - 1);
+      }
+      established_ = true;
+      return false; //p, len is consumed completely for establishment
     }
   }
-  size_t consumed = 0;
-  for (;i < n_blocks; i++) {
-    handler_->OnRecv(NqStreamHandler::ToCStr(v[i].iov_base), v[i].iov_len);
-    consumed += v[i].iov_len;
-  }
-  sequencer()->MarkConsumed(consumed);  
+  //normal receiving packet
+  handler_->OnRecv(NqStreamHandler::ToCStr(p), len);
+  return false;
 }
 
 
@@ -244,35 +223,14 @@ std::mutex &NqServerStream::static_mutex() {
 
 
 
-class AckHandler : public QuicAckListenerInterface {
-  nq_stream_opt_t opt_;
- public:
-  AckHandler(const nq_stream_opt_t &opt) : opt_(opt) {}
-  //implements QuicAckListenerInterface
-
-  // Called when a packet is acked.  Called once per packet.
-  // |acked_bytes| is the number of data bytes acked.
-  void OnPacketAcked(int acked_bytes,
-                             QuicTime::Delta ack_delay_time) override {
-    if (nq_closure_is_empty(opt_.on_ack)) { return; }
-    nq_closure_call(opt_.on_ack, acked_bytes, nq_time_usec(ack_delay_time.ToMicroseconds()));
-  }
-  // Called when a packet is retransmitted.  Called once per packet.
-  // |retransmitted_bytes| is the number of data bytes retransmitted.
-  void OnPacketRetransmitted(int retransmitted_bytes) override {
-    if (nq_closure_is_empty(opt_.on_retransmit)) { return; }
-    nq_closure_call(opt_.on_retransmit, retransmitted_bytes);
-  }
-};
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len) {
   stream_->SendHandshake();
-  stream_->WriteOrBufferData(QuicStringPiece(p, len), false, nullptr);
+  stream_->Send(p, len, false, nullptr);
 }
 void NqStreamHandler::WriteBytes(const char *p, nq_size_t len, const nq_stream_opt_t &opt) {
   stream_->SendHandshake();
   //TODO(iyatomi): do we need common ack_callback, which is applied to all stream bytes sent?
-  stream_->WriteOrBufferData(QuicStringPiece(p, len), false, 
-    QuicReferenceCountedPointer<QuicAckListenerInterface>(new AckHandler(opt)));
+  stream_->Send(p, len, false, &opt);
 }
 
 

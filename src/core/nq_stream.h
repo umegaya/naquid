@@ -2,13 +2,10 @@
 
 #include <string>
 
-#include "net/quic/core/quic_stream.h"
-#include "net/quic/core/quic_alarm.h"
-#include "net/quic/core/quic_spdy_stream.h"
-
 #include "basis/header_codec.h"
 #include "basis/id_factory.h"
 #include "basis/timespec.h"
+#include "core/compat/nq_stream_compat.h"
 #include "core/nq_closure.h"
 #include "core/nq_loop.h"
 #include "core/nq_alarm.h"
@@ -20,38 +17,41 @@ class NqSession;
 class NqBoxer;
 class NqStreamHandler;
 
-class NqStream : public QuicStream {
+class NqStream : public NqStreamCompat {
  protected:
   NqSerial stream_serial_;
   std::string buffer_; //scratchpad for initial handshake (receiver side) or stream protocol name (including ternminate)
  private:
   std::unique_ptr<NqStreamHandler> handler_;
-  SpdyPriority priority_;
   bool establish_side_, established_, proto_sent_;
  public:
-  NqStream(QuicStreamId id, 
-           NqSession* nq_session, 
-           bool establish_side, 
-           SpdyPriority priority = kDefaultPriority);
-  ~NqStream() override {
-    ASSERT(stream_serial_.IsEmpty()); 
-  }
+  NqStream(NqQuicStreamId id, NqSession* nq_session, bool establish_side);
+  ~NqStream() override { ASSERT(stream_serial_.IsEmpty()); }
 
+  //get/set
   NqLoop *GetLoop();
+  inline bool establish_side() const { return establish_side_; }
+  inline bool proto_sent() const { return proto_sent_; }
+  inline void set_proto_sent() { proto_sent_ = true; }
+  inline const NqSerial &stream_serial() const { return stream_serial_; }
+  bool set_protocol(const std::string &name);
 
+  //operation
   inline void SendHandshake() {
     if (!proto_sent_) {
-      WriteOrBufferData(QuicStringPiece(buffer_.c_str(), buffer_.length()), false, nullptr);
+      Send(buffer_.c_str(), buffer_.length(), false, nullptr);
       proto_sent_ = true;
     }
   }
   bool TryOpenRawHandler(bool *p_on_open_fail);
   bool OpenHandler(const std::string &name, bool update_buffer_with_name);
-
   void Disconnect();
 
-  void OnDataAvailable() override;
+  //implements NqStreamCompat
+  bool OnRecv(const void *p, nq_size_t len) override;
   void OnClose() override;
+
+  //NqStream interfaces
   virtual void *Context() = 0;
   virtual void **ContextBuffer() = 0;
   virtual NqBoxer *GetBoxer() = 0;
@@ -61,16 +61,6 @@ class NqStream : public QuicStream {
     std::unique_lock<std::mutex> lk(StaticMutex());
     stream_serial_.Clear(); 
   }
-
-  inline bool establish_side() const { return establish_side_; }
-  inline bool proto_sent() const { return proto_sent_; }
-  inline void set_proto_sent() { proto_sent_ = true; }
-  inline const NqSerial &stream_serial() const { return stream_serial_; }
-  //NqSessionIndex session_index() const;
-
-  NqSession *nq_session();
-  const NqSession *nq_session() const;
-  bool set_protocol(const std::string &name);
 
   //following code assumes nq_stream_t and nq_rpc_t has exactly same way to create and memory layout, 
   //which can be partially checked this static assertion.
@@ -91,11 +81,8 @@ class NqStream : public QuicStream {
 
 class NqClientStream : public NqStream {
  public:
-  NqClientStream(QuicStreamId id, 
-           NqSession* nq_session, 
-           bool establish_side, 
-           SpdyPriority priority = kDefaultPriority) : 
-    NqStream(id, nq_session, establish_side, priority) {}
+  NqClientStream(QuicStreamId id, NqSession* nq_session, bool establish_side) : 
+    NqStream(id, nq_session, establish_side) {}
 
   void InitSerial(NqStreamIndex idx);
   std::mutex &static_mutex();
@@ -111,11 +98,8 @@ class NqClientStream : public NqStream {
 class NqServerStream : public NqStream {
   void *context_;
  public:
-  NqServerStream(QuicStreamId id, 
-           NqSession* nq_session, 
-           bool establish_side, 
-           SpdyPriority priority = kDefaultPriority) : 
-    NqStream(id, nq_session, establish_side, priority), context_(nullptr) {}
+  NqServerStream(QuicStreamId id, NqSession* nq_session, bool establish_side) : 
+    NqStream(id, nq_session, establish_side), context_(nullptr) {}
 
   inline void *context() { return context_; }
 

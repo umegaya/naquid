@@ -6,8 +6,6 @@
 
 #include "basis/timespec.h"
 #include "core/nq_stream.h"
-#include "core/compat/chromium/nq_network_helper.h"
-#include "core/compat/chromium/nq_stub_interface.h"
 #include "core/nq_client_loop.h"
 
 #include "core/platform/nq_reachability.h"

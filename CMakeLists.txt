@@ -61,6 +61,7 @@ set(lib_src
 	./src/core/compat/nq_quic_alarm.cpp
 	./src/core/compat/nq_server_session_compat.cpp
 	./src/core/compat/nq_session.cpp
+	./src/core/compat/nq_stream_compat.cpp
 
 	./src/core/platform/nq_jni_android.cpp
 	./src/core/platform/nq_reachability.cpp
