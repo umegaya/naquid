@@ -29,7 +29,7 @@ void NqQuicDispatcher::OnConnectionClosed(QuicConnectionId connection_id,
   QuicDispatcher::OnConnectionClosed(connection_id, error, error_details);  
 }
 QuicSession* NqQuicDispatcher::CreateQuicSession(QuicConnectionId connection_id,
-                                                 const NqQuicSocketAddress &client_address,
+                                                 const QuicSocketAddress &client_address,
                                                  QuicStringPiece alpn) {
   return dispatcher_.CreateQuicSession(connection_id, client_address, alpn);
 }
@@ -41,7 +41,7 @@ QuicConnectionId NqQuicDispatcher::GenerateConnectionIdForReject(
   return dispatcher_.GenerateConnectionIdForReject(connection_id);
 }
 bool NqQuicDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                          const NqQuicSocketAddress& self_address,
+                          const QuicSocketAddress& self_address,
                           std::string* error_details) const {
   return dispatcher_.CanAcceptClientHello(message, self_address, error_details);
 }

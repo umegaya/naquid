@@ -100,7 +100,7 @@ void NqDispatcherCompat::OnRecv(NqPacket *packet) {
 
 //implements QuicCryptoServerStream::Helper
 bool NqDispatcherCompat::CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                                        const NqQuicSocketAddress& self_address,
+                                        const QuicSocketAddress& self_address,
                                         std::string* error_details) const {
   //TODO(iyatomi): reject when number of connection is too much, getting the config and 
   //total connection number from server_.
@@ -122,8 +122,8 @@ void NqDispatcherCompat::OnSessionClosed(NqServerSession *session) {
   server_map_.Remove(idx);
 }
 QuicSession* NqDispatcherCompat::CreateQuicSession(QuicConnectionId connection_id,
-                                             const QuicSocketAddress& client_address,
-                                             QuicStringPiece alpn) {
+                                                   const QuicSocketAddress& client_address,
+                                                   QuicStringPiece alpn) {
   auto it = server_.port_configs().find(port_);
   if (it == server_.port_configs().end()) {
     return nullptr;

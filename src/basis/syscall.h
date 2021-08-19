@@ -2,9 +2,13 @@
 
 #include <unistd.h>
 #include <errno.h>
+#ifdef OS_LINUX
+#include <linux/net_tstamp.h>
+#endif
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 #include "basis/defs.h"
 
@@ -16,6 +20,10 @@ constexpr Fd INVALID_FD = -1;
 #elif defined(__ENABLE_IOCP__)
 //TODO(iyatomi): windows definition
 #else
+#endif
+
+#ifndef SO_RXQ_OVFL
+#define SO_RXQ_OVFL 40
 #endif
 
 class Syscall {
@@ -80,6 +88,141 @@ public:
       return 0;
     }
   }
+  static bool SetNonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+      int saved_errno = errno;
+      char buf[256];
+      nq::logger::fatal({
+        {"msg", "fcntl() to get flags fails"},
+        {"fd", fd},
+        {"errno", saved_errno},
+        {"strerror", strerror_r(saved_errno, buf, sizeof(buf))}
+      });
+      return false;
+    }
+    if (!(flags & O_NONBLOCK)) {
+      int saved_flags = flags;
+      flags = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+      if (flags == -1) {
+        int saved_errno = errno;
+        char buf[256];
+        // bad.
+        nq::logger::fatal({
+          {"msg", "fcntl() to set flags fails"},
+          {"fd", fd},
+          {"prev_flags", saved_flags},
+          {"errno", saved_errno},
+          {"strerror", strerror_r(saved_errno, buf, sizeof(buf))}
+        });
+        return false;
+      }
+    }
+    return true;
+  }
+  static const size_t kDefaultSocketReceiveBuffer = 1024 * 1024;
+  static int SetGetAddressInfo(int fd, int address_family) {
+#if defined(OS_MACOSX)
+    if (address_family == AF_INET6) {
+      //for osx, IP_PKTINFO for ipv6 will not work. (at least at Sierra)
+      return 0;
+    }
+#endif
+    int get_local_ip = 1;
+    int rc = setsockopt(fd, IPPROTO_IP, IP_PKTINFO, &get_local_ip,
+                        sizeof(get_local_ip));
+#if defined(IPV6_RECVPKTINFO)
+    if (rc == 0 && address_family == AF_INET6) {
+      rc = setsockopt(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &get_local_ip,
+                      sizeof(get_local_ip));
+    }
+#endif
+    return rc;
+  }
+
+  static int SetGetSoftwareReceiveTimestamp(int fd) {
+#if defined(SO_TIMESTAMPING) && defined(SOF_TIMESTAMPING_RX_SOFTWARE)
+    int timestamping = SOF_TIMESTAMPING_RX_SOFTWARE | SOF_TIMESTAMPING_SOFTWARE;
+    return setsockopt(fd, SOL_SOCKET, SO_TIMESTAMPING, &timestamping,
+                      sizeof(timestamping));
+#else
+    return -1;
+#endif
+  }
+
+  static bool SetSendBufferSize(int fd, size_t size) {
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)) != 0) {
+      nq::logger::error({
+        {"msg", "Failed to set socket send size"},
+        {"size", size}
+      });
+      return false;
+    }
+    return true;
+  }
+
+  static bool SetReceiveBufferSize(int fd, size_t size) {
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)) != 0) {
+      nq::logger::error({
+        {"msg", "Failed to set socket recv size"},
+        {"size", size}
+      });
+      return false;
+    }
+    return true;
+  }
+  static int CreateUDPSocket(int address_family, bool* overflow_supported) {
+    int fd = socket(address_family, SOCK_DGRAM, IPPROTO_UDP);
+    if (fd < 0) {
+      nq::logger::error({
+        {"msg", "socket() failed"},
+        {"errno", Errno()}
+      });
+      return -1;
+    }
+    
+    if (!SetNonblocking(fd)) {
+      return -1;
+    }
+
+    int get_overflow = 1;
+    int rc = setsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &get_overflow,
+                        sizeof(get_overflow));
+    if (rc < 0) {
+      nq::logger::warn({
+        {"msg", "Socket overflow detection not supported"}
+      });
+    } else {
+      *overflow_supported = true;
+    }
+
+    if (!SetReceiveBufferSize(fd, kDefaultSocketReceiveBuffer)) {
+      return -1;
+    }
+
+    if (!SetSendBufferSize(fd, kDefaultSocketReceiveBuffer)) {
+      return -1;
+    }
+
+    rc = SetGetAddressInfo(fd, address_family);
+    if (rc < 0) {
+      nq::logger::error({
+        {"msg", "IP detection not supported"},
+        {"errno", Errno()}
+      });
+      return -1;
+    }
+
+    rc = SetGetSoftwareReceiveTimestamp(fd);
+    if (rc < 0) {
+      nq::logger::warn({
+        {"msg", "SO_TIMESTAMPING not supported; using fallback"},
+        {"errno", Errno()}
+      });
+    }
+
+    return fd;
+  }  
   static void *Memdup(const void *p, nq_size_t sz) {
     void *r = malloc(sz);
     memcpy(r, p, sz);

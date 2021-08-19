@@ -35,15 +35,15 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
 
   // implements ProcessPacketInterface. 
   // This will be called for each received packet.
-  void OnRecv(NqPacketReader::Packet *p) override;
+  void OnRecv(NqPacket *p) override;
 
   // implements NetworkHelper.
   void RunEventLoop() override;
-  bool CreateUDPSocketAndBind(NqQuicSocketAddress server_address,
+  bool CreateUDPSocketAndBind(QuicSocketAddress server_address,
                               QuicIpAddress bind_to_address,
                               int bind_to_port) override;
   void CleanUpAllUDPSockets() override;
-  NqQuicSocketAddress GetLatestClientAddress() const override;
+  QuicSocketAddress GetLatestClientAddress() const override;
   QuicPacketWriter* CreateQuicPacketWriter() override;
 
 
@@ -67,7 +67,7 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
   Fd fd_;
 
   // socket address
-  NqQuicSocketAddress address_;
+  QuicSocketAddress address_;
 
   // If overflow_supported_ is true, this will be the number of packets dropped
   // during the lifetime of the server.

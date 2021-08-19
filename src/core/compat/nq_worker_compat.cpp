@@ -1,0 +1,1 @@
+// put implementations of NqWorkerCompat here

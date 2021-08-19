@@ -25,7 +25,7 @@ WriteResult NqPacketWriter::WritePacket(
     const char* buffer,
     size_t buf_len,
     const QuicIpAddress& self_address,
-    const NqQuicSocketAddress& peer_address,
+    const QuicSocketAddress& peer_address,
     bool reachability_tracked) {
   //TRACE("Write %zu bytes to %d from %s", buf_len, fd, self_address.ToString().c_str());
   sockaddr_storage raw_address = peer_address.generic_address();
@@ -101,7 +101,7 @@ WriteResult NqPacketWriter::WritePacket(
     const char* buffer,
     size_t buf_len,
     const QuicIpAddress& self_address,
-    const NqQuicSocketAddress& peer_address,
+    const QuicSocketAddress& peer_address,
     PerPacketOptions* options) {
   DCHECK(!IsWriteBlocked());
   DCHECK(nullptr == options)

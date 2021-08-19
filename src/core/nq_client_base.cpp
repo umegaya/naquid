@@ -12,10 +12,9 @@
 
 namespace net {
 
-NqClientBase::NqClientBase(NqQuicSocketAddress server_address,
-                   NqClientLoop &loop,
-                   const NqQuicServerId &server_id,
-                   const NqClientConfig &config)
+NqClientBase::NqClientBase(NqClientLoop &loop,
+                           const NqQuicServerId &server_id,
+                           const NqClientConfig &config)
   : loop_(&loop), on_close_(config.client().on_close),
     on_open_(config.client().on_open),
     on_finalize_(config.client().on_finalize),

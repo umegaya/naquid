@@ -4,16 +4,8 @@
 
 namespace net {
 struct NqDnsQuery : public NqAsyncResolver::Query {
-  static bool ConvertToIpAddress(struct hostent *entries, QuicIpAddress &ip) {
-    return ip.FromPackedString(entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype));
-  }
   static bool ConvertToSocketAddress(struct hostent *entries, int port, NqQuicSocketAddress &address) {
-    QuicIpAddress ip;
-    if (!ConvertToIpAddress(entries, ip)) {
-      return false;
-    }
-    address = NqQuicSocketAddress(ip, port);
-    return true;
+    return NqQuicSocketAddress::FromHostent(entries, port, address);
   }
 };
 

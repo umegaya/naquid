@@ -5,18 +5,17 @@
 
 #include "MoodyCamel/concurrentqueue.h"
 
+#include "core/compat/nq_worker_compat.h"
 #include "core/nq_server_loop.h"
-#include "core/compat/chromium/nq_packet_reader.h"
 #include "core/nq_boxer.h"
 
 namespace net {
 class NqServer;
 class NqDispatcher;
-class NqWorker {
+class NqWorker : public NqWorkerCompat {
   uint32_t index_;
   NqServer &server_;
   NqServerLoop loop_;
-  NqPacketReader reader_;
   std::thread thread_;
   //TODO(iyatomi): measture this to confirm
   //almost case, should only have a few element. I think linear scan of vector faster
@@ -26,7 +25,7 @@ class NqWorker {
   typedef moodycamel::ConcurrentQueue<NqPacket*> PacketQueue;
   typedef NqBoxer::Processor InvokeQueue;
   NqWorker(uint32_t index, NqServer &server) : 
-    index_(index), server_(server), loop_(), reader_(), 
+    NqWorkerCompat(), index_(index), server_(server), loop_(),
     thread_(), dispatchers_(), overflow_supported_(false) {}
   void Start(PacketQueue &pq) {
     thread_ = std::thread([this, &pq]() { Run(pq); });
@@ -42,7 +41,6 @@ class NqWorker {
 
   //accessor
   inline const NqServer &server() const { return server_; }
-  inline NqPacketReader &reader() { return reader_; }
   inline NqServerLoop &loop() { return loop_; }
   inline uint32_t index() { return index_; }
   inline NqServer &server() { return server_; }

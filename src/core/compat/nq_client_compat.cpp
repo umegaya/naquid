@@ -13,7 +13,7 @@ NqClientCompat::NqClientCompat(NqQuicSocketAddress server_address,
                            NqClientLoop &loop,
                            const NqQuicServerId &server_id,
                            const NqClientConfig &config)
-  : NqClientBase(server_address, loop, server_id, config), 
+  : NqClientBase(loop, server_id, config), 
   client_(this, loop, server_id, config) {
   client_.set_server_address(server_address);
 }

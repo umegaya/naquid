@@ -51,7 +51,7 @@ class NqDispatcherCompat : public NqDispatcherBase,
   //NqQuicDispatcher delegates
   QuicSession* CreateQuicSession(
     QuicConnectionId connection_id,
-    const NqQuicSocketAddress& client_address,
+    const QuicSocketAddress& client_address,
     QuicStringPiece alpn);
   void OnSessionClosed(NqServerSession *session);
 
@@ -64,7 +64,7 @@ class NqDispatcherCompat : public NqDispatcherBase,
   // acceptable according to the visitor's policy. Otherwise, returns false
   // and populates |error_details|.
   bool CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                            const NqQuicSocketAddress& self_address,
+                            const QuicSocketAddress& self_address,
                             std::string* error_details) const;
 
  private:

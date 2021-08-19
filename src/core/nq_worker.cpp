@@ -117,16 +117,24 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
 }
 //helper
 nq::Fd NqWorker::CreateUDPSocketAndBind(const NqQuicSocketAddress& address) {
-  nq::Fd fd = QuicSocketUtils::CreateUDPSocket(address, &overflow_supported_);
+  nq::Fd fd = nq::Syscall::CreateUDPSocket(address.family(), &overflow_supported_);
   if (fd < 0) {
-    QUIC_LOG(ERROR) << "CreateSocket() failed: " << strerror(errno);
+    nq::logger::error({
+      {"msg", "CreateSocket() failed"},
+      {"errno", errno}, 
+      {"strerror", strerror(errno)}
+    });
     return -1;
   }
 
   //set socket resuable
   int flag = 1, rc = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
   if (rc < 0) {
-    QUIC_LOG(ERROR) << "setsockopt(SO_REUSEPORT) failed: " << strerror(errno);
+    nq::logger::error({
+      {"msg", "setsockopt(SO_REUSEPORT) failed"},
+      {"errno", errno}, 
+      {"strerror", strerror(errno)}
+    });
     nq::Syscall::Close(fd);
     return -1;    
   }
@@ -139,11 +147,18 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const NqQuicSocketAddress& address) {
   }
   rc = bind(fd, reinterpret_cast<sockaddr*>(&addr), slen);
   if (rc < 0) {
-    QUIC_LOG(ERROR) << "Bind failed: " << strerror(errno);
+    nq::logger::error({
+      {"msg", "Bind failed"},
+      {"errno", errno}, 
+      {"strerror", strerror(errno)}
+    });
     nq::Syscall::Close(fd);
     return -1;
   }
-  QUIC_LOG(INFO) << "Listening on " << address.ToString();
+  nq::logger::error({
+    {"msg", "Listening start"},
+    {"address", address.ToString()}
+  });
   return fd; 
 }
 /* static */
@@ -153,11 +168,6 @@ bool NqWorker::ToSocketAddress(const nq_addr_t &addr, NqQuicSocketAddress &socke
   if ((len = NqAsyncResolver::PtoN(addr.host, &af, &buffer)) < 0) {
     return false;
   }
-  QuicIpAddress ip;
-  if (!ip.FromPackedString(buffer, len)) {
-    return false;
-  }
-  socket_address = NqQuicSocketAddress(ip, addr.port);
-  return true;
+  return NqQuicSocketAddress::FromPackedString(buffer, len, addr.port, socket_address);
 }
 }

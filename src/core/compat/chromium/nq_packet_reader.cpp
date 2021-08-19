@@ -28,19 +28,6 @@
 #endif
 
 namespace net {
-
-NqPacketReader::Packet::Packet(const char* buffer,
-                                   size_t length,
-                                   QuicTime receipt_time,
-                                   int ttl,
-                                   bool ttl_valid, 
-                                   struct sockaddr_storage client_sockaddr, 
-                                   QuicIpAddress &server_ip, int server_port) : 
-                                  QuicReceivedPacket(buffer, length, receipt_time, false, ttl, ttl_valid), 
-                                  client_address_(client_sockaddr), server_address_(server_ip, server_port) {
-
-}
-
 NqPacketReader::NqPacketReader() {
   Initialize();
 }
@@ -166,7 +153,7 @@ bool NqPacketReader::ReadPackets(
     QuicPacketCount* packets_dropped) {
   char *buf = NewBuffer();
 
-  NqQuicSocketAddress client_address;
+  QuicSocketAddress client_address;
   QuicIpAddress server_ip;
   QuicWallTime walltimestamp = QuicWallTime::Zero();
   int bytes_read =

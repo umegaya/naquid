@@ -27,7 +27,7 @@ NqNetworkHelper::~NqNetworkHelper() {
 }
 
 bool NqNetworkHelper::CreateUDPSocketAndBind(
-    NqQuicSocketAddress server_address,
+    QuicSocketAddress server_address,
     QuicIpAddress bind_to_address,
     int bind_to_port) {
   //close fd on reconnection.
@@ -41,11 +41,11 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
   }
 
   if (bind_to_address.IsInitialized()) {
-    address_ = NqQuicSocketAddress(bind_to_address, client_->chromium()->local_port());
+    address_ = QuicSocketAddress(bind_to_address, client_->chromium()->local_port());
   } else if (server_address.host().address_family() == IpAddressFamily::IP_V4) {
-    address_ = NqQuicSocketAddress(QuicIpAddress::Any4(), bind_to_port);
+    address_ = QuicSocketAddress(QuicIpAddress::Any4(), bind_to_port);
   } else {
-    address_ = NqQuicSocketAddress(QuicIpAddress::Any6(), bind_to_port);
+    address_ = QuicSocketAddress(QuicIpAddress::Any6(), bind_to_port);
   }
 
   sockaddr_storage addr = address_.generic_address();
@@ -126,11 +126,11 @@ QuicPacketWriter* NqNetworkHelper::CreateQuicPacketWriter() {
   return w;
 }
 
-NqQuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
+QuicSocketAddress NqNetworkHelper::GetLatestClientAddress() const {
   return address_;
 }
 
-void NqNetworkHelper::OnRecv(NqPacketReader::Packet *p) {
+void NqNetworkHelper::OnRecv(NqPacket *p) {
   //self == server, peer == client
   auto chromium_client = client_->chromium();
 #if !defined(USE_DIRECT_WRITE)

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "net/tools/quic/quic_dispatcher.h"
+#include "core/compat/nq_quic_types.h"
 #include "core/nq_config.h"
 #include "core/nq_server_session.h"
-#include "core/compat/chromium/nq_packet_reader.h"
 
 namespace net {
 class NqDispatcherCompat;
@@ -56,7 +56,7 @@ class NqQuicDispatcher : public QuicDispatcher,
   //implements QuicDispatcher
   QuicSession* CreateQuicSession(
     QuicConnectionId connection_id,
-    const NqQuicSocketAddress& client_address,
+    const QuicSocketAddress& client_address,
     QuicStringPiece alpn) override;
   void OnConnectionClosed(QuicConnectionId connection_id,
                           QuicErrorCode error,
@@ -69,7 +69,7 @@ class NqQuicDispatcher : public QuicDispatcher,
   // acceptable according to the visitor's policy. Otherwise, returns false
   // and populates |error_details|.
   bool CanAcceptClientHello(const CryptoHandshakeMessage& message,
-                            const NqQuicSocketAddress& self_address,
+                            const QuicSocketAddress& self_address,
                             std::string* error_details) const override;
 
  private:

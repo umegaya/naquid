@@ -98,8 +98,7 @@ class NqClientBase : public NqSessionDelegate,
   };
  public:
   // This will create its own QuicClientEpollNetworkHelper.
-  NqClientBase(NqQuicSocketAddress server_address,
-               NqClientLoop &loop,
+  NqClientBase(NqClientLoop &loop,
                const NqQuicServerId& server_id,
                const NqClientConfig &config);
   ~NqClientBase() override;

@@ -12,8 +12,6 @@
 #include "net/quic/platform/api/quic_clock.h"
 #include "net/tools/quic/platform/impl/quic_socket_utils.h"
 
-#include "basis/endian.h"
-
 #include "core/compat/nq_quic_types.h"
 
 #if defined(__linux__)
@@ -31,34 +29,9 @@ const int kNumPacketsPerReadMmsgCall = 16;
 
 class NqPacketReader {
  public:
-  class Packet : public QuicReceivedPacket {
-    NqQuicSocketAddress client_address_, server_address_;
-    int port_;
-   public:
-    Packet(const char* buffer,
-           size_t length,
-           QuicTime receipt_time,
-           int ttl,
-           bool ttl_valid, 
-           struct sockaddr_storage client_sockaddr, 
-           QuicIpAddress &server_ip, int server_port);
-    inline NqQuicSocketAddress &server_address() { return server_address_; }
-    inline NqQuicSocketAddress &client_address() { return client_address_; }
-    inline void set_port(int port) { port_ = port; }
-    inline int port() const { return port_; }
-    inline uint64_t ConnectionId() const {
-      switch (data()[0] & 0x08) {
-        case 0x08:
-          return nq::Endian::NetbytesToHost<uint64_t>(data() + 1);
-        default:
-          //TODO(iyatomi): can we detect connection_id from packet->client_address()? but chromium server sample itself seems to ignore...
-          return 0;
-      }
-    } 
-  };
   class Delegate {
    public:
-    virtual void OnRecv(Packet *p) = 0;
+    virtual void OnRecv(NqPacket *p) = 0;
   };
  public:
   NqPacketReader();
@@ -70,15 +43,15 @@ class NqPacketReader {
   // packets available on the socket.
   // Populates |packets_dropped| if it is non-null and the socket is configured
   // to track dropped packets and some packets are read.
-  // If the socket has timestamping enabled, the per packet timestamps will be
+  // If the socket has timestamping enabled, the per NqPacket timestamps will be
   // passed to the processor. Otherwise, |clock| will be used.
   bool Read(int fd, int port, const QuicClock& clock, 
             Delegate *delegate, QuicPacketCount* packets_dropped);
 
   // memory pool
-  inline void Pool(char *buffer, Packet *packet) { 
+  inline void Pool(char *buffer, NqPacket *NqPacket) { 
     buffer_pool_.push(buffer);
-    packet_pool_.push(reinterpret_cast<char*>(packet));
+    packet_pool_.push(reinterpret_cast<char*>(NqPacket));
   }
   inline char *NewBuffer() { 
     if (buffer_pool_.size() > 0) {
@@ -89,7 +62,7 @@ class NqPacketReader {
       return new char[kMaxPacketSize];
     }
   }
-  inline Packet *NewPacket(const char* buffer,
+  inline NqPacket *NewPacket(const char* buffer,
            size_t length,
            QuicTime receipt_time,
            int ttl,
@@ -101,9 +74,9 @@ class NqPacketReader {
       p = packet_pool_.top();
       packet_pool_.pop();
     } else {
-      p = new char[sizeof(Packet)];
+      p = new char[sizeof(NqPacket)];
     }
-    return new(p) Packet(buffer, length, receipt_time, ttl, ttl_valid, client_sockaddr, server_ip, server_port);
+    return new(p) NqPacket(buffer, length, receipt_time, ttl, ttl_valid, client_sockaddr, server_ip, server_port);
   }
 
  private:
@@ -117,7 +90,7 @@ class NqPacketReader {
                         Delegate *delegate,
                         QuicPacketCount* packets_dropped);
 
-  // Reads and dispatches a single packet using recvmsg.
+  // Reads and dispatches a single NqPacket using recvmsg.
   bool ReadPackets(int fd,
                           int port,
                           const QuicClock& clock,
@@ -149,7 +122,4 @@ class NqPacketReader {
 
   DISALLOW_COPY_AND_ASSIGN(NqPacketReader);
 };
-
-typedef NqPacketReader::Packet NqPacket;
-
 }  // namespace net

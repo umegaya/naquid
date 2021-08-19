@@ -16,7 +16,7 @@ class NqPacketWriter : public QuicDefaultPacketWriter {
                                  const char* buffer,
                                  size_t buf_len,
                                  const QuicIpAddress& self_address,
-                                 const NqQuicSocketAddress& peer_address,
+                                 const QuicSocketAddress& peer_address,
                                  bool reachability_tracked);
  public:
   NqPacketWriter(nq::Fd fd) : QuicDefaultPacketWriter(fd), reachability_tracked_(false) {}
@@ -25,7 +25,7 @@ class NqPacketWriter : public QuicDefaultPacketWriter {
   WriteResult WritePacket(const char* buffer,
                           size_t buf_len,
                           const QuicIpAddress& self_address,
-                          const NqQuicSocketAddress& peer_address,
+                          const QuicSocketAddress& peer_address,
                           PerPacketOptions* options) override;
 };
 }

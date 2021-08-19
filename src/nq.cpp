@@ -13,7 +13,6 @@
 #include "core/nq_server.h"
 #include "core/nq_unwrapper.h"
 #include "core/nq_session_delegate.h"
-#include "core/compat/chromium/nq_network_helper.h"
 
 //at exit manager seems optimized out and causes linkder error without following anchor
 extern nq_at_exit_manager_t nq_at_exit_manager();
