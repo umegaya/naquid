@@ -11,7 +11,8 @@
 #include "net/quic/core/crypto/quic_random.h"
 #include "net/quic/platform/api/quic_clock.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 class NqAlarmInterface;
 class NqLoopCompat : public NqLoopBase,
                public QuicConnectionHelperInterface,
@@ -46,7 +47,7 @@ private:
 };
 }
 #else
-namespace net {
+namespace nq {
 typedef NqLoopBase NqLoopCompat;
 }
 #endif

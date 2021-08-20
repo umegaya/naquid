@@ -465,7 +465,7 @@ static void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkRea
 }
 @end
 
-namespace net {
+namespace nq {
 
 class NqReachabilityMac : public NqReachability {
  public:
@@ -518,11 +518,11 @@ class NqReachabilityMac : public NqReachability {
 NqReachability *NqReachability::Create(nq_on_reachability_change_t cb) {
   return new NqReachabilityMac(cb);
 }
-}
+} //namepace nq
 void TMReachabilityCallback(SCNetworkReachabilityRef target, SCNetworkReachabilityFlags flags, void* info) 
 {
 #pragma unused (target)
 
-    net::NqReachabilityMac *reachability = ((net::NqReachabilityMac*)info);
+    nq::NqReachabilityMac *reachability = ((nq::NqReachabilityMac*)info);
     reachability->OnChange(flags);
 }

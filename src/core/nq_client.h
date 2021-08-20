@@ -2,7 +2,7 @@
 
 #include "core/compat/nq_client_compat.h"
 
-namespace net {
+namespace nq {
 class NqClient : public NqClientCompat {
  public:
   NqClient(NqQuicSocketAddress server_address,

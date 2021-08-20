@@ -1,8 +1,8 @@
 #pragma once
 
-namespace net {
+namespace nq {
 //statically allocated section which is related with object which is allocated with
-//nq::AllocatorWithBSS. this memory block keep on being alive even if related object freed.
+//AllocatorWithBSS. this memory block keep on being alive even if related object freed.
 class NqStaticSection {
   std::mutex mutex_;
  public:

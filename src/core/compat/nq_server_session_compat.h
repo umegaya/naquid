@@ -9,7 +9,8 @@
 #include "core/nq_config.h"
 
 #if defined(NQ_CHROMIUM_BACKEND)
-namespace net {
+namespace nq {
+using namespace net;
 class NqStream;
 class NqServerSessionCompat : public NqSession,
                               public NqSessionDelegate {
@@ -37,9 +38,9 @@ class NqServerSessionCompat : public NqSession,
     NqQuicConnection::ScopedPacketBundler bundler(connection(), NqQuicConnection::SEND_ACK_IF_QUEUED); 
   }
 };
-} // namespace net
+} // namespace nq
 #else
-namespace net {
+namespace nq {
 class NqStream;
 class NqServerSessionCompat : public NqSession,
                               public NqSessionDelegate {
@@ -65,5 +66,5 @@ class NqServerSessionCompat : public NqSession,
   NqQuicConnectionId ConnectionIdImpl() { ASSERT(false); return 0LL; }
   void FlushWriteBufferImpl() { ASSERT(false); }
 };
-} // namespace net
+} // namespace nq
 #endif

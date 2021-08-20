@@ -10,7 +10,7 @@
 
 #include "core/platform/nq_reachability.h"
 
-namespace net {
+namespace nq {
 
 NqClientBase::NqClientBase(NqClientLoop &loop,
                            const NqQuicServerId &server_id,
@@ -142,7 +142,7 @@ void NqClientBase::OnClose(int error, const std::string& error_details, bool clo
     .code = error,
     .msg = error_details.c_str(),
   };
-  uint64_t next_connect_us = nq::clock::to_us(nq_closure_call(on_close_, ToHandle(), 
+  uint64_t next_connect_us = clock::to_us(nq_closure_call(on_close_, ToHandle(), 
                                               NQ_EQUIC, 
                                               &detail, 
                                               close_by_peer_or_self));
@@ -191,11 +191,11 @@ uint64_t NqClientBase::ReconnectDurationUS() const {
   auto now = loop_->NowInUsec();
   return now < next_reconnect_us_ts_ ? (next_reconnect_us_ts_ - now) : 0;
 }
-const nq::HandlerMap *NqClientBase::GetHandlerMap() const {
+const HandlerMap *NqClientBase::GetHandlerMap() const {
   return own_handler_map_ != nullptr ? own_handler_map_.get() : loop_->handler_map();
 }
-nq::HandlerMap* NqClientBase::ResetHandlerMap() {
-  own_handler_map_.reset(new nq::HandlerMap());
+HandlerMap* NqClientBase::ResetHandlerMap() {
+  own_handler_map_.reset(new HandlerMap());
   return own_handler_map_.get();
 }
 NqClientStream *NqClientBase::FindOrCreateStream(NqStreamIndex index) {
@@ -307,4 +307,4 @@ void NqClientBase::StreamManager::OnClose(NqClientStream *s) {
     OnOutgoingClose(s);
   }
 }
-}  // namespace net
+}  // namespace nq

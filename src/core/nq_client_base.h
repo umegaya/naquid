@@ -16,7 +16,7 @@
 #include "core/nq_config.h"
 #include "core/nq_session_delegate.h"
 
-namespace net {
+namespace nq {
 
 class NqQuicServerId;
 class NqClientLoop;
@@ -158,8 +158,8 @@ class NqClientBase : public NqSessionDelegate,
   bool Reconnect() override;
   void OnReachabilityChange(nq_reachability_t state) override;
   uint64_t ReconnectDurationUS() const override;
-  const nq::HandlerMap *GetHandlerMap() const override;
-  nq::HandlerMap *ResetHandlerMap() override;
+  const HandlerMap *GetHandlerMap() const override;
+  HandlerMap *ResetHandlerMap() override;
   void InitStream(const std::string &name, void *ctx) override;
   void OpenStream(const std::string &name, void *ctx) override;
   NqLoop *GetLoop() override;
@@ -174,14 +174,14 @@ class NqClientBase : public NqSessionDelegate,
 
  protected:
   NqClientLoop* loop_;
-  std::unique_ptr<nq::HandlerMap> own_handler_map_;
+  std::unique_ptr<HandlerMap> own_handler_map_;
   nq_on_client_conn_close_t on_close_;
   nq_on_client_conn_open_t on_open_;
   nq_on_client_conn_finalize_t on_finalize_;
   NqSerial session_serial_;
   StreamManager stream_manager_;
   uint64_t next_reconnect_us_ts_;
-  nq::atomic<ConnectState> connect_state_;
+  atomic<ConnectState> connect_state_;
   void *context_;
   NqReachability *reachability_;
 

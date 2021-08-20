@@ -5,7 +5,7 @@
 #include "basis/allocator.h"
 #include "core/nq_serial_codec.h"
 
-namespace net {
+namespace nq {
 class NqBoxer;
 class NqLoop;
 class NqAlarmInterface {
@@ -41,7 +41,7 @@ class NqAlarm : public NqAlarmBase {
   NqBoxer *boxer_;
   NqSerial alarm_serial_;
  public:
-  typedef nq::Allocator<NqAlarm> Allocator;
+  typedef Allocator<NqAlarm> Allocator;
 
   NqAlarm() : NqAlarmBase(), alarm_serial_() { cb_ = nq_closure_empty(); }
   ~NqAlarm() override { alarm_serial_.Clear(); }

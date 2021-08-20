@@ -3,7 +3,8 @@
 #include "core/nq_client_loop_base.h"
 
 #if defined(NQ_CHROMIUM_BACKEND)
-namespace net {
+namespace nq {
+using namespace net;
 class NqClientLoopCompat : public NqClientLoopBase,
                            public QuicSession::Visitor,
                            public QuicStreamAllocator {
@@ -26,7 +27,7 @@ class NqClientLoopCompat : public NqClientLoopBase,
 };
 } // net
 #else
-namespace net {
+namespace nq {
 typedef NqClientLoopBase NqClientLoopCompat;
 } // net
 #endif

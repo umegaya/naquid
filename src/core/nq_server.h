@@ -12,20 +12,20 @@
 #include "core/nq_worker.h"
 #include "core/nq_config.h"
 
-namespace net {
+namespace nq {
 class NqServer {
  public:
 	typedef NqWorker::PacketQueue PacketQueue;
   typedef NqWorker::InvokeQueue InvokeQueue;
   struct PortConfig : public NqServerConfig {
     nq_addr_t address_;
-    nq::HandlerMap handler_map_;
+    HandlerMap handler_map_;
 
     PortConfig(const nq_addr_t &a) : NqServerConfig(a), address_(a), handler_map_() {}
     PortConfig(const nq_addr_t &a, const nq_svconf_t &port_config) : 
       NqServerConfig(a, port_config), address_(a), handler_map_() {}
 
-    inline const nq::HandlerMap *handler_map() const { return &handler_map_; }
+    inline const HandlerMap *handler_map() const { return &handler_map_; }
   }; 
   enum Status {
     RUNNING,
@@ -33,7 +33,7 @@ class NqServer {
     TERMINATED,
   };
  protected:
-  nq::atomic<Status> status_;
+  atomic<Status> status_;
   uint32_t n_worker_;
 	std::unique_ptr<PacketQueue[]> worker_queue_;
   std::map<int, std::unique_ptr<InvokeQueue[]>> invoke_queues_list_;
@@ -42,14 +42,14 @@ class NqServer {
   std::mutex mutex_;
   std::condition_variable cond_;
   std::thread shutdown_thread_;
-  nq::IdFactory<uint32_t> stream_index_factory_;
+  IdFactory<uint32_t> stream_index_factory_;
 
  public:
 	NqServer(uint32_t n_worker) : 
     status_(RUNNING), n_worker_(n_worker), worker_queue_(nullptr), invoke_queues_list_(), 
     stream_index_factory_(0x7FFFFFFF) {}
   ~NqServer() {}
-  nq::HandlerMap *Open(const nq_addr_t *addr, const nq_svconf_t *conf) {
+  HandlerMap *Open(const nq_addr_t *addr, const nq_svconf_t *conf) {
     if (port_configs_.find(addr->port) != port_configs_.end()) {
       return nullptr; //already port used
     } 
@@ -129,7 +129,7 @@ class NqServer {
   }
   inline const std::map<int, PortConfig> &port_configs() const { return port_configs_; }
   inline nq_server_t ToHandle() { return (nq_server_t)this; }
-  inline nq::IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
+  inline IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
   static inline NqServer *FromHandle(nq_server_t sv) { return (NqServer *)sv; }
 
  protected:

@@ -15,7 +15,8 @@
 #include "net/quic/core/quic_stream.h"
 #include "net/quic/core/quic_alarm.h"
 #include "net/quic/core/quic_spdy_stream.h"
-namespace net {
+namespace nq {
+using namespace net;
 class NqSession;
 class NqStreamCompat : public QuicStream {
  protected:
@@ -58,9 +59,9 @@ class NqStreamCompat : public QuicStream {
   virtual bool OnRecv(const void *p, nq_size_t len) = 0;
   //also required OnClose, which is defined as non-abstract function `QuicStream::OnClose`
 };
-}  //namespace net
+}  //namespace nq
 #else
-namespace net {
+namespace nq {
 class NqSession;
 class NqStreamCompat {
  private:
@@ -82,5 +83,5 @@ class NqStreamCompat {
   virtual void OnClose() = 0;
   virtual bool OnRecv(const void *p, nq_size_t len) = 0;
 };
-} //namespace net
+} //namespace nq
 #endif

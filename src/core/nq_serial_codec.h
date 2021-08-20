@@ -10,7 +10,7 @@
 #include "core/compat/nq_quic_types.h"
 #include "basis/id_factory.h"
 
-namespace net {
+namespace nq {
 typedef uint32_t NqSessionIndex; //logical serial for session
 typedef uint32_t NqStreamIndex;  //stream id
 typedef uint32_t NqAlarmIndex;   //logical serial for alarm
@@ -149,7 +149,7 @@ class NqStreamSerialCodec {
 };
 template <class S, typename INDEX>
 class NqSessiontMap : protected std::map<INDEX, S*> {
-  nq::IdFactory<INDEX> idgen_;
+  IdFactory<INDEX> idgen_;
  public:
   typedef std::map<INDEX, S*> container;
   NqSessiontMap() : container(), idgen_() {}

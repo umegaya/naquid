@@ -3,7 +3,8 @@
 #if defined(NQ_CHROMIUM_BACKEND)
 #include "core/compat/nq_session.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 
 NqStreamCompat::NqStreamCompat(QuicStreamId id, NqSession* nq_session, SpdyPriority priority) : 
   QuicStream(id, nq_session) {
@@ -42,6 +43,6 @@ void NqStreamCompat::Send(
   );
 }
 
-} //namespace net
+} //namespace nq
 #else
 #endif

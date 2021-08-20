@@ -2,7 +2,7 @@
 
 #include "core/compat/nq_client_loop_compat.h"
 
-namespace net {
+namespace nq {
 class NqClientLoop : public NqClientLoopCompat {
  public:
   NqClientLoop(int max_client_hint, int max_stream_hint) : 

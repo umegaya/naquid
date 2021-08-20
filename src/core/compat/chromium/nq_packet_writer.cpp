@@ -18,7 +18,9 @@
 
 extern bool chaos_write();
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 // static
 WriteResult NqPacketWriter::WritePacket(
     int fd,
@@ -70,8 +72,8 @@ WriteResult NqPacketWriter::WritePacket(
       return WriteResult(WRITE_STATUS_OK, rc);
     }
     fprintf(stderr, "%d: fail to send: %s(%d:%s)\n", fd, strerror(errno), errno, 
-      nq::Syscall::WriteMayBlocked(errno, reachability_tracked) ? "blocked" : "error");
-    return WriteResult(nq::Syscall::WriteMayBlocked(errno, reachability_tracked)
+      Syscall::WriteMayBlocked(errno, reachability_tracked) ? "blocked" : "error");
+    return WriteResult(Syscall::WriteMayBlocked(errno, reachability_tracked)
                            ? WRITE_STATUS_BLOCKED
                            : WRITE_STATUS_ERROR,
                        errno);
@@ -89,8 +91,8 @@ WriteResult NqPacketWriter::WritePacket(
     return WriteResult(WRITE_STATUS_OK, rc);
   }
   fprintf(stderr, "%d: fail to send: %s(%d:%s)\n", fd, strerror(errno), errno, 
-    nq::Syscall::WriteMayBlocked(errno, reachability_tracked) ? "blocked" : "error");
-  return WriteResult(nq::Syscall::WriteMayBlocked(errno, reachability_tracked)
+    Syscall::WriteMayBlocked(errno, reachability_tracked) ? "blocked" : "error");
+  return WriteResult(Syscall::WriteMayBlocked(errno, reachability_tracked)
                          ? WRITE_STATUS_BLOCKED
                          : WRITE_STATUS_ERROR,
                      errno);
@@ -113,4 +115,5 @@ WriteResult NqPacketWriter::WritePacket(
   }
   return result;
 }
-}
+} //namespace chromium
+} //namespace nq

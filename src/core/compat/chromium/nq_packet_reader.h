@@ -20,8 +20,9 @@
 #define MMSG_MORE 0
 #endif
 
-namespace net {
-
+namespace nq {
+namespace chromium {
+using namespace net;
 #if MMSG_MORE
 // Read in larger batches to minimize recvmmsg overhead.
 const int kNumPacketsPerReadMmsgCall = 16;
@@ -122,4 +123,5 @@ class NqPacketReader {
 
   DISALLOW_COPY_AND_ASSIGN(NqPacketReader);
 };
-}  // namespace net
+} //namespace chromium
+} //namespace nq

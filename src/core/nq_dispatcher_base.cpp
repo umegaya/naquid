@@ -3,7 +3,7 @@
 #include "core/nq_server_session.h"
 #include "core/nq_server.h"
 
-namespace net {
+namespace nq {
 NqDispatcherBase::NqDispatcherBase(int port, const NqServerConfig& config, NqWorker &worker)
   : port_(port), 
   accept_per_loop_(config.server().accept_per_loop <= 0 ? kNumSessionsToCreatePerSocketEvent : config.server().accept_per_loop),

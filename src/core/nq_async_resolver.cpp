@@ -2,7 +2,7 @@
 
 #include "core/nq_loop.h"
 
-namespace net {
+namespace nq {
 // optmask, server_list, flags, timeout, lookups are member of the class
 NqAsyncResolver::Config::Config() : optmask(0), server_list(nullptr) {
   flags = 0;
@@ -26,7 +26,7 @@ bool NqAsyncResolver::Config::SetServerHostPort(const std::string &host, int por
     tmp->family = af;
     tmp->udp_port = tmp->tcp_port = port;
   } else {
-    nq::Syscall::MemFree(tmp);
+    Syscall::MemFree(tmp);
     return false;
   }
   tmp->next = server_list;
@@ -66,7 +66,7 @@ bool NqAsyncResolver::Initialize(const Config &config) {
   int status = ares_init_options(&channel_, 
     const_cast<ares_options *>(config.options()), config.optmask);
   if(status != ARES_SUCCESS) {
-    nq::logger::error({
+    logger::error({
       {"msg", "fail ares_init_options"},
       {"error", ares_strerror(status)}
     });

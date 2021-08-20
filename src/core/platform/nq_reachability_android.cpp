@@ -18,7 +18,7 @@ extern bool JNI_OnLoad_InitReachability() {
   return g_connectivity_manager != nullptr;
 }
 
-namespace net {
+namespace nq {
 
 class NqReachabilityAndroid : public NqReachability {
  public:
@@ -27,11 +27,11 @@ class NqReachabilityAndroid : public NqReachability {
     //that means we need to find the way to receive intent message without activity, or create activity from JNI code,
     //which seems to be error-prone. for now, I provide API nq_conn_reachability_change and call it from Java side,
     //and wait for someone who is ninja-level android JNI programmer lol
-    nq::logger::fatal("android does not support automatic reachability change yet. call nq_conn_reachability_change manally");
+    logger::fatal("android does not support automatic reachability change yet. call nq_conn_reachability_change manally");
     return false;
   }
   void Stop() override {
-    nq::logger::fatal("android does not support automatic reachability change yet. call nq_conn_reachability_change manally");
+    logger::fatal("android does not support automatic reachability change yet. call nq_conn_reachability_change manally");
   }
   NqReachabilityAndroid(nq_on_reachability_change_t cb) : NqReachability(cb) {}
  protected:

@@ -10,7 +10,8 @@
 #include "net/quic/core/quic_server_id.h"
 #include "net/quic/platform/api/quic_socket_address.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 typedef QuicStreamId NqQuicStreamId;
 typedef QuicConnectionId NqQuicConnectionId;
 class NqQuicSocketAddress : public QuicSocketAddress {
@@ -34,7 +35,7 @@ class NqQuicSocketAddress : public QuicSocketAddress {
     return true;
   }
   static bool FromHostent(struct hostent *entries, int port, NqQuicSocketAddress &address) {
-    return FromPackedString(entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype), port, address);
+    return FromPackedString(entries->h_addr_list[0], Syscall::GetIpAddrLen(entries->h_addrtype), port, address);
   }
 };
 typedef QuicCryptoStream NqQuicCryptoStream;
@@ -63,7 +64,7 @@ class NqPacket : public QuicReceivedPacket {
   inline uint64_t ConnectionId() const {
     switch (data()[0] & 0x08) {
       case 0x08:
-        return nq::Endian::NetbytesToHost<uint64_t>(data() + 1);
+        return Endian::NetbytesToHost<uint64_t>(data() + 1);
       default:
         //TODO(iyatomi): can we detect connection_id from packet->client_address()? but chromium server sample itself seems to ignore...
         return 0;
@@ -74,7 +75,7 @@ class NqPacket : public QuicReceivedPacket {
 #else
 #include <stdint.h>
 #include <sys/socket.h>
-namespace net {
+namespace nq {
 typedef std::uint32_t NqQuicStreamId;
 typedef uint64_t NqQuicConnectionId;
 typedef void *NqQuicCryptoStream;
@@ -107,7 +108,7 @@ class NqPacket : public NqQuicSocketAddress {
   inline uint64_t ConnectionId() const {
     switch (data()[0] & 0x08) {
       case 0x08:
-        return nq::Endian::NetbytesToHost<uint64_t>(data() + 1);
+        return Endian::NetbytesToHost<uint64_t>(data() + 1);
       default:
         //TODO(iyatomi): can we detect connection_id from packet->client_address()? but chromium server sample itself seems to ignore...
         return 0;

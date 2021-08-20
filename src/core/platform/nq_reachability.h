@@ -4,7 +4,7 @@
 
 #include "nq.h"
 
-namespace net {
+namespace nq {
 class NqReachability {
  public:
   typedef nq_reachability_t Status;

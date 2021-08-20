@@ -6,7 +6,7 @@
 #include "core/nq_server_session.h"
 #include "core/nq_server.h"
 
-namespace net {
+namespace nq {
 void NqWorker::Process(NqPacket *p) {
   // usually size of dispatcher isn't large, simple for loop run faster
   for (size_t i = 0; i < dispatchers_.size(); i++) {
@@ -22,7 +22,7 @@ void NqWorker::Run(PacketQueue &pq) {
   InvokeQueue *iq[n_dispatcher];
   NqDispatcher *ds[n_dispatcher];
   if (!Listen(iq, ds)) {
-    nq::logger::fatal("fail to listen");
+    logger::fatal("fail to listen");
     exit(1);
     return;
   }
@@ -95,7 +95,7 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
       ASSERT(false);
       return false;
     }
-    nq::logger::info({
+    logger::info({
       {"msg", "listen"},
       {"thread_index", index_}, 
       {"fd", listen_fd},
@@ -103,7 +103,7 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
     auto d = new NqDispatcher(kv.first, kv.second, *this);
     d->SetFromConfig(kv.second);
     if (loop_.Add(listen_fd, d, NqLoop::EV_READ | NqLoop::EV_WRITE) != NQ_OK) {
-      nq::Syscall::Close(listen_fd);
+      Syscall::Close(listen_fd);
       delete d;
       ASSERT(false);
       return false;
@@ -116,10 +116,10 @@ bool NqWorker::Listen(InvokeQueue **iq, NqDispatcher **ds) {
   return true;
 }
 //helper
-nq::Fd NqWorker::CreateUDPSocketAndBind(const NqQuicSocketAddress& address) {
-  nq::Fd fd = nq::Syscall::CreateUDPSocket(address.family(), &overflow_supported_);
+Fd NqWorker::CreateUDPSocketAndBind(const NqQuicSocketAddress& address) {
+  Fd fd = Syscall::CreateUDPSocket(address.family(), &overflow_supported_);
   if (fd < 0) {
-    nq::logger::error({
+    logger::error({
       {"msg", "CreateSocket() failed"},
       {"errno", errno}, 
       {"strerror", strerror(errno)}
@@ -130,32 +130,32 @@ nq::Fd NqWorker::CreateUDPSocketAndBind(const NqQuicSocketAddress& address) {
   //set socket resuable
   int flag = 1, rc = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag));
   if (rc < 0) {
-    nq::logger::error({
+    logger::error({
       {"msg", "setsockopt(SO_REUSEPORT) failed"},
       {"errno", errno}, 
       {"strerror", strerror(errno)}
     });
-    nq::Syscall::Close(fd);
+    Syscall::Close(fd);
     return -1;    
   }
 
   sockaddr_storage addr = address.generic_address();
-  socklen_t slen = nq::Syscall::GetSockAddrLen(addr.ss_family);
+  socklen_t slen = Syscall::GetSockAddrLen(addr.ss_family);
   if (slen == 0) {
-    nq::Syscall::Close(fd);
+    Syscall::Close(fd);
     return -1;
   }
   rc = bind(fd, reinterpret_cast<sockaddr*>(&addr), slen);
   if (rc < 0) {
-    nq::logger::error({
+    logger::error({
       {"msg", "Bind failed"},
       {"errno", errno}, 
       {"strerror", strerror(errno)}
     });
-    nq::Syscall::Close(fd);
+    Syscall::Close(fd);
     return -1;
   }
-  nq::logger::error({
+  logger::error({
     {"msg", "Listening start"},
     {"address", address.ToString()}
   });

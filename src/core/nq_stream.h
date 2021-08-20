@@ -11,7 +11,7 @@
 #include "core/nq_alarm.h"
 #include "core/nq_serial_codec.h"
 
-namespace net {
+namespace nq {
 
 class NqSession;
 class NqBoxer;
@@ -76,7 +76,7 @@ class NqStream : public NqStreamCompat {
   friend class NqStreamHandler;
   friend class NqDispatcher;
   NqStreamHandler *CreateStreamHandler(const std::string &name);
-  NqStreamHandler *CreateStreamHandler(const nq::HandlerMap::HandlerEntry *he);
+  NqStreamHandler *CreateStreamHandler(const HandlerMap::HandlerEntry *he);
 };
 
 class NqClientStream : public NqStream {
@@ -156,7 +156,7 @@ class NqStreamHandler {
   static const void *ToPV(const char *p) { return static_cast<const void *>(p); }
   static const char *ToCStr(const void *p) { return static_cast<const char *>(p); }
 
-  static constexpr size_t len_buff_len = nq::LengthCodec::EncodeLength(sizeof(nq_size_t));
+  static constexpr size_t len_buff_len = LengthCodec::EncodeLength(sizeof(nq_size_t));
   static constexpr size_t header_buff_len = 8;  
  protected:
   NqSession *nq_session() { return stream_->nq_session(); }
@@ -172,7 +172,7 @@ class NqSimpleStreamHandler : public NqStreamHandler {
 
   inline void SendCommon(const void *p, nq_size_t len, const nq_stream_opt_t *opt) {
     char buffer[len_buff_len + len];
-    auto enc_len = nq::LengthCodec::Encode(len, buffer, sizeof(buffer));
+    auto enc_len = LengthCodec::Encode(len, buffer, sizeof(buffer));
     memcpy(buffer + enc_len, p, len);
     if (opt != nullptr) {
       WriteBytes(buffer, enc_len + len, *opt);
@@ -254,7 +254,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
   nq_on_rpc_request_t on_request_;
   nq_on_rpc_notify_t on_notify_;
   nq_time_t default_timeout_ts_;
-  nq::IdFactory<nq_msgid_t> msgid_factory_;
+  IdFactory<nq_msgid_t> msgid_factory_;
   std::map<uint32_t, Request*> req_map_;
   NqLoop *loop_;
  public:
@@ -293,8 +293,8 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     //pack and send buffer
     char buffer[header_buff_len + len_buff_len + len];
     size_t ofs = 0;
-    ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), msgid, buffer, sizeof(buffer));
-    ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
+    ofs = HeaderCodec::Encode(static_cast<int16_t>(type), msgid, buffer, sizeof(buffer));
+    ofs += LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
     memcpy(buffer + ofs, p, len);
     WriteBytes(buffer, ofs + len);      
   }
@@ -305,4 +305,4 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
 
 // TODO: customized rpc handler? but needed?
 
-}  // namespace net
+}  // namespace nq

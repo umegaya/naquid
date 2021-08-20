@@ -3,7 +3,10 @@
 #include "core/nq_loop.h"
 #include "core/nq_dispatcher.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
+
 class NqStubConnectionHelper : public QuicConnectionHelperInterface {
 	NqLoop &loop_;
  public:
@@ -43,4 +46,5 @@ public:
     return dispatcher_.CanAcceptClientHello(message, self_address, error_details);
   }
 };
-}
+} //namespace chromium
+} //namespace nq

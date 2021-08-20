@@ -1,7 +1,7 @@
 #include "core/nq_client.h"
 #include "core/nq_client_loop.h"
 
-namespace net {
+namespace nq {
 void* NqClient::operator new(std::size_t sz) {
   ASSERT(false);
   auto r = reinterpret_cast<NqClient *>(std::malloc(sz));

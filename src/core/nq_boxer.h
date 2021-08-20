@@ -15,7 +15,7 @@
 
 //#define USE_DIRECT_WRITE (1)
 
-namespace net {
+namespace nq {
 class NqLoop;
 class NqBoxer {
  public:
@@ -66,10 +66,10 @@ class NqBoxer {
         } else {
           ASSERT(len <= 10000);
           //TODO(iyatomi): allocation from some pool
-          p_ = nq::Syscall::Memdup(p, len); len_ = len;
+          p_ = Syscall::Memdup(p, len); len_ = len;
         }
       }
-      ~Data() { if (len_ > 0) { nq::Syscall::MemFree(const_cast<void *>(p_)); } }
+      ~Data() { if (len_ > 0) { Syscall::MemFree(const_cast<void *>(p_)); } }
       inline const void *ptr() const { return p_; }
       inline nq_size_t length() const { return len_; } 
     } data_;

@@ -4,16 +4,17 @@
 #include "net/cert/ct_known_logs.h"
 #include "net/cert/ct_log_verifier.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 void NqClientConfigCompat::Setup() { //init other variables from client_
   config_.ConfigureSelf(client_);
   NqClientConfigBase::Setup();
 }
 std::unique_ptr<ProofVerifier> NqClientConfigCompat::NewProofVerifier() const { 
   if (client_.insecure) {
-    return std::unique_ptr<ProofVerifier>(new NqNoopProofVerifier);
+    return std::unique_ptr<ProofVerifier>(new chromium::NqNoopProofVerifier);
   } else {
-    return std::unique_ptr<ProofVerifier>(new NqProofVerifier);
+    return std::unique_ptr<ProofVerifier>(new chromium::NqProofVerifier);
   }
 }
 
@@ -33,7 +34,7 @@ NqServerConfigCompat::NewCryptoConfig(QuicClock *clock) const {
   auto c = std::unique_ptr<QuicCryptoServerConfig>(new QuicCryptoServerConfig(
     server_.quic_secret == nullptr ? kDefaultQuicSecret : server_.quic_secret, 
     QuicRandom::GetInstance(),
-    std::unique_ptr<ProofSource>(new NqProofSource(addr_))
+    std::unique_ptr<ProofSource>(new chromium::NqProofSource(addr_))
   ));
   std::unique_ptr<CryptoHandshakeMessage> scfg(
     c->AddDefaultConfig(
@@ -44,5 +45,5 @@ NqServerConfigCompat::NewCryptoConfig(QuicClock *clock) const {
   );
   return c;
 }
-} // namespace net
+} // namespace nq
 #endif

@@ -4,7 +4,7 @@
 #include "core/nq_stream.h"
 #include "core/nq_dispatcher.h"
 
-namespace net {
+namespace nq {
 NqServerSession::NqServerSession(NqQuicConnection *connection,
                                  const NqServer::PortConfig &port_config)
   //quic_dispatcher implements QuicSession::Visitor interface                                 
@@ -103,11 +103,11 @@ int NqServerSession::UnderlyingFd() {
   ASSERT(false);
   return -1;
 }
-const nq::HandlerMap *NqServerSession::GetHandlerMap() const {
+const HandlerMap *NqServerSession::GetHandlerMap() const {
   return own_handler_map_ != nullptr ? own_handler_map_.get() : port_config_.handler_map();
 }
-nq::HandlerMap *NqServerSession::ResetHandlerMap() {
-  own_handler_map_.reset(new nq::HandlerMap());
+HandlerMap *NqServerSession::ResetHandlerMap() {
+  own_handler_map_.reset(new HandlerMap());
   return own_handler_map_.get();
 }
 } //net

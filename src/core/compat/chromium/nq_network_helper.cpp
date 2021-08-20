@@ -6,7 +6,9 @@
 #include "core/nq_client_loop.h"
 #include "core/compat/chromium/nq_quic_client.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 
 namespace {
 const int kLoopFlags = NqLoop::EV_READ | NqLoop::EV_WRITE;
@@ -49,15 +51,15 @@ bool NqNetworkHelper::CreateUDPSocketAndBind(
   }
 
   sockaddr_storage addr = address_.generic_address();
-  socklen_t slen = nq::Syscall::GetSockAddrLen(addr.ss_family);
+  socklen_t slen = Syscall::GetSockAddrLen(addr.ss_family);
   if (slen == 0) {
-    nq::Syscall::Close(fd);
+    Syscall::Close(fd);
     return false;
   }
   int rc = bind(fd, reinterpret_cast<sockaddr*>(&addr), slen);
   if (rc < 0) {
     QUIC_LOG(ERROR) << "Bind failed: " << strerror(errno);
-    nq::Syscall::Close(fd);
+    Syscall::Close(fd);
     return false;
   }
 
@@ -85,7 +87,7 @@ void NqNetworkHelper::CleanUpUDPSocketImpl(Fd fd) {
   if (fd > -1) {
     loop_->Del(fd);
     TRACE("close fd: %d", fd);
-    int rc = nq::Syscall::Close(fd);
+    int rc = Syscall::Close(fd);
     DCHECK_EQ(0, rc);
     fd_ = -1;
   }
@@ -145,4 +147,5 @@ void NqNetworkHelper::OnRecv(NqPacket *p) {
 #endif
 }
 
-}  // namespace net
+} //namespace chromium
+} //namespace nq

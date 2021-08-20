@@ -10,7 +10,8 @@
 #include "core/compat/chromium/nq_packet_writer.h"
 #include "core/compat/chromium/nq_stub_interface.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 NqDispatcherCompat::NqDispatcherCompat(int port, const NqServerConfig& config, NqWorker &worker) 
   : NqDispatcherBase(port, config, worker),
   crypto_config_(config.NewCryptoConfig(&(worker.loop()))),
@@ -23,12 +24,12 @@ NqDispatcherCompat::NqDispatcherCompat(int port, const NqServerConfig& config, N
 void NqDispatcherCompat::SetFromConfig(const NqServerConfig &config) {
   if (config.server().idle_timeout > 0) {
     dispatcher_.buffered_packets().SetConnectionLifeSpan(
-      QuicTime::Delta::FromMicroseconds(nq::clock::to_us(config.server().idle_timeout))
+      QuicTime::Delta::FromMicroseconds(clock::to_us(config.server().idle_timeout))
     );
   }
 }
 void NqDispatcherCompat::Shutdown() {
-  nq::logger::info({
+  logger::info({
     {"msg", "shutdown start"},
     {"worker_index", index_},
     {"port", port_},
@@ -43,7 +44,7 @@ void NqDispatcherCompat::Shutdown() {
 }
 bool NqDispatcherCompat::ShutdownFinished(nq_time_t shutdown_start) const { 
   if (dispatcher_.session_map().size() <= 0) {
-    nq::logger::info({
+    logger::info({
       {"msg", "shutdown finished"},
       {"reason", "all session closed"},
       {"worker_index", index_},
@@ -51,7 +52,7 @@ bool NqDispatcherCompat::ShutdownFinished(nq_time_t shutdown_start) const {
     });
     return true;
   } else if ((shutdown_start + config_.server().shutdown_timeout) < nq_time_now()) {
-    nq::logger::error({
+    logger::error({
       {"msg", "shutdown finished"},
       {"reason", "timeout"},
       {"worker_index", index_},
@@ -66,8 +67,8 @@ bool NqDispatcherCompat::ShutdownFinished(nq_time_t shutdown_start) const {
 }
 
 
-//implements nq::IoProcessor
-void NqDispatcherCompat::OnEvent(nq::Fd fd, const Event &e) {
+//implements IoProcessor
+void NqDispatcherCompat::OnEvent(Fd fd, const Event &e) {
   if (NqLoop::Writable(e)) {
     dispatcher_.writer()->SetWritable(); //indicate fd become writable
   }
@@ -75,13 +76,13 @@ void NqDispatcherCompat::OnEvent(nq::Fd fd, const Event &e) {
     while (dispatcher_.reader().Read(fd, port_, *(loop_.GetClock()), this, nullptr)) {}
   } 
 }
-int NqDispatcherCompat::OnOpen(nq::Fd fd) {
-  dispatcher_.InitializeWithWriter(new NqPacketWriter(fd));
+int NqDispatcherCompat::OnOpen(Fd fd) {
+  dispatcher_.InitializeWithWriter(new chromium::NqPacketWriter(fd));
   return NQ_OK;
 }
 
 
-//implements NqPacketReader::Delegate
+//implements chromium::NqPacketReader::Delegate
 void NqDispatcherCompat::OnRecv(NqPacket *packet) {
   auto conn_id = packet->ConnectionId();
   if (conn_id == 0) { 
@@ -141,5 +142,5 @@ QuicSession* NqDispatcherCompat::CreateQuicSession(QuicConnectionId connection_i
   return s;
 }
 
-} // namespace net
+} // namespace nq
 #endif

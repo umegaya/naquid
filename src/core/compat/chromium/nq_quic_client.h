@@ -7,16 +7,19 @@
 #include "core/compat/chromium/nq_stub_interface.h"
 #include "core/compat/chromium/nq_packet_writer.h"
 
-namespace net {
+namespace nq {
 class NqClientCompat;
 class NqClientLoop;
+namespace chromium {
+using namespace net;
+
 class NqQuicClient : public QuicClientBase,
-										public QuicCryptoClientStream::ProofHandler {
+										 public QuicCryptoClientStream::ProofHandler {
  public:
-	NqQuicClient(NqClientCompat *client, 
-							NqClientLoop &loop,
-							const NqQuicServerId &server_id,
-							const NqClientConfig &config);
+	NqQuicClient(nq::NqClientCompat *client, 
+							 nq::NqClientLoop &loop,
+							 const NqQuicServerId &server_id,
+							 const NqClientConfig &config);
 	~NqQuicClient() override {}
 
 	// operation
@@ -50,4 +53,5 @@ class NqQuicClient : public QuicClientBase,
  private:
 	NqClientCompat *client_;
 };
-} // net
+} //namespace chromium
+} //namespace nq

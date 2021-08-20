@@ -8,7 +8,7 @@
 #include "core/compat/chromium/nq_stub_interface.h"
 #include "core/compat/chromium/nq_network_helper.h"
 
-namespace net {
+namespace nq {
 NqClientCompat::NqClientCompat(NqQuicSocketAddress server_address,
                            NqClientLoop &loop,
                            const NqQuicServerId &server_id,
@@ -17,11 +17,11 @@ NqClientCompat::NqClientCompat(NqQuicSocketAddress server_address,
   client_(this, loop, server_id, config) {
   client_.set_server_address(server_address);
 }
-}  // namespace net
+}  // namespace nq
 #else
 #include <quiche.h>
 
-namespace net {
+namespace nq {
 void NqClientCompat::StartConnect() {
   OnInitializeSession();
   // MUST_DO(iyatomi): call quiche_connect

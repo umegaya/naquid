@@ -4,23 +4,24 @@
 
 #include "core/compat/chromium/nq_packet_reader.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 class NqWorkerCompat {
  public:
   NqWorkerCompat() : reader_()  {}
 
   //get/set
-  inline NqPacketReader &reader() { return reader_; }
+  inline chromium::NqPacketReader &reader() { return reader_; }
 
 private:
-  NqPacketReader reader_;
+  chromium::NqPacketReader reader_;
 };
-} //namespace net
+} //namespace nq
 #else
-namespace net {
+namespace nq {
 class NqWorkerCompat {
  public:
   NqWorkerCompat() {}
 };
-} //namespace net
+} //namespace nq
 #endif

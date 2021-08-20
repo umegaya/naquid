@@ -2,7 +2,10 @@
 
 #include "core/compat/chromium/nq_stub_interface.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
+
 NqQuicDispatcher::NqQuicDispatcher(
   NqDispatcherCompat &dispatcher, QuicCryptoServerConfig *crypto_config,
   const NqServerConfig& config, NqWorker &worker
@@ -45,4 +48,5 @@ bool NqQuicDispatcher::CanAcceptClientHello(const CryptoHandshakeMessage& messag
                           std::string* error_details) const {
   return dispatcher_.CanAcceptClientHello(message, self_address, error_details);
 }
-} // namespace net
+} //namespace chromium
+} //namespace nq

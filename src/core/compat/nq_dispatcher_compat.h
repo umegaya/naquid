@@ -9,10 +9,11 @@
 #include "core/compat/chromium/nq_packet_reader.h"
 #include "core/compat/chromium/nq_quic_dispatcher.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 class NqDispatcherCompat : public NqDispatcherBase,
-                           public nq::IoProcessor,
-                           public NqPacketReader::Delegate,
+                           public IoProcessor,
+                           public chromium::NqPacketReader::Delegate,
                            public QuicStreamAllocator, 
                            public QuicSessionAllocator {
  public:
@@ -24,7 +25,7 @@ class NqDispatcherCompat : public NqDispatcherBase,
   // get/set
   inline QuicCompressedCertsCache *cert_cache() { return &cert_cache_; }
   inline const QuicCryptoServerConfig *crypto_config() const { return crypto_config_.get(); }
-  inline NqQuicDispatcher *chromium() { return &dispatcher_; }
+  inline chromium::NqQuicDispatcher *chromium() { return &dispatcher_; }
 
   //implements NqDispatcherBase
   void Accept() override { dispatcher_.ProcessBufferedChlos(accept_per_loop_); }
@@ -32,10 +33,10 @@ class NqDispatcherCompat : public NqDispatcherBase,
   bool ShutdownFinished(nq_time_t shutdown_start) const override;
   void SetFromConfig(const NqServerConfig &config) override;
 
-  //implements nq::IoProcessor
-  void OnEvent(nq::Fd fd, const Event &e) override;
-  void OnClose(nq::Fd fd) override {}
-	int OnOpen(nq::Fd fd) override;
+  //implements IoProcessor
+  void OnEvent(Fd fd, const Event &e) override;
+  void OnClose(Fd fd) override {}
+	int OnOpen(Fd fd) override;
 
   //implements NqPacketReader::Delegate
   void OnRecv(NqPacket *packet) override;
@@ -48,14 +49,14 @@ class NqDispatcherCompat : public NqDispatcherBase,
   void *AllocSession(size_t sz) override { return session_allocator_.Alloc(sz); }
   void FreeSession(void *p) override { return session_allocator_.Free(p); }  
 
-  //NqQuicDispatcher delegates
+  //chromium::NqQuicDispatcher delegates
   QuicSession* CreateQuicSession(
     QuicConnectionId connection_id,
     const QuicSocketAddress& client_address,
     QuicStringPiece alpn);
   void OnSessionClosed(NqServerSession *session);
 
-  //delegate QuicCryptoServerStream::Helper (called from NqQuicDispatcher)
+  //delegate QuicCryptoServerStream::Helper (called from chromium::NqQuicDispatcher)
   QuicConnectionId GenerateConnectionIdForReject(
       QuicConnectionId connection_id) const {
     return loop_.GetRandomGenerator()->RandUint64();
@@ -70,11 +71,11 @@ class NqDispatcherCompat : public NqDispatcherBase,
  private:
   std::unique_ptr<QuicCryptoServerConfig> crypto_config_;
   QuicCompressedCertsCache cert_cache_;
-  NqQuicDispatcher dispatcher_;
+  chromium::NqQuicDispatcher dispatcher_;
 };
-} // namespace net
+} // namespace nq
 #else
-namespace net {
+namespace nq {
 typedef NqDispatcherBase NqDispatcherCompat;
 }
 #endif

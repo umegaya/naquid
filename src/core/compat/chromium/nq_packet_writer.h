@@ -8,7 +8,9 @@
 
 #include "core/compat/nq_quic_types.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 class NqPacketWriter : public QuicDefaultPacketWriter {
  protected:
   bool reachability_tracked_;
@@ -19,7 +21,7 @@ class NqPacketWriter : public QuicDefaultPacketWriter {
                                  const QuicSocketAddress& peer_address,
                                  bool reachability_tracked);
  public:
-  NqPacketWriter(nq::Fd fd) : QuicDefaultPacketWriter(fd), reachability_tracked_(false) {}
+  NqPacketWriter(Fd fd) : QuicDefaultPacketWriter(fd), reachability_tracked_(false) {}
   ~NqPacketWriter() override { reachability_tracked_ = false; }
   void SetReachabilityTracked(bool on) { reachability_tracked_ = on; }
   WriteResult WritePacket(const char* buffer,
@@ -28,4 +30,5 @@ class NqPacketWriter : public QuicDefaultPacketWriter {
                           const QuicSocketAddress& peer_address,
                           PerPacketOptions* options) override;
 };
-}
+} //namespace chromium
+} //namespace nq

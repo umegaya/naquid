@@ -5,7 +5,9 @@
 #include "core/compat/chromium/nq_stub_interface.h"
 #include "core/compat/chromium/nq_network_helper.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 
 NqQuicClient::NqQuicClient(NqClientCompat *client,
                            NqClientLoop &loop,
@@ -60,4 +62,5 @@ void NqQuicClient::OnProofValid(const QuicCryptoClientConfig::CachedState& cache
 void NqQuicClient::OnProofVerifyDetailsAvailable(const ProofVerifyDetails& verify_details) {
   // TODO(iyatomi): Handle the proof verification.
 }
-}  // namespace net
+} //namespace chromium
+} //namespace nq

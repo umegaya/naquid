@@ -16,7 +16,7 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
     char buffer1[32], buffer2[32];
     sprintf(buffer1, "%p", g_vm_p);
     sprintf(buffer2, "%p", vm);
-    nq::logger::error({
+    logger::error({
       {"msg", "panic: JNI_Onload seems called twice"},
       {"oldjvm_p", buffer1},
       {"newjvm_p", buffer2}
@@ -25,7 +25,7 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved) {
   }
   g_vm_p = vm;
   if (GetEnv(g_vm_p, &g_env_p, JNI_VERSION_1_4) != JNI_OK) {
-    nq::logger::error({
+    logger::error({
       {"msg", "panic: fail to get env"},
     });
     return -1;

@@ -2,8 +2,11 @@
 
 #include "core/compat/nq_session.h"
 
-namespace net {
+namespace nq {
 class NqClientStream;
+
+namespace chromium {
+using namespace net;
 class NqClientSession : public NqSession {
  public:
   NqClientSession(NqQuicConnection *connection,
@@ -39,4 +42,5 @@ class NqClientSession : public NqSession {
   friend class NqQuicClient;
   void InitCryptoStream(QuicCryptoStream *cs) { NqSession::SetCryptoStream(cs); }
 };
-} // namespace net
+} //namespace chromium
+} //namespace nq

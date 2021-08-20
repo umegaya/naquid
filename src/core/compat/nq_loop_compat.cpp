@@ -5,7 +5,8 @@
 
 #include "core/compat/nq_quic_alarm.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 //implements QuicTime
 QuicTime NqLoopCompat::ApproximateNow() const {
   if (approx_now_in_usec_ == 0) {

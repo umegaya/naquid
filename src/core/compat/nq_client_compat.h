@@ -6,7 +6,7 @@
 #if defined(NQ_CHROMIUM_BACKEND)
 #include "core/compat/chromium/nq_quic_client.h"
 
-namespace net {
+namespace nq {
 class NqClientLoop;
 class NqClientCompat : public NqClientBase {
  public:
@@ -30,11 +30,11 @@ class NqClientCompat : public NqClientBase {
       client_.nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED); 
   }
   int UnderlyingFd() override { 
-    return static_cast<NqNetworkHelper *>(client_.network_helper())->fd();
+    return static_cast<chromium::NqNetworkHelper *>(client_.network_helper())->fd();
   }
 
   // get/set
-  NqQuicClient *chromium() { return &client_; }
+  chromium::NqQuicClient *chromium() { return &client_; }
 
  private:
   friend class NqClient;
@@ -45,12 +45,12 @@ class NqClientCompat : public NqClientBase {
                  const NqClientConfig &config);
   ~NqClientCompat() override {}
 
-  NqQuicClient client_;
+  chromium::NqQuicClient client_;
   DISALLOW_COPY_AND_ASSIGN(NqClientCompat);
 };
 } //net
 #else
-namespace net {
+namespace nq {
 class NqClientLoop;
 class NqClientCompat : public NqClientBase {
  public:

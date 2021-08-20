@@ -2,7 +2,7 @@
 
 #include "core/nq_client.h"
 
-namespace net {
+namespace nq {
 struct NqDnsQuery : public NqAsyncResolver::Query {
   static bool ConvertToSocketAddress(struct hostent *entries, int port, NqQuicSocketAddress &address) {
     return NqQuicSocketAddress::FromHostent(entries, port, address);
@@ -41,7 +41,7 @@ struct NqDnsQueryForClosure : public NqDnsQuery {
   void OnComplete(int status, int timeouts, struct hostent *entries) override {
     if (ARES_SUCCESS == status) {
       nq_closure_call(cb_, NQ_OK, nullptr, 
-        entries->h_addr_list[0], nq::Syscall::GetIpAddrLen(entries->h_addrtype));
+        entries->h_addr_list[0], Syscall::GetIpAddrLen(entries->h_addrtype));
     } else {
       nq_error_detail_t detail = {
         .code = status,

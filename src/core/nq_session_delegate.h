@@ -3,7 +3,7 @@
 #include "basis/handler_map.h"
 #include "core/nq_serial_codec.h"
 
-namespace net {
+namespace nq {
 class NqLoop;
 class NqSession;
 class NqSessionDelegate {
@@ -23,8 +23,8 @@ class NqSessionDelegate {
   virtual void InitStream(const std::string &name, void *ctx) = 0;
   virtual void OpenStream(const std::string &name, void *ctx) = 0;
   virtual int UnderlyingFd() = 0;
-  virtual const nq::HandlerMap *GetHandlerMap() const = 0;
-  virtual nq::HandlerMap *ResetHandlerMap() = 0;
+  virtual const HandlerMap *GetHandlerMap() const = 0;
+  virtual HandlerMap *ResetHandlerMap() = 0;
   virtual NqLoop *GetLoop() = 0;
   virtual NqQuicConnectionId ConnectionId() = 0;
   virtual void FlushWriteBuffer() = 0;

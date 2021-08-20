@@ -6,7 +6,9 @@
 #include "core/nq_stream.h"
 #include "core/nq_client_loop.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 QuicStream* NqClientSession::CreateIncomingDynamicStream(QuicStreamId id) {
   auto c = static_cast<NqClient *>(delegate());
   auto s = new(c->client_loop()) NqClientStream(id, this, false);
@@ -21,5 +23,7 @@ QuicStream* NqClientSession::CreateOutgoingDynamicStream() {
   //InitSerial and StreamManager::OnOpen called in NqClient::NewStream.
   ActivateStream(QuicWrapUnique(s));
   return s;
-}
-}
+} 
+} //namespace chromium
+} //namespace nq
+

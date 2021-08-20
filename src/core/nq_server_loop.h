@@ -3,7 +3,7 @@
 #include "core/nq_loop.h"
 #include "core/nq_config.h"
 
-namespace net {
+namespace nq {
 class NqServerLoop : public NqLoop {
  public:
   NqServerLoop() {}

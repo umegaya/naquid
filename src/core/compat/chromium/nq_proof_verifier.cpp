@@ -4,7 +4,9 @@
 #include "net/cert/asn1_util.h"
 #include "net/quic/core/crypto/crypto_protocol.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 class NqProofVerifyDetails : public ProofVerifyDetails {
  public:
   ProofVerifyDetails* Clone() const override {
@@ -188,4 +190,5 @@ QuicAsyncStatus NqProofVerifier::VerifyCertChain(
   }
   return QUIC_SUCCESS;
 }
-}
+} //namespace chromium 
+} //namespace nq

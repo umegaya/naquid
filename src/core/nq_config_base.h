@@ -5,7 +5,7 @@
 #include "basis/timespec.h"
 #include "core/compat/nq_protocol_manager.h"
 
-namespace net {
+namespace nq {
 
 class NqConfig {
  public:

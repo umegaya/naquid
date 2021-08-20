@@ -8,7 +8,8 @@
 #include "net/quic/core/quic_crypto_server_stream.h"
 #include "net/quic/platform/api/quic_ptr_util.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 NqServerSessionCompat::NqServerSessionCompat(NqQuicConnection *connection,
                                              const NqServer::PortConfig &port_config)
   //quic_dispatcher implements QuicSession::Visitor interface                                 
@@ -58,5 +59,5 @@ QuicCryptoStream *NqServerSessionCompat::NewCryptoStream() {
     dispatcher()->chromium()
   );
 }
-} // namespace net
+} // namespace nq
 #endif

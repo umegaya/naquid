@@ -7,11 +7,11 @@
 #include "basis/handler_map.h"
 #include "core/nq_serial_codec.h"
 
-namespace net {
+namespace nq {
 class NqAlarmInterface;
-class NqLoopBase : public nq::Loop {
+class NqLoopBase : public Loop {
  public:
-  NqLoopBase() : nq::Loop(), 
+  NqLoopBase() : Loop(), 
              approx_now_in_usec_(0),
              alarm_map_(), 
              alarm_process_us_ts_(0),
@@ -43,6 +43,6 @@ class NqLoopBase : public nq::Loop {
   uint64_t approx_now_in_usec_;
   std::multimap<uint64_t, AlarmEntry> alarm_map_;
   nq_time_t alarm_process_us_ts_;
-  nq::atomic<NqSessionIndex> current_locked_session_id_;
+  atomic<NqSessionIndex> current_locked_session_id_;
 };
 } // net

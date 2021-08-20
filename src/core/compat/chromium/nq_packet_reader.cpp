@@ -27,7 +27,9 @@
 #define SO_RXQ_OVFL 40
 #endif
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 NqPacketReader::NqPacketReader() {
   Initialize();
 }
@@ -187,5 +189,5 @@ bool NqPacketReader::ReadPackets(
   return true;
 }
 
-
-}  // namespace net
+} //namespce chromium
+} //namespace nq

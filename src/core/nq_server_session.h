@@ -8,7 +8,7 @@
 #include "core/nq_server.h"
 #include "core/nq_config.h"
 
-namespace net {
+namespace nq {
 class NqStream;
 class NqServerSession : public NqServerSessionCompat {
  public:
@@ -47,8 +47,8 @@ class NqServerSession : public NqServerSessionCompat {
   void InitStream(const std::string &name, void *ctx) override;
   void OpenStream(const std::string &name, void *ctx) override;
   int UnderlyingFd() override;
-  const nq::HandlerMap *GetHandlerMap() const override;
-  nq::HandlerMap *ResetHandlerMap() override;
+  const HandlerMap *GetHandlerMap() const override;
+  HandlerMap *ResetHandlerMap() override;
   NqLoop *GetLoop() override;
   uint64_t ReconnectDurationUS() const override { return 0; }
   NqQuicConnectionId ConnectionId() override { return ConnectionIdImpl(); }
@@ -57,7 +57,7 @@ class NqServerSession : public NqServerSessionCompat {
 
  private:
   const NqServer::PortConfig &port_config_;
-  std::unique_ptr<nq::HandlerMap> own_handler_map_;
+  std::unique_ptr<HandlerMap> own_handler_map_;
   NqSerial session_serial_;
   void *context_;
 };

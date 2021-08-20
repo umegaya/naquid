@@ -5,7 +5,8 @@
 #include "core/nq_server_session.h"
 #include "core/nq_stream.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 
 NqSession::NqSession(NqQuicConnection* connection,
                      Visitor* owner,

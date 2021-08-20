@@ -2,7 +2,8 @@
 #include "core/nq_loop.h"
 
 #if defined(NQ_CHROMIUM_BACKEND)
-namespace net {
+namespace nq {
+using namespace net;
 //implements QuicAlarm
 void NqQuicAlarm::SetImpl() {
   DCHECK(deadline().IsInitialized());

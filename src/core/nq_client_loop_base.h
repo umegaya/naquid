@@ -15,18 +15,18 @@
 #include "core/nq_client.h"
 #include "core/nq_stream.h"
 
-namespace net {
+namespace nq {
 class NqClientLoop;
 class NqClientLoopBase : public NqLoop,
                          public NqBoxer {
   typedef NqSessiontMap<NqClient, NqSessionIndex> ClientMap;
   typedef NqSessiontMap<NqAlarm, NqAlarmIndex> AlarmMap;
-  typedef nq::Allocator<NqClient, NqStaticSection> ClientAllocator;
-  typedef nq::Allocator<NqClientStream, NqStaticSection> StreamAllocator;
+  typedef Allocator<NqClient, NqStaticSection> ClientAllocator;
+  typedef Allocator<NqClientStream, NqStaticSection> StreamAllocator;
   typedef NqAlarm::Allocator AlarmAllocator;
   static constexpr nq_time_t CLIENT_LOOP_WAIT_NS = 1000 * 1000; 
   static constexpr const char *DEFAULT_DNS = "8.8.8.8";
-  static nq::IdFactory<uint32_t> client_worker_index_factory_;
+  static IdFactory<uint32_t> client_worker_index_factory_;
 
  protected:
   NqClientLoopBase(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
@@ -44,8 +44,8 @@ class NqClientLoopBase : public NqLoop,
   void Close();
   void RemoveClient(NqClient *cl);
 
-  inline nq::HandlerMap *mutable_handler_map() { return &handler_map_; }
-  inline const nq::HandlerMap *handler_map() const { return &handler_map_; }
+  inline HandlerMap *mutable_handler_map() { return &handler_map_; }
+  inline const HandlerMap *handler_map() const { return &handler_map_; }
   inline nq_client_t ToHandle() { return (nq_client_t)this; }
   inline bool main_thread() const { return thread_id_ == std::this_thread::get_id(); }
   inline void set_main_thread() { thread_id_ = std::this_thread::get_id(); }
@@ -53,7 +53,7 @@ class NqClientLoopBase : public NqLoop,
   inline ClientMap &client_map() { return client_map_; }
   inline ClientAllocator &client_allocator() { return client_allocator_; }
   inline StreamAllocator &stream_allocator() { return stream_allocator_; }
-  inline nq::IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
+  inline IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
   inline int worker_index() const { return worker_index_; }
   inline NqAsyncResolver &async_resolver() { return async_resolver_; }
 
@@ -73,7 +73,7 @@ class NqClientLoopBase : public NqLoop,
   void AddAlarm(NqAlarm *a);
   bool InitResolver(const nq_dns_conf_t *dns_conf);
 
-  nq::HandlerMap handler_map_;
+  HandlerMap handler_map_;
   ClientMap client_map_;
   AlarmMap alarm_map_;
   NqBoxer::Processor processor_;
@@ -83,7 +83,7 @@ class NqClientLoopBase : public NqLoop,
   StreamAllocator stream_allocator_;
   AlarmAllocator alarm_allocator_;
   NqAsyncResolver async_resolver_;
-  nq::IdFactory<uint32_t> stream_index_factory_;
+  IdFactory<uint32_t> stream_index_factory_;
   uint32_t worker_index_;
 };
 }

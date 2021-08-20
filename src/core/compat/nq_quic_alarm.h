@@ -7,7 +7,8 @@
 
 #include "core/nq_loop_base.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 class NqQuicAlarm : public QuicAlarm, 
                     public NqAlarmInterface {
  public:
@@ -31,7 +32,7 @@ class NqQuicAlarm : public QuicAlarm,
 };
 }
 #else
-namespace net {
+namespace nq {
 class NqQuicAlarm : public NqAlarmBase {
 };
 }

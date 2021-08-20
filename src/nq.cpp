@@ -28,7 +28,7 @@ static nq_at_exit_manager_t g_at_exit_manager;
 #define NQAPI_BOOTSTRAP
 #endif
 
-using namespace net;
+using namespace nq;
 
 
 
@@ -106,17 +106,17 @@ static inline bool IsOutgoing(bool is_client, nq_sid_t stream_id) {
 }
 
 
-static nq::logger::level::def cr_severity_to_nq_map[] = {
-  nq::logger::level::debug, //const LogSeverity LOG_VERBOSE = -1;  // This is level 1 verbosity
-  nq::logger::level::info, //const LogSeverity LOG_INFO = 0;
-  nq::logger::level::warn, //const LogSeverity LOG_WARNING = 1;
-  nq::logger::level::error, //const LogSeverity LOG_ERROR = 2;
-  nq::logger::level::fatal, //const LogSeverity LOG_FATAL = 3;
+static logger::level::def cr_severity_to_nq_map[] = {
+  logger::level::debug, //const LogSeverity LOG_VERBOSE = -1;  // This is level 1 verbosity
+  logger::level::info, //const LogSeverity LOG_INFO = 0;
+  logger::level::warn, //const LogSeverity LOG_WARNING = 1;
+  logger::level::error, //const LogSeverity LOG_ERROR = 2;
+  logger::level::fatal, //const LogSeverity LOG_FATAL = 3;
 };
 static bool nq_chromium_logger(int severity,
   const char* file, int line, size_t message_start, const std::string& str) {
   auto lv = cr_severity_to_nq_map[severity + 1];
-  nq::logger::log(lv, {
+  logger::log(lv, {
     {"tag", "crlog"},
     {"file", file},
     {"line", line},
@@ -136,7 +136,7 @@ static void lib_init(bool client) {
     //initialize c-ares
     auto status = ares_library_init(ARES_LIB_INIT_ALL);
     if (status != ARES_SUCCESS) {
-      nq::logger::fatal({
+      logger::fatal({
         {"msg", "fail to init ares"},
         {"status", status}
       });
@@ -248,16 +248,16 @@ NQAPI_BOOTSTRAP void nq_server_join(nq_server_t sv) {
 //
 // --------------------------
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_handler(nq_hdmap_t h, const char *name, nq_stream_handler_t handler) {
-  return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
+  return HandlerMap::FromHandle(h)->AddEntry(name, handler);
 }
 NQAPI_BOOTSTRAP bool nq_hdmap_rpc_handler(nq_hdmap_t h, const char *name, nq_rpc_handler_t handler) {
-  return nq::HandlerMap::FromHandle(h)->AddEntry(name, handler);
+  return HandlerMap::FromHandle(h)->AddEntry(name, handler);
 }
 NQAPI_BOOTSTRAP bool nq_hdmap_stream_factory(nq_hdmap_t h, const char *name, nq_stream_factory_t factory) {
-  return nq::HandlerMap::FromHandle(h)->AddEntry(name, factory);
+  return HandlerMap::FromHandle(h)->AddEntry(name, factory);
 }
 NQAPI_BOOTSTRAP void nq_hdmap_raw_handler(nq_hdmap_t h, nq_stream_handler_t handler) {
-  nq::HandlerMap::FromHandle(h)->SetRawHandler(handler);
+  HandlerMap::FromHandle(h)->SetRawHandler(handler);
 }
 
 
@@ -522,18 +522,18 @@ NQAPI_THREADSAFE nq_sid_t nq_rpc_sid(nq_rpc_t rpc) {
 //
 // --------------------------
 NQAPI_THREADSAFE nq_time_t nq_time_now() {
-  return nq::clock::now();
+  return clock::now();
 }
 NQAPI_THREADSAFE nq_unix_time_t nq_time_unix() {
   long s, us;
-  nq::clock::now(s, us);
+  clock::now(s, us);
   return s;
 }
 NQAPI_THREADSAFE nq_time_t nq_time_sleep(nq_time_t d) {
-  return nq::clock::sleep(d);
+  return clock::sleep(d);
 }
 NQAPI_THREADSAFE nq_time_t nq_time_pause(nq_time_t d) {
-  return nq::clock::pause(d);
+  return clock::pause(d);
 }
 
 
@@ -563,10 +563,10 @@ NQAPI_THREADSAFE bool nq_alarm_is_valid(nq_alarm_t a) {
 //
 // --------------------------
 NQAPI_BOOTSTRAP void nq_log_config(const nq_logconf_t *conf) {
-  nq::logger::configure(conf->callback, conf->id, conf->manual_flush);
+  logger::configure(conf->callback, conf->id, conf->manual_flush);
 }
 NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *params, int n_params) {
-  nq::json j = {
+  json j = {
     {"msg", msg}
   };
   for (int i = 0; i < n_params; i++) {
@@ -586,8 +586,8 @@ NQAPI_THREADSAFE void nq_log(nq_loglv_t lv, const char *msg, nq_logparam_t *para
       break;
     }
   }
-  nq::logger::log((nq::logger::level::def)(int)lv, j);
+  logger::log((logger::level::def)(int)lv, j);
 }
 NQAPI_THREADSAFE void nq_log_flush() {
-  nq::logger::flush();
+  logger::flush();
 }

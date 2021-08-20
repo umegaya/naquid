@@ -2,7 +2,7 @@
 
 #include "core/compat/nq_loop_compat.h"
 
-namespace net {
+namespace nq {
 class NqLoop : public NqLoopCompat {
 };
-} // namespace net
+} // namespace nq

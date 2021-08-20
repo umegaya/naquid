@@ -8,7 +8,9 @@
 
 #include "nq.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 
 class NqProofSource : public ProofSourceChromium {
  public:
@@ -44,4 +46,5 @@ class NqProofSource : public ProofSourceChromium {
   DISALLOW_COPY_AND_ASSIGN(NqProofSource);
 };
 
-}  // namespace net
+} //namespace chromium 
+} //namespace nq

@@ -7,7 +7,9 @@
 
 #include "basis/defs.h"
 
-namespace net {
+namespace nq {
+namespace chromium {
+using namespace net;
 // TODO(iyatomi): because most of developer don't want heavy-wait proof verification (eg. certificate transparency), 
 // need to implement minimum one (eg. allow self cert). 
 // but Im not sure that such a light weight version is possible,
@@ -96,8 +98,5 @@ protected:
     const std::string& cert,
     scoped_refptr<X509Certificate> cert_chain);
 };
-} //net
-
-
-
-
+} //namespace chromium
+} //namespace nq

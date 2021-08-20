@@ -5,15 +5,19 @@
 #include "core/nq_config.h"
 #include "core/nq_server_session.h"
 
-namespace net {
+namespace nq {
 class NqDispatcherCompat;
 class NqWorker;
+
+namespace chromium {
+using namespace net;
+
 class NqQuicDispatcher : public QuicDispatcher,
                          public QuicCryptoServerStream::Helper {
  public:
   NqQuicDispatcher(
-    NqDispatcherCompat &dispatcher, QuicCryptoServerConfig *crypto_config, 
-    const NqServerConfig& config, NqWorker &worker
+    nq::NqDispatcherCompat &dispatcher, QuicCryptoServerConfig *crypto_config, 
+    const NqServerConfig& config, nq::NqWorker &worker
   );
 
   //get/set
@@ -76,4 +80,5 @@ class NqQuicDispatcher : public QuicDispatcher,
   NqDispatcherCompat &dispatcher_;
   NqPacketReader &reader_;
 };
-}
+} //namespace chromium
+} //namespace nq

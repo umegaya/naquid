@@ -12,7 +12,7 @@
 #include "core/nq_stream.h"
 #include "core/nq_serial_codec.h"
 
-namespace net {
+namespace nq {
 class NqWorker;
 class NqServerConfig;
 class NqDispatcherBase : public NqBoxer {
@@ -22,8 +22,8 @@ class NqDispatcherBase : public NqBoxer {
   typedef NqWorker::InvokeQueue InvokeQueue;
   typedef NqSessiontMap<NqServerSession, NqSessionIndex> ServerMap;
   typedef NqSessiontMap<NqAlarm, NqAlarmIndex> AlarmMap;
-  typedef nq::Allocator<NqServerSession, NqStaticSection> SessionAllocator;
-  typedef nq::Allocator<NqServerStream, NqStaticSection> StreamAllocator;
+  typedef Allocator<NqServerSession, NqStaticSection> SessionAllocator;
+  typedef Allocator<NqServerStream, NqStaticSection> StreamAllocator;
   typedef NqAlarm::Allocator AlarmAllocator;
   
   int port_, accept_per_loop_; 
@@ -59,7 +59,7 @@ class NqDispatcherBase : public NqBoxer {
   inline StreamAllocator &stream_allocator() { return stream_allocator_; }
   //avoid confusing with QuicSession::session_allocator
   inline SessionAllocator &session_allocator_body() { return session_allocator_; }
-  inline nq::IdFactory<uint32_t> &stream_index_factory() { return server_.stream_index_factory(); }
+  inline IdFactory<uint32_t> &stream_index_factory() { return server_.stream_index_factory(); }
 
   //implements NqBoxer
   void Enqueue(Op *op) override;
@@ -76,4 +76,4 @@ class NqDispatcherBase : public NqBoxer {
  protected:
   void AddAlarm(NqAlarm *a);
 };
-} // namespace net
+} // namespace nq

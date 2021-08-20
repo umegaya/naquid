@@ -12,7 +12,8 @@
 #include "net/quic/core/quic_crypto_stream.h"
 #include "net/quic/core/quic_crypto_client_stream.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 class NqServerSession;
 // A QUIC session with a headers stream.
 class NqSession : public QuicSession {
@@ -35,7 +36,7 @@ class NqSession : public QuicSession {
   //get/set
   inline NqSessionDelegate *delegate() { return delegate_; }
   inline const NqSessionDelegate *delegate() const { return delegate_; }
-  inline const nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
+  inline const HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
   inline nq_conn_t ToHandle() { 
     return MakeHandle<nq_conn_t, NqSessionDelegate>(delegate_, delegate_->SessionSerial()); 
   }
@@ -61,9 +62,9 @@ class NqSession : public QuicSession {
   std::unique_ptr<QuicCryptoStream> crypto_stream_;
   NqSessionDelegate *delegate_;
 };
-} // namespace net
+} // namespace nq
 #else
-namespace net {
+namespace nq {
 // A QUIC session with a headers stream.
 class NqSession {
  public:
@@ -81,7 +82,7 @@ class NqSession {
   //get/set
   inline NqSessionDelegate *delegate() { return delegate_; }
   inline const NqSessionDelegate *delegate() const { return delegate_; }
-  inline const nq::HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
+  inline const HandlerMap *handler_map() { return delegate_->GetHandlerMap(); }
   inline DynamicStreamMap& dynamic_streams() { return dynamic_stream_map_; }
   inline const DynamicStreamMap& dynamic_streams() const { return dynamic_stream_map_; }
   inline ClosedStreams* closed_streams() { return &closed_streams_; }
@@ -97,5 +98,5 @@ class NqSession {
   ClosedStreams closed_stream_map_;     // stream already closed
   ZombieStreamMap zombie_streams_;      // closed stream which still waiting acks
 };
-} // namespace net
+} // namespace nq
 #endif

@@ -9,7 +9,7 @@
 #include "core/nq_server_loop.h"
 #include "core/nq_boxer.h"
 
-namespace net {
+namespace nq {
 class NqServer;
 class NqDispatcher;
 class NqWorker : public NqWorkerCompat {
@@ -48,7 +48,7 @@ class NqWorker : public NqWorkerCompat {
 
  protected:
   static bool ToSocketAddress(const nq_addr_t &addr, NqQuicSocketAddress &address);
-  nq::Fd CreateUDPSocketAndBind(const NqQuicSocketAddress& address);
+  Fd CreateUDPSocketAndBind(const NqQuicSocketAddress& address);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(NqWorker);

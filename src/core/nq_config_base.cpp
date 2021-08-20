@@ -1,6 +1,6 @@
 #include "core/nq_config.h"
 
-namespace net {
+namespace nq {
 void NqClientConfigBase::Setup() {}
 
 

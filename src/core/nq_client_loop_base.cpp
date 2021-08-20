@@ -3,8 +3,8 @@
 
 #include "core/nq_client.h"
 
-namespace net {
-nq::IdFactory<uint32_t> NqClientLoopBase::client_worker_index_factory_;
+namespace nq {
+IdFactory<uint32_t> NqClientLoopBase::client_worker_index_factory_;
 
 bool NqClientLoopBase::InitResolver(const nq_dns_conf_t *dns_conf) {
   NqAsyncResolver::Config c;

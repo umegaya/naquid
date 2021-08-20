@@ -63,7 +63,7 @@ public:
       return sizeof(struct sockaddr_in6);
       break;
     default:
-      nq::logger::fatal({
+      logger::fatal({
         {"msg", "unsupported address family"},
         {"address_family", address_family}
       });
@@ -80,7 +80,7 @@ public:
       return sizeof(struct in6_addr);
       break;
     default:
-      nq::logger::fatal({
+      logger::fatal({
         {"msg", "unsupported address family"},
         {"address_family", address_family}
       });
@@ -93,7 +93,7 @@ public:
     if (flags == -1) {
       int saved_errno = errno;
       char buf[256];
-      nq::logger::fatal({
+      logger::fatal({
         {"msg", "fcntl() to get flags fails"},
         {"fd", fd},
         {"errno", saved_errno},
@@ -108,7 +108,7 @@ public:
         int saved_errno = errno;
         char buf[256];
         // bad.
-        nq::logger::fatal({
+        logger::fatal({
           {"msg", "fcntl() to set flags fails"},
           {"fd", fd},
           {"prev_flags", saved_flags},
@@ -152,7 +152,7 @@ public:
 
   static bool SetSendBufferSize(int fd, size_t size) {
     if (setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size)) != 0) {
-      nq::logger::error({
+      logger::error({
         {"msg", "Failed to set socket send size"},
         {"size", size}
       });
@@ -163,7 +163,7 @@ public:
 
   static bool SetReceiveBufferSize(int fd, size_t size) {
     if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)) != 0) {
-      nq::logger::error({
+      logger::error({
         {"msg", "Failed to set socket recv size"},
         {"size", size}
       });
@@ -174,7 +174,7 @@ public:
   static int CreateUDPSocket(int address_family, bool* overflow_supported) {
     int fd = socket(address_family, SOCK_DGRAM, IPPROTO_UDP);
     if (fd < 0) {
-      nq::logger::error({
+      logger::error({
         {"msg", "socket() failed"},
         {"errno", Errno()}
       });
@@ -189,7 +189,7 @@ public:
     int rc = setsockopt(fd, SOL_SOCKET, SO_RXQ_OVFL, &get_overflow,
                         sizeof(get_overflow));
     if (rc < 0) {
-      nq::logger::warn({
+      logger::warn({
         {"msg", "Socket overflow detection not supported"}
       });
     } else {
@@ -206,7 +206,7 @@ public:
 
     rc = SetGetAddressInfo(fd, address_family);
     if (rc < 0) {
-      nq::logger::error({
+      logger::error({
         {"msg", "IP detection not supported"},
         {"errno", Errno()}
       });
@@ -215,7 +215,7 @@ public:
 
     rc = SetGetSoftwareReceiveTimestamp(fd);
     if (rc < 0) {
-      nq::logger::warn({
+      logger::warn({
         {"msg", "SO_TIMESTAMPING not supported; using fallback"},
         {"errno", Errno()}
       });

@@ -9,7 +9,7 @@
 #include "core/nq_dispatcher.h"
 #include "core/nq_unwrapper.h"
 
-namespace net {
+namespace nq {
 
 NqStream::NqStream(NqQuicStreamId id, NqSession* nq_session, bool establish_side) : 
   NqStreamCompat(id, nq_session),
@@ -67,13 +67,13 @@ NqStreamHandler *NqStream::CreateStreamHandler(const std::string &name) {
   }
   return CreateStreamHandler(he);
 }
-NqStreamHandler *NqStream::CreateStreamHandler(const nq::HandlerMap::HandlerEntry *he) {
+NqStreamHandler *NqStream::CreateStreamHandler(const HandlerMap::HandlerEntry *he) {
   NqStreamHandler *s;
   switch (he->type) {
-  case nq::HandlerMap::FACTORY: {
+  case HandlerMap::FACTORY: {
     s = (NqStreamHandler *)nq_closure_call(he->factory, nq_session()->ToHandle());
   } break;
-  case nq::HandlerMap::STREAM: {
+  case HandlerMap::STREAM: {
     if (nq_closure_is_empty(he->stream.stream_reader)) {
       s = new NqSimpleStreamHandler(this, he->stream.on_stream_record);
     } else {
@@ -83,7 +83,7 @@ NqStreamHandler *NqStream::CreateStreamHandler(const nq::HandlerMap::HandlerEntr
     }
     s->SetLifeCycleCallback(he->stream.on_stream_open, he->stream.on_stream_close);
   } break;
-  case nq::HandlerMap::RPC: {
+  case HandlerMap::RPC: {
     s = new NqSimpleRPCStreamHandler(this, he->rpc.on_rpc_request, 
                                      he->rpc.on_rpc_notify, 
                                     he->rpc.timeout,
@@ -240,7 +240,7 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	parse_buffer_.append(ToCStr(p), len);
 	const char *pstr = parse_buffer_.c_str();
 	size_t plen = parse_buffer_.length();
-	nq_size_t reclen = 0, read_ofs = nq::LengthCodec::Decode(&reclen, pstr, plen);
+	nq_size_t reclen = 0, read_ofs = LengthCodec::Decode(&reclen, pstr, plen);
 	if (reclen > 0 && (reclen + read_ofs) <= plen) {
 	  nq_closure_call(on_recv_, stream_->ToHandle<nq_stream_t>(), pstr + read_ofs, reclen);
 	  parse_buffer_.erase(0, reclen + read_ofs);
@@ -295,9 +295,9 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   nq_error_t type;
   do {
     //decode header
-    read_ofs = nq::HeaderCodec::Decode(&type_tmp, &msgid, pstr, plen);
+    read_ofs = HeaderCodec::Decode(&type_tmp, &msgid, pstr, plen);
     /* tmp_ofs => length of encoded header, reclen => actual payload length */
-    auto tmp_ofs = nq::LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
+    auto tmp_ofs = LengthCodec::Decode(&reclen, pstr + read_ofs, plen - read_ofs);
     if (tmp_ofs == 0) { break; }
     read_ofs += tmp_ofs;
     if ((read_ofs + reclen) > plen) {
@@ -329,8 +329,8 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
       } else {
         //request
         //fprintf(stderr, "stream handler request: idx %u %llu\n", 
-          //nq::Endian::NetbytesToHost<uint32_t>(pstr), 
-          //nq::Endian::NetbytesToHost<uint64_t>(pstr + 4));
+          //Endian::NetbytesToHost<uint32_t>(pstr), 
+          //Endian::NetbytesToHost<uint64_t>(pstr + 4));
         nq_closure_call(on_request_, stream_->ToHandle<nq_rpc_t>(), type, msgid, ToPV(pstr), reclen);
       }
     } else if (type > 0) {
@@ -352,8 +352,8 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];
   size_t ofs = 0;
-  ofs = nq::HeaderCodec::Encode(static_cast<int16_t>(type), 0, buffer, sizeof(buffer));
-  ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
+  ofs = HeaderCodec::Encode(static_cast<int16_t>(type), 0, buffer, sizeof(buffer));
+  ofs += LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
   memcpy(buffer + ofs, p, len);
   WriteBytes(buffer, ofs + len);  
 }
@@ -379,8 +379,8 @@ void NqSimpleRPCStreamHandler::Reply(nq_error_t result, nq_msgid_t msgid, const 
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];
   size_t ofs = 0;
-  ofs = nq::HeaderCodec::Encode(result, msgid, buffer, sizeof(buffer));
-  ofs += nq::LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
+  ofs = HeaderCodec::Encode(result, msgid, buffer, sizeof(buffer));
+  ofs += LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
   memcpy(buffer + ofs, p, len);
   WriteBytes(buffer, ofs + len);  
 }

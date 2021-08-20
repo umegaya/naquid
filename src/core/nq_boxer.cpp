@@ -1,7 +1,7 @@
 #include "core/nq_boxer.h"
 #include "core/nq_unwrapper.h"
 
-namespace net {
+namespace nq {
 void NqBoxer::Processor::Poll(NqBoxer *p) {
   Op *op;
   while (try_dequeue(op)) {

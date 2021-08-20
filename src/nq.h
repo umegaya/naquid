@@ -52,7 +52,7 @@ typedef struct nq_client_tag *nq_client_t; //NqClientLoop
 
 typedef struct nq_server_tag *nq_server_t; //NqServer
 
-typedef struct nq_hdmap_tag *nq_hdmap_t; //nq::HandlerMap
+typedef struct nq_hdmap_tag *nq_hdmap_t; //HandlerMap
 
 typedef struct {
   uint64_t data[1];

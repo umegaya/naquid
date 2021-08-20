@@ -12,23 +12,26 @@
 #include "core/nq_loop.h"
 #include "core/compat/chromium/nq_packet_reader.h"
 
-namespace net {
+namespace nq {
+class NqClientCompat;
+
+namespace chromium {
+using namespace net;
 // An implementation of the QuicClientBase::NetworkHelper based off
 // the epoll server.
-class NqClientCompat;
 class NqQuicClient;
 class NqNetworkHelper : public QuicClientBase::NetworkHelper,
-                        public nq::IoProcessor,
+                        public IoProcessor,
                         public NqPacketReader::Delegate {
  public:
   // Create a quic client, which will have events managed by an externally owned
   // EpollServer.
-  NqNetworkHelper(NqLoop* loop, NqClientCompat* client);
+  NqNetworkHelper(NqLoop* loop, nq::NqClientCompat* client);
   ~NqNetworkHelper() override;
 
-  // implements nq::IoProcessor
-  typedef nq::Fd Fd;
-  typedef nq::IoProcessor::Event Event;
+  // implements IoProcessor
+  typedef Fd Fd;
+  typedef IoProcessor::Event Event;
   void OnEvent(Fd fd, const Event &e) override;
   void OnClose(Fd fd) override;
   int OnOpen(Fd fd) override;
@@ -48,7 +51,7 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
 
 
   // Accessors provided for convenience, not part of any interface.
-  NqClientCompat* client() { return client_; }  
+  nq::NqClientCompat* client() { return client_; }  
 
   Fd fd() { return fd_; }
 
@@ -81,9 +84,9 @@ class NqNetworkHelper : public QuicClientBase::NetworkHelper,
   // space than allowed on the stack.
   std::unique_ptr<NqPacketReader> packet_reader_;
 
-  NqClientCompat* client_;
+  nq::NqClientCompat* client_;
 
   DISALLOW_COPY_AND_ASSIGN(NqNetworkHelper);
 };
-
-}  // namespace net
+} //namespace chromium
+} //namespace nq

@@ -7,7 +7,7 @@
 #include "basis/defs.h"
 #include "basis/io_processor.h"
 
-namespace net {
+namespace nq {
 class NqLoop;
 class NqAsyncResolver {
  public:
@@ -50,9 +50,9 @@ class NqAsyncResolver {
   typedef ares_host_callback Callback;  
   typedef ares_channel Channel;
  protected:
-  typedef nq::Fd Fd;
-  typedef nq::IoProcessor::Event Event;
-  class IoRequest : public nq::IoProcessor {
+  typedef Fd Fd;
+  typedef IoProcessor::Event Event;
+  class IoRequest : public IoProcessor {
    private:
     uint32_t current_flags_;
     bool alive_;
@@ -62,7 +62,7 @@ class NqAsyncResolver {
     IoRequest(Channel channel, Fd fd, uint32_t flags) : 
       current_flags_(flags), alive_(true), channel_(channel), fd_(fd) {}
     ~IoRequest() override {}
-    // implements nq::IoProcessor
+    // implements IoProcessor
     void OnEvent(Fd fd, const Event &e) override;
     void OnClose(Fd fd) override {}
     int OnOpen(Fd fd) override { return NQ_OK; }
@@ -85,16 +85,16 @@ class NqAsyncResolver {
   static inline int PtoN(const std::string &host, int *af, void *buff) {
     *af = host.find(':') == std::string::npos ?  AF_INET : AF_INET6;
     if (ares_inet_pton(*af, host.c_str(), buff) >= 0) {
-      return nq::Syscall::GetIpAddrLen(*af);
+      return Syscall::GetIpAddrLen(*af);
     } else {
       return -1;
     }
   }
   static inline int NtoP(const void *src, nq_size_t srclen, char *dst, nq_size_t dstlen) {
     const char *converted = nullptr;
-    if (srclen == nq::Syscall::GetIpAddrLen(AF_INET)) {
+    if (srclen == Syscall::GetIpAddrLen(AF_INET)) {
       converted = ares_inet_ntop(AF_INET, src, dst, dstlen);
-    } else if (srclen == nq::Syscall::GetIpAddrLen(AF_INET6)) {
+    } else if (srclen == Syscall::GetIpAddrLen(AF_INET6)) {
       converted = ares_inet_ntop(AF_INET6, src, dst, dstlen);
     } else {
       TRACE("invalid srclen:%u", srclen);
@@ -104,7 +104,7 @@ class NqAsyncResolver {
     if (converted != nullptr) {
       return 0;
     } else {
-      int eno = nq::Syscall::Errno();
+      int eno = Syscall::Errno();
       TRACE("failure ntop: %d", eno);
       return -1;
     }

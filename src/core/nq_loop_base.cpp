@@ -4,7 +4,7 @@
 
 #include "core/nq_alarm.h"
 
-namespace net {
+namespace nq {
 // handling alarm
 void NqLoopBase::SetAlarm(NqAlarmInterface *a, uint64_t timeout_in_us) {
   alarm_map_.emplace(std::piecewise_construct, 
@@ -37,7 +37,7 @@ uint64_t NqLoopBase::NowInUsec() const {
   return ((uint64_t)tv.tv_usec) + (((uint64_t)tv.tv_sec) * 1000 * 1000);
 }
 void NqLoopBase::Poll() {
-  nq::Loop::Poll();
+  Loop::Poll();
   approx_now_in_usec_ = NowInUsec();
   alarm_process_us_ts_ = approx_now_in_usec_;
   auto it = alarm_map_.begin();
@@ -68,4 +68,4 @@ void NqLoopBase::Poll() {
   alarm_process_us_ts_ = 0;
   //TRACE("------------ end -------------------");
 }
-}  // namespace net
+}  // namespace nq

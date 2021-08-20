@@ -5,7 +5,8 @@
 #if defined(NQ_CHROMIUM_BACKEND)
 #include "net/quic/core/quic_version_manager.h"
 
-namespace net {
+namespace nq {
+using namespace net;
 class NqProtocolManager : public QuicVersionManager {
  public:
   NqProtocolManager() : QuicVersionManager(net::AllSupportedVersions()) {}
@@ -15,7 +16,7 @@ class NqProtocolManager : public QuicVersionManager {
 };
 }
 #else
-namespace net {
+namespace nq {
 class NqProtocolManager {
  public:
   enum Protocol {
@@ -35,7 +36,7 @@ class NqProtocolManager {
       case NQ_QUIC_V1:
         return QuicV1;
       default:
-        nq::logger::fatal({
+        logger::fatal({
           {"msg", "unsupported wire protocol"},
           {"protocol_number", p}
         });

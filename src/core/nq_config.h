@@ -2,7 +2,7 @@
 
 #include "core/compat/nq_config_compat.h"
 
-namespace net {
+namespace nq {
 class NqClientConfig : public NqClientConfigCompat {
  public:
   NqClientConfig() : NqClientConfigCompat() {}
@@ -13,4 +13,4 @@ class NqServerConfig : public NqServerConfigCompat {
   NqServerConfig(const nq_addr_t &addr) : NqServerConfigCompat(addr) {}
   NqServerConfig(const nq_addr_t &addr, const nq_svconf_t &conf) : NqServerConfigCompat(addr, conf) {}
 };
-} // namespace net
+} // namespace nq

@@ -11,7 +11,7 @@
 #include "core/nq_session_delegate.h"
 #include "core/nq_stream.h"
 
-namespace net {
+namespace nq {
 //these code does valid check of nq_conn_t, nq_stream_t, nq_rpc_t, nq_alarm_t even if related pointer (member p)
 //already freed, and return casted NqSessionDelegate* or NqStream* if valid. its really wild part of the codes, be careful to make change.
 //especially, keep following restriction in mind.
