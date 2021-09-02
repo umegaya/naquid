@@ -22,7 +22,7 @@ void NqAsyncResolver::Config::SetTimeout(nq_time_t t_o) {
 bool NqAsyncResolver::Config::SetServerHostPort(const std::string &host, int port) {
   auto tmp = new struct ares_addr_port_node;
   int af;
-  if (NqAsyncResolver::PtoN(host.c_str(), &af, &(tmp->addr)) > 0) {
+  if (NqAsyncResolver::PtoN(host.c_str(), &af, &(tmp->addr), sizeof(tmp->addr)) > 0) {
     tmp->family = af;
     tmp->udp_port = tmp->tcp_port = port;
   } else {

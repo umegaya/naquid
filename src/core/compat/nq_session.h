@@ -64,7 +64,9 @@ class NqSession : public QuicSession {
 };
 } // namespace nq
 #else
+#include "core/nq_stream.h"
 namespace nq {
+class NqStream;
 // A QUIC session with a headers stream.
 class NqSession {
  public:
@@ -76,7 +78,7 @@ class NqSession {
   NqSession(NqQuicConnection *connection,
             NqSessionDelegate* delegate) : 
             connection_(connection), delegate_(delegate), 
-            dynamic_stream_map_(), closed_stream_map_(), zombie_streams_() {}
+            dynamic_stream_map_(), closed_streams_(), zombie_streams_() {}
   virtual ~NqSession() {}
 
   //get/set
@@ -91,11 +93,14 @@ class NqSession {
     return MakeHandle<nq_conn_t, NqSessionDelegate>(delegate_, delegate_->SessionSerial()); 
   }
 
- private:
+  //operation
+  void CloseStream(NqQuicStreamId stream_id);
+
+ protected:
   NqQuicConnection *connection_;
   NqSessionDelegate *delegate_;
   DynamicStreamMap dynamic_stream_map_; // active streamsd
-  ClosedStreams closed_stream_map_;     // stream already closed
+  ClosedStreams closed_streams_;        // stream already closed
   ZombieStreamMap zombie_streams_;      // closed stream which still waiting acks
 };
 } // namespace nq

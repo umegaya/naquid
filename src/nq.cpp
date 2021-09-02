@@ -106,6 +106,7 @@ static inline bool IsOutgoing(bool is_client, nq_sid_t stream_id) {
 }
 
 
+#if defined(NQ_CHROMIUM_BACKEND)
 static logger::level::def cr_severity_to_nq_map[] = {
   logger::level::debug, //const LogSeverity LOG_VERBOSE = -1;  // This is level 1 verbosity
   logger::level::info, //const LogSeverity LOG_INFO = 0;
@@ -122,14 +123,17 @@ static bool nq_chromium_logger(int severity,
     {"line", line},
     {"msg", str.c_str() + message_start},
   });
-  ASSERT(severity < logging::LOG_FATAL);
+  ASSERT(severity < ::base::logging::LOG_FATAL);
   return true;
 }
+#endif
 
 static void lib_init(bool client) {
   g_at_exit_manager = nq_at_exit_manager(); //anchor
+#if defined(NQ_CHROMIUM_BACKEND)
   //set loghandoer for chromium codebase
-  logging::SetLogMessageHandler(nq_chromium_logger);
+  ::base::logging::SetLogMessageHandler(nq_chromium_logger);
+#endif
   //break some of the systems according to the env value "CHAOS"
   chaos_init();
   if (client) {
@@ -158,7 +162,7 @@ static void lib_init(bool client) {
 // --------------------------
 NQAPI_THREADSAFE const char *nq_error_detail_code2str(nq_error_t code, int detail_code) {
   if (code == NQ_EQUIC) {
-    return QuicErrorCodeToString(static_cast<QuicErrorCode>(code));
+    return NqQuicStrError(code);
   } else if (code == NQ_ERESOLVE) {
     //TODO ares erorr code
     ASSERT(false);

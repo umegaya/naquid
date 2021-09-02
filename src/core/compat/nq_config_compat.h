@@ -69,8 +69,86 @@ class NqServerConfigCompat : public NqServerConfigBase {
   QuicCryptoServerConfig::ConfigOptions crypto_options_;
 };
 
-} // namespace nq
+} //namespace nq
 #else
-typedef NqClientConfigBase NqClientConfigCompat;
-typedef NqServerConfigBase NqServerConfigCompat;
+#include "basis/syscall.h"
+#include "core/compat/quiche/deps.h"
+
+namespace nq {
+class NqClientConfigCompat;
+class NqServerConfigCompat;
+class NqQuicConfig {
+ public:
+  NqQuicConfig() : config_(nullptr) {}
+  ~NqQuicConfig() {
+    if (config_ != nullptr) {
+      quiche_config_free(config_);
+      config_ = nullptr;
+    }
+  }
+  //cast operator
+  operator quiche_config *() { return config_; }
+
+  //operation
+  bool Initialize(const NqProtocolManager::Protocol p) {
+    config_ = quiche_config_new(p);
+    if (config_ == nullptr) {
+      return false;
+    }
+    return true;
+  }
+  template <class CONF>
+  void CommonSetup(const CONF &config) {
+    quiche_config_set_max_recv_udp_payload_size(config_, Syscall::kDefaultSocketReceiveBuffer);
+    quiche_config_set_max_send_udp_payload_size(config_, Syscall::kDefaultSocketReceiveBuffer);
+    auto idle_timeout = config.idle_timeout;
+    if (idle_timeout <= 0) {
+      idle_timeout = nq_time_sec(5);
+    }
+    if (config.handshake_timeout > 0) {
+      if (config.handshake_timeout > idle_timeout) {
+        logger::warn({
+          {"msg", "handshake_timeout does not support for quiche"},
+          {"handshake_timeout", config.handshake_timeout},
+          {"idle_timeout", idle_timeout}
+        });
+      }
+    }
+    quiche_config_set_max_idle_timeout(config_, idle_timeout);
+  }
+  void Setup(const nq_clconf_t &config) {
+    CommonSetup(config);
+    quiche_config_verify_peer(config_, !config.insecure);
+  }
+  void Setup(const nq_svconf_t &config) {
+    CommonSetup(config);
+  }
+
+  //factory
+  static NqQuicConfig *Create(const NqClientConfigCompat &config);
+  static NqQuicConfig *Create(const NqServerConfigCompat &config);
+ private:
+  quiche_config *config_;
+};
+class NqClientConfigCompat : public NqClientConfigBase {
+ public:
+  NqClientConfigCompat() : NqClientConfigBase() {}
+  NqClientConfigCompat(const nq_clconf_t &conf) : NqClientConfigBase(conf) {}
+  //operation
+  std::unique_ptr<NqQuicConfig> NewQuicConfig() const {
+    return std::unique_ptr<NqQuicConfig>(NqQuicConfig::Create(*this));
+  }
+};
+class NqServerConfigCompat : public NqServerConfigBase {
+ public:
+  NqServerConfigCompat(const nq_addr_t &addr) : 
+    NqServerConfigBase(addr) {}
+  NqServerConfigCompat(const nq_addr_t &addr, const nq_svconf_t &conf) : 
+    NqServerConfigBase(addr, conf) {}
+  //operation
+  std::unique_ptr<NqQuicConfig> NewQuicConfig() const {
+    return std::unique_ptr<NqQuicConfig>(NqQuicConfig::Create(*this));
+  }
+};
+} //namespace nq
 #endif

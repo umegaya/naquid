@@ -18,6 +18,7 @@ class NqDispatcherCompat : public NqDispatcherBase,
                            public QuicSessionAllocator {
  public:
   NqDispatcherCompat(int port, const NqServerConfig& config, NqWorker &worker);
+  ~NqDispatcherCompat() override {}
 
   // operation
   inline void Process(NqPacket *packet) { dispatcher_.Process(packet); }
@@ -76,6 +77,26 @@ class NqDispatcherCompat : public NqDispatcherBase,
 } // namespace nq
 #else
 namespace nq {
-typedef NqDispatcherBase NqDispatcherCompat;
-}
+class NqDispatcherCompat : public NqDispatcherBase,                           
+                           public IoProcessor {
+ public:
+  NqDispatcherCompat(int port, const NqServerConfig& config, NqWorker &worker) :
+    NqDispatcherBase(port, config, worker) {}
+  ~NqDispatcherCompat() override {}
+
+  // operation
+  inline void Process(NqPacket *packet) { ASSERT(false); }
+
+  //implements IoProcessor
+  void OnEvent(Fd fd, const Event &e) override;
+  void OnClose(Fd fd) override {}
+	int OnOpen(Fd fd) override;
+  
+  //implements NqDispatcherBase
+  void Accept() override { ASSERT(false); }
+  void Shutdown() override { ASSERT(false); }
+  bool ShutdownFinished(nq_time_t shutdown_start) const override { ASSERT(false); return false; }
+  void SetFromConfig(const NqServerConfig &config) override { ASSERT(false); }
+};
+} //namespace nq
 #endif

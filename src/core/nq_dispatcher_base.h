@@ -41,6 +41,7 @@ class NqDispatcherBase : public NqBoxer {
 
  public:
   NqDispatcherBase(int port, const NqServerConfig& config, NqWorker &worker);
+  virtual ~NqDispatcherBase() {}
 
   //interface NqDispatcherBase
   virtual void Shutdown() = 0;

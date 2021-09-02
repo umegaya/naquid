@@ -47,6 +47,8 @@ class NqStreamCompat : public QuicStream {
   //get/set
   NqSession *nq_session();
   const NqSession *nq_session() const;
+  NqDispatcher *dispatcher();
+  NqClientLoop *client_loop();
 
   //operation
   void Send(const char *p, nq_size_t len, bool fin, const nq_stream_opt_t *p_opt);
@@ -63,16 +65,47 @@ class NqStreamCompat : public QuicStream {
 #else
 namespace nq {
 class NqSession;
+class NqClientLoop;
+class NqDispatcher;
 class NqStreamCompat {
  private:
   NqQuicStreamId id_;
   NqSession *session_;
+  enum AllocatorType {
+    None,
+    ClientLoop,
+    Dispatcher
+  } allocator_type_;
+  union {
+    NqClientLoop *client_loop_;
+    NqDispatcher *dispatcher_;
+    void *allocator_ptr_;
+  };
  public:
   NqStreamCompat(NqQuicStreamId id, 
                  NqSession* nq_session)
     : id_(id), session_(nq_session) {}
+  virtual ~NqStreamCompat() {}
+
+  //operator
+  void* operator new(std::size_t sz, NqClientLoop* a);
+  void operator delete(void *p, NqClientLoop *a) noexcept;
+  inline void* operator new(std::size_t sz, NqDispatcher* a);
+  void operator delete(void *p, NqDispatcher *a) noexcept;
+  inline void* operator new(std::size_t sz) {
+    volatile auto r = reinterpret_cast<NqStreamCompat *>(std::malloc(sz));
+    r->allocator_ptr_ = nullptr;
+    r->allocator_type_ = None;
+    return r;
+  }
+  void operator delete(void *p) noexcept;
+
 
   //get/set
+  inline void *stream_allocator() { return allocator_ptr_; }
+  inline NqDispatcher *dispatcher() { return dispatcher_; }
+  inline NqClientLoop *client_loop() { return client_loop_; }
+  NqQuicStreamId id() const { return id_; }
   NqSession *nq_session() { return session_; }
   const NqSession *nq_session() const { return session_; }
 
@@ -80,7 +113,7 @@ class NqStreamCompat {
   void Send(const char *p, nq_size_t len, bool fin, const nq_stream_opt_t *p_opt);
 
   // NqStreamCompat interface
-  virtual void OnClose() = 0;
+  virtual void OnClose() { ASSERT(false); }
   virtual bool OnRecv(const void *p, nq_size_t len) = 0;
 };
 } //namespace nq

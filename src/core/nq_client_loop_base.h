@@ -8,12 +8,14 @@
 #include "core/nq_loop.h"
 
 #include "basis/allocator.h"
+#include "basis/syscall.h"
 #include "core/nq_alarm.h"
 #include "core/nq_async_resolver.h"
 #include "core/nq_config.h"
 #include "core/nq_boxer.h"
 #include "core/nq_client.h"
 #include "core/nq_stream.h"
+#include "core/nq_static_section.h"
 
 namespace nq {
 class NqClientLoop;
@@ -32,7 +34,7 @@ class NqClientLoopBase : public NqLoop,
   NqClientLoopBase(int max_client_hint, int max_stream_hint) : handler_map_(), client_map_(), alarm_map_(), 
     processor_(), protocols_(),
     client_allocator_(max_client_hint), stream_allocator_(max_stream_hint), alarm_allocator_(max_client_hint),
-    async_resolver_(), stream_index_factory_(0x7FFFFFFF) {
+    async_resolver_(), stream_index_factory_(0x7FFFFFFF), random_() {
     worker_index_ = client_worker_index_factory_.New();
     set_main_thread();
   }
@@ -56,6 +58,7 @@ class NqClientLoopBase : public NqLoop,
   inline IdFactory<uint32_t> &stream_index_factory() { return stream_index_factory_; }
   inline int worker_index() const { return worker_index_; }
   inline NqAsyncResolver &async_resolver() { return async_resolver_; }
+  inline Syscall::Random &random() { return random_; }
 
   //implements NqBoxer
   void Enqueue(NqBoxer::Op *op) override { processor_.enqueue(op); }
@@ -85,5 +88,6 @@ class NqClientLoopBase : public NqLoop,
   NqAsyncResolver async_resolver_;
   IdFactory<uint32_t> stream_index_factory_;
   uint32_t worker_index_;
+  Syscall::Random random_;
 };
 }

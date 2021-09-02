@@ -82,8 +82,12 @@ class NqAsyncResolver {
   void StartResolve(Query *q) { q->resolver_ = this; queries_.push_back(q); }
   void Resolve(const char *host, int family, Callback cb, void *arg);
   void Poll(NqLoop *l);
-  static inline int PtoN(const std::string &host, int *af, void *buff) {
+  static inline int PtoN(const std::string &host, int *af, void *buff, nq_size_t buflen) {
     *af = host.find(':') == std::string::npos ?  AF_INET : AF_INET6;
+    if (Syscall::GetIpAddrLen(*af) > buflen) {
+      ASSERT(false);
+      return -1;
+    }
     if (ares_inet_pton(*af, host.c_str(), buff) >= 0) {
       return Syscall::GetIpAddrLen(*af);
     } else {

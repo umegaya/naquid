@@ -161,7 +161,7 @@ bool NqStream::OnRecv(const void *p, nq_size_t len) {
 
 
 NqBoxer *NqClientStream::boxer() {
-  return static_cast<NqBoxer *>(static_cast<NqClientLoop *>(stream_allocator()));
+  return static_cast<NqBoxer *>(client_loop());
 }
 void NqClientStream::InitSerial(NqStreamIndex idx) { 
   auto session_serial = nq_session()->delegate()->SessionSerial();
@@ -197,14 +197,14 @@ const std::string &NqClientStream::Protocol() const {
     NqStreamSerialCodec::ClientStreamIndex(stream_serial()));
 }
 std::mutex &NqClientStream::static_mutex() {
-  auto cl = static_cast<NqClientLoop *>(stream_allocator());  
+  auto cl = client_loop(); 
   return cl->stream_allocator().Bss(this)->mutex();
 }
 
 
 
 NqBoxer *NqServerStream::boxer() {
-  return static_cast<NqBoxer *>(static_cast<NqDispatcher *>(stream_allocator()));
+  return static_cast<NqBoxer *>(dispatcher());
 }
 void NqServerStream::InitSerial(NqStreamIndex idx) {
   auto session_serial = nq_session()->delegate()->SessionSerial();
@@ -217,8 +217,8 @@ void NqServerStream::OnClose() {
   InvalidateSerial();
 }
 std::mutex &NqServerStream::static_mutex() {
-  auto cl = static_cast<NqDispatcher *>(stream_allocator());  
-  return cl->stream_allocator().Bss(this)->mutex();
+  auto dp = dispatcher();  
+  return dp->stream_allocator().Bss(this)->mutex();
 }
 
 
@@ -250,14 +250,10 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	}
 }
 void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
-  NqQuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
-  SendCommon(p, len, nullptr);
+  WriteBytes(reinterpret_cast<const char *>(p), len);
 }
 void NqSimpleStreamHandler::SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) {
-  NqQuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
-  SendCommon(p, len, &opt);
+  WriteBytes(reinterpret_cast<const char *>(p), len, opt);
 }
 
 
@@ -346,8 +342,6 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   } while (parse_buffer_.length() > 0);
 }
 void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t len) {
-  NqQuicConnection::ScopedPacketBundler bundler(
-    nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(type > 0);
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];
@@ -358,23 +352,17 @@ void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t le
   WriteBytes(buffer, ofs + len);  
 }
 void NqSimpleRPCStreamHandler::Call(uint16_t type, const void *p, nq_size_t len, nq_on_rpc_reply_t cb) {
-  //NqQuicConnection::ScopedPacketBundler bundler(
-    //nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   nq_msgid_t msgid = msgid_factory_.New();
   SendCommon(type, msgid, p, len);
   EntryRequest(msgid, cb, default_timeout_ts_);
 }
 void NqSimpleRPCStreamHandler::CallEx(uint16_t type, const void *p, nq_size_t len, nq_rpc_opt_t &opt) {
-  //NqQuicConnection::ScopedPacketBundler bundler(
-    //nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   nq_msgid_t msgid = msgid_factory_.New();
   SendCommon(type, msgid, p, len);
   EntryRequest(msgid, opt.callback, opt.timeout);
 }
 
 void NqSimpleRPCStreamHandler::Reply(nq_error_t result, nq_msgid_t msgid, const void *p, nq_size_t len) {
-  //NqQuicConnection::ScopedPacketBundler bundler(
-    //nq_session()->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED);
   ASSERT(result <= 0);
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];

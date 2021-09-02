@@ -81,7 +81,7 @@ class NqStream : public NqStreamCompat {
 
 class NqClientStream : public NqStream {
  public:
-  NqClientStream(QuicStreamId id, NqSession* nq_session, bool establish_side) : 
+  NqClientStream(NqQuicStreamId id, NqSession* nq_session, bool establish_side) : 
     NqStream(id, nq_session, establish_side) {}
 
   void InitSerial(NqStreamIndex idx);
@@ -98,7 +98,7 @@ class NqClientStream : public NqStream {
 class NqServerStream : public NqStream {
   void *context_;
  public:
-  NqServerStream(QuicStreamId id, NqSession* nq_session, bool establish_side) : 
+  NqServerStream(NqQuicStreamId id, NqSession* nq_session, bool establish_side) : 
     NqStream(id, nq_session, establish_side), context_(nullptr) {}
 
   inline void *context() { return context_; }

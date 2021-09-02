@@ -59,5 +59,12 @@ QuicCryptoStream *NqServerSessionCompat::NewCryptoStream() {
     dispatcher()->chromium()
   );
 }
-} // namespace nq
+} //namespace nq
+#else
+namespace nq {
+NqServerSessionCompat::NqServerSessionCompat(NqQuicConnection *connection,
+                                             const NqServer::PortConfig &port_config) : 
+  NqSession(connection, this) {
+}
+} //namespace nq
 #endif

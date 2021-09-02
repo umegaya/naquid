@@ -50,16 +50,12 @@ class NqServerSessionCompat : public NqSession,
   ~NqServerSessionCompat() override {}
 
   //get/set
-  NqDispatcher *dispatcher();
+  NqDispatcher *dispatcher() { ASSERT(false); return nullptr; }
 
   //operation
-  NqQuicCryptoStream *NewCryptoStream();
-  NqStream *NewStream();
-  NqStreamIndex NewStreamIndex();
-
-  //implements QuicSession
-  QuicStream* CreateIncomingDynamicStream(QuicStreamId id) override;
-  QuicStream* CreateOutgoingDynamicStream() override;
+  NqQuicCryptoStream *NewCryptoStream() { ASSERT(false); return nullptr; }
+  NqStream *NewStream() { ASSERT(false); return nullptr; }
+  NqStreamIndex NewStreamIndex() { ASSERT(false); return 0; }
 
   //per backend implementation body for NqSessionDelegate
   void DisconnectImpl() { ASSERT(false); }

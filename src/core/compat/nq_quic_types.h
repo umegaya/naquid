@@ -21,6 +21,8 @@ class NqQuicSocketAddress : public QuicSocketAddress {
 
   //get/set
   inline int family() const { return generic_address().ss_family; }
+  inline nq_size_t generic_address_length() const { return Syscall::GetSockAddrLen(family()); }
+
 
   //static
   static bool ConvertToIpAddress(const char *data, int len, QuicIpAddress &ip) {
@@ -71,39 +73,62 @@ class NqPacket : public QuicReceivedPacket {
     }
   } 
 };
+const char *NqQuicStrError(nq_error_t error) {
+  return QuicErrorCodeToString(static_cast<QuicErrorCode>(code));
+}
 } // net
 #else
+#include <netdb.h>
 #include <stdint.h>
 #include <sys/socket.h>
+
+#include "core/compat/quiche/deps.h"
+
 namespace nq {
 typedef std::uint32_t NqQuicStreamId;
 typedef uint64_t NqQuicConnectionId;
 typedef void *NqQuicCryptoStream;
-typedef quiche_conn_t NqQuicConnection;
+typedef quiche_conn *NqQuicConnection;
 class NqQuicServerId {
  public:
-  NqQuicServerId(const std::string &host, int port) {
-    id_ = host + ":" + std::to_string(port);
-  }
+  NqQuicServerId(const std::string &host, int port) : host_(host), port_(port) {}
+  inline const std::string &host() const { return host_; }
+  inline int port() const { return port_; }
  private:
-  std::string id_;
+  std::string host_;
+  int port_;
 };
 class NqQuicSocketAddress {
  public:
-  NqQuicSocketAddress() : port_(0) {}
+  NqQuicSocketAddress() {}
+  NqQuicSocketAddress(const char *data, nq_size_t len, int port) {
+    set_generic_address(data, len, port);
+  }
 
   //get/set
-  inline sockaddr_storage generic_address() const { return host_; }
+  inline const sockaddr_storage &generic_address() const { return addr_; }
+  inline nq_size_t generic_address_length() const { return Syscall::GetSockAddrLen(family()); }
   inline int family() const { return generic_address().ss_family; }
+  inline int port() const { return Syscall::GetSockAddrPort(addr_); }
+  inline void set_generic_address(const char *data, nq_size_t len, int port) {
+    Syscall::SetSockAddr(addr_, data, len, port);
+  }
 
- private:
-  int port_;
-  struct sockaddr_storage host_;
+  //operation
+  std::string ToString() const;
+
+  //static
+  static bool FromPackedString(const char *data, int len, int port, NqQuicSocketAddress &address);
+  static bool FromHostent(struct hostent *entries, int port, NqQuicSocketAddress &address) {
+    return FromPackedString(entries->h_addr_list[0], Syscall::GetIpAddrLen(entries->h_addrtype), port, address);
+  }
+
+ protected:
+  struct sockaddr_storage addr_;
 };
 class NqPacket : public NqQuicSocketAddress {
  public:
   NqPacket() : NqQuicSocketAddress(), buff_(nullptr), len_(0) {}
-  inline int port() const { return port_; }
   inline const char *data() const { return buff_; }
   inline uint64_t ConnectionId() const {
     switch (data()[0] & 0x08) {
@@ -114,9 +139,13 @@ class NqPacket : public NqQuicSocketAddress {
         return 0;
     }
   }
- private:
+ protected:
   char *buff_;
   nq_size_t len_;
 };
+const char *NqQuicStrError(nq_error_t error) {
+  ASSERT(false);
+  return "TODO:NqQuicStrError";
+}
 } // net
 #endif

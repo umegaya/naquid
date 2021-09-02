@@ -165,9 +165,9 @@ Fd NqWorker::CreateUDPSocketAndBind(const NqQuicSocketAddress& address) {
 bool NqWorker::ToSocketAddress(const nq_addr_t &addr, NqQuicSocketAddress &socket_address) {
   char buffer[sizeof(struct sockaddr_storage)];
   int len, af;
-  if ((len = NqAsyncResolver::PtoN(addr.host, &af, &buffer)) < 0) {
+  if ((len = NqAsyncResolver::PtoN(addr.host, &af, &buffer, sizeof(buffer))) < 0) {
     return false;
   }
   return NqQuicSocketAddress::FromPackedString(buffer, len, addr.port, socket_address);
 }
-}
+} //namespace nq

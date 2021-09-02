@@ -21,15 +21,21 @@ class NqProtocolManager {
  public:
   enum Protocol {
     QuicNeedNegosiate = 0xbabababa, // reserved version for quic negosiation
-    QuicV1 = 0x0000_0001,
-    QuicDraft27 = 0xff00_001b,
-    QuicDraft28 = 0xff00_001c,
-    QuicDraft29 = 0xff00_001d
-  };
-  NqProtocolManager() : version_(Version::QuicNeedNegosiate) {}
-  NqProtocolManager(nq_wire_proto_t p) : versions_(From(p)) {}
+    QuicV1 = 0x00000001,
+    QuicDraft27 = 0xff00001b,
+    QuicDraft28 = 0xff00001c,
+    QuicDraft29 = 0xff00001d,
 
-  inline Protocol From(nq_wire_proto_t p) {
+    QuicLatest = QuicV1,
+  };
+  NqProtocolManager() : protocol_(Protocol::QuicNeedNegosiate) {}
+  NqProtocolManager(nq_wire_proto_t p) : protocol_(From(p)) {}
+
+  //get/set
+  inline Protocol protocol() const { return protocol_; }
+
+  //static
+  static inline Protocol From(nq_wire_proto_t p) {
     switch (p) {
       case NQ_QUIC_NEGOTIATE:
         return QuicNeedNegosiate;

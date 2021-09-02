@@ -142,5 +142,15 @@ QuicSession* NqDispatcherCompat::CreateQuicSession(QuicConnectionId connection_i
   return s;
 }
 
-} // namespace nq
+} //namespace nq
+#else
+namespace nq {
+void NqDispatcherCompat::OnEvent(Fd fd, const Event &e) {
+  ASSERT(false);
+}
+int NqDispatcherCompat::OnOpen(Fd fd) {
+  ASSERT(false);
+  return NQ_OK;
+}
+} //namespace nq
 #endif

@@ -56,29 +56,44 @@ class NqClientCompat : public NqClientBase {
  public:
   // implements NqClientBase
   bool Initialize() override { ASSERT(false); }
-  void StartConnect() override { ASSERT(false); }
+  void StartConnect() override;
   void StartDisconnect() override { ASSERT(false); }
   void ForceShutdown() override { ASSERT(false); }
   bool MigrateSocket() override { ASSERT(false); return false; }
-
-  // implements NqSession::Delegate
-  NqQuicConnectionId ConnectionId() override { ASSERT(false); return 0LL; }
-  void FlushWriteBuffer() override { ASSERT(false); }
   NqClientStream *NewStream() override { ASSERT(false); return nullptr; }
 
-  // operation
-  void StartConnect();
+  // implements NqSession::Delegate
+  NqQuicConnectionId ConnectionId() override { return conn_id_; }
+  void FlushWriteBuffer() override { ASSERT(false); }
+  int UnderlyingFd() override { ASSERT(false); }
 
  private:
   friend class NqClient;
   NqClientCompat(NqQuicSocketAddress server_address,
                  NqClientLoop &loop,
                  const NqQuicServerId &server_id,
-                 const NqClientConfig &config) 
-    : NqClientBase(server_address, loop, server_id, config) {}
-  ~NqClientCompat() override {}
+                 const NqClientConfig &config) : 
+    NqClientBase(loop, server_id, config), 
+    server_address_(server_address), server_id_(server_id), conn_(nullptr) {
+    config_ = config.NewQuicConfig();
+  }
+  ~NqClientCompat() override {
+    if (conn_ != nullptr) { 
+      quiche_conn_free(conn_);
+      conn_ = nullptr;
+    }
+  }
 
   DISALLOW_COPY_AND_ASSIGN(NqClientCompat);
+
+  NqQuicSocketAddress server_address_;
+  NqQuicServerId server_id_;
+  std::unique_ptr<NqQuicConfig> config_; 
+  NqQuicConnection conn_;
+  union  {
+      uint8_t conn_id_as_bytes_[sizeof(NqQuicConnectionId)];
+      NqQuicConnectionId conn_id_;
+  };
 };
 } //net
 #endif

@@ -2,6 +2,8 @@
 
 #if defined(NQ_CHROMIUM_BACKEND)
 #include "core/compat/nq_session.h"
+#include "core/nq_client_loop.h"
+#include "core/nq_dispather.h"
 
 namespace nq {
 using namespace net;
@@ -15,6 +17,12 @@ NqSession *NqStreamCompat::nq_session() {
 }
 const NqSession *NqStreamCompat::nq_session() const { 
   return static_cast<const NqSession *>(session()); 
+}
+NqDispatcher *NqStreamCompat::dispatcher() {
+  return static_cast<NqDispatcher *>(stream_allocator());
+}
+NqClientLoop *NqStreamCompat::client_loop() {
+  return static_cast<NqClientLoop *>(stream_allocator())
 }
 void NqStreamCompat::OnDataAvailable() {
   NqQuicConnection::ScopedPacketBundler bundler(
@@ -45,4 +53,49 @@ void NqStreamCompat::Send(
 
 } //namespace nq
 #else
+#include "core/nq_client_loop.h"
+#include "core/nq_dispatcher.h"
+
+namespace nq {
+void* NqStreamCompat::operator new(std::size_t sz, NqClientLoop *a) {
+  volatile auto r = static_cast<NqClientStream *>(a->stream_allocator().Alloc(sz));
+  r->client_loop_ = a;
+  r->allocator_type_ = ClientLoop;
+  return r;
+}
+void NqStreamCompat::operator delete(void *p, NqClientLoop *a) noexcept {
+  a->stream_allocator().Free(p);
+}
+void* NqStreamCompat::operator new(std::size_t sz, NqDispatcher *a) {
+  volatile auto r = static_cast<NqServerStream *>(a->stream_allocator().Alloc(sz));
+  r->dispatcher_ = a;
+  r->allocator_type_ = Dispatcher;
+  return r;
+}
+void NqStreamCompat::operator delete(void *p, NqDispatcher *a) noexcept {
+  a->stream_allocator().Free(p);
+}
+void NqStreamCompat::operator delete(void *p) noexcept {
+  auto r = reinterpret_cast<NqStreamCompat *>(p);
+  if (r->allocator_ptr_ == nullptr) {
+    std::free(r);
+  } else {
+    switch (r->allocator_type_) {
+      case ClientLoop:
+        r->client_loop_->stream_allocator().Free(p);
+        break;
+      case Dispatcher:
+        r->dispatcher_->stream_allocator().Free(p);
+        break;
+      default:
+        ASSERT(false);
+        std::free(r);
+        break;
+    }
+  }
+}
+void NqStreamCompat::Send(const char *p, nq_size_t len, bool fin, const nq_stream_opt_t *p_opt) {
+  ASSERT(false);
+}
+}
 #endif

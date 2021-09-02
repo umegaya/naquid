@@ -23,7 +23,7 @@ NqBoxer *NqServerSession::boxer() {
 
 
 // stream operation
-NqStream *NqServerSession::FindStream(QuicStreamId id) {
+NqStream *NqServerSession::FindStream(NqQuicStreamId id) {
   auto it = dynamic_streams().find(id);
   return it != dynamic_streams().end() ? static_cast<NqStream *>(it->second.get()) : nullptr;
 }

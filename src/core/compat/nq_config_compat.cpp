@@ -45,5 +45,28 @@ NqServerConfigCompat::NewCryptoConfig(QuicClock *clock) const {
   );
   return c;
 }
-} // namespace nq
+} //namespace nq
+#else
+#include "core/nq_config.h"
+
+namespace nq {
+NqQuicConfig *NqQuicConfig::Create(const NqClientConfigCompat &config) {
+  auto c = new NqQuicConfig();
+  if (!c->Initialize(config.protocol_manager().protocol())) {
+    delete c;
+    return nullptr;
+  }
+  c->Setup(config.client());
+  return c;
+}
+NqQuicConfig *NqQuicConfig::Create(const NqServerConfigCompat &config) {
+  auto c = new NqQuicConfig();
+  if (!c->Initialize(NqProtocolManager::Protocol::QuicLatest)) {
+    delete c;
+    return nullptr;
+  }
+  c->Setup(config.server());
+  return c;
+}
+} //namespace nq
 #endif

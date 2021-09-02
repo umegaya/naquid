@@ -17,7 +17,7 @@ class NqServerSession : public NqServerSessionCompat {
   ~NqServerSession() override { ASSERT(session_serial_.IsEmpty()); }
 
   nq_conn_t ToHandle();
-  NqStream *FindStream(QuicStreamId id);
+  NqStream *FindStream(NqQuicStreamId id);
   //if you set included closed to true, be careful to use returned value, 
   //this pointer soon will be invalid.
   NqStream *FindStreamBySerial(const nq_serial_t &s, bool include_closed = false);

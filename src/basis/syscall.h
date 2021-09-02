@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include "basis/defs.h"
 
@@ -52,6 +53,39 @@ public:
       return true;
     } else {
       return false;
+    }
+  }
+  static int SetSockAddr(
+    struct sockaddr_storage &addr, const char *addr_p, nq_size_t addr_len, uint16_t port
+  ) {
+    if (addr_len == Syscall::GetIpAddrLen(AF_INET)) {
+      auto tmp = (struct sockaddr_in *)&addr;
+      tmp->sin_family = AF_INET;
+      tmp->sin_port = port;
+      memcpy(&tmp->sin_addr, addr_p, addr_len);
+    } else if (addr_len == Syscall::GetIpAddrLen(AF_INET6)) {
+      auto tmp = (struct sockaddr_in6 *)&addr;
+      tmp->sin6_family = AF_INET6;
+      tmp->sin6_port = port;
+      memcpy(&tmp->sin6_addr, addr_p, addr_len);
+    } else {
+      TRACE("invalid addr_len:%u", addr_len);
+      ASSERT(false);
+      return -1;
+    }
+    return 0;
+  }
+  static int GetSockAddrPort(const struct sockaddr_storage &addr) {
+    if (addr.ss_family == AF_INET) {
+      auto tmp = (struct sockaddr_in *)&addr;
+      return tmp->sin_port;
+    } else if (addr.ss_family == AF_INET6) {
+      auto tmp = (struct sockaddr_in6 *)&addr;
+      return tmp->sin6_port;
+    } else {
+      TRACE("invalid ss_family:%u", addr.ss_family);
+      ASSERT(false);
+      return -1;
     }
   }
   static socklen_t GetSockAddrLen(int address_family) {
@@ -222,7 +256,32 @@ public:
     }
 
     return fd;
-  }  
+  }
+  class Random {
+   public:
+    Random() : fd_(INVALID_FD) {}
+    int GetBytes(uint8_t *buff, nq_size_t sz) {
+      if (fd_ == INVALID_FD) {
+        if ((fd_ = open("/dev/urandom", O_RDONLY)) < 0) {
+          logger::error({
+            {"msg", "failed to open /dev/urandom"},
+            {"errno", Errno()}
+          });
+          return -1;
+        }
+      }
+      if (read(fd_, reinterpret_cast<char *>(buff), sz) < 0) {
+          logger::error({
+            {"msg", "failed to read /dev/urandom"},
+            {"errno", Errno()}
+          });
+          return -1;
+      }
+      return 0;
+    }
+   private:
+    Fd fd_;
+  };
   static void *Memdup(const void *p, nq_size_t sz) {
     void *r = malloc(sz);
     memcpy(r, p, sz);

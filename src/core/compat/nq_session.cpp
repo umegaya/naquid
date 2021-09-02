@@ -52,5 +52,11 @@ void NqSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   }
 }
 
-} //net
+} //namespace nq
+#else
+namespace nq {
+void NqSession::CloseStream(NqQuicStreamId stream_id) {
+  ASSERT(false);
+}
+}
 #endif

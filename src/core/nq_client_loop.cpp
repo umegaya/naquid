@@ -73,8 +73,6 @@ NqClient *NqClientLoop::Create(const std::string &host,
                                const NqQuicServerId server_id,
                                const NqQuicSocketAddress server_address,
                                NqClientConfig &config) {
-
-  auto supported_versions = AllSupportedVersions();//versions_.GetSupportedVersions();
   auto c = new(this) NqClient(
     server_address,
     *this,

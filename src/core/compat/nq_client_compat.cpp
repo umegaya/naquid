@@ -19,17 +19,19 @@ NqClientCompat::NqClientCompat(NqQuicSocketAddress server_address,
 }
 }  // namespace nq
 #else
-#include <quiche.h>
+#include "core/compat/quiche/deps.h"
+#include "core/nq_client_loop.h"
 
 namespace nq {
 void NqClientCompat::StartConnect() {
   OnInitializeSession();
+  client_loop()->random().GetBytes(conn_id_as_bytes_, sizeof(conn_id_));
   // MUST_DO(iyatomi): call quiche_connect
-  conn_ = quiche_connect();
-}
-NqQuicConnectionId NqClientCompat::connection_id() {
-  // MUST_DO(iyatomi): call quiche_connect
-  return quiche_conn_source_id(conn_);
+  conn_ = quiche_connect(
+    server_id_.host().c_str(), conn_id_as_bytes_, sizeof(conn_id_),
+    reinterpret_cast<const struct sockaddr *>(&(server_address_.generic_address())), 
+    server_address_.generic_address_length(), config_->operator quiche_config *()
+  );
 }
 }
 #endif
