@@ -3,7 +3,7 @@
 #if defined(NQ_CHROMIUM_BACKEND)
 #include "core/compat/nq_session.h"
 #include "core/nq_client_loop.h"
-#include "core/nq_dispather.h"
+#include "core/nq_dispatcher.h"
 
 namespace nq {
 using namespace net;
@@ -22,7 +22,7 @@ NqDispatcher *NqStreamCompat::dispatcher() {
   return static_cast<NqDispatcher *>(stream_allocator());
 }
 NqClientLoop *NqStreamCompat::client_loop() {
-  return static_cast<NqClientLoop *>(stream_allocator())
+  return static_cast<NqClientLoop *>(stream_allocator());
 }
 void NqStreamCompat::OnDataAvailable() {
   NqQuicConnection::ScopedPacketBundler bundler(

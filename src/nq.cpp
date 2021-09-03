@@ -123,7 +123,7 @@ static bool nq_chromium_logger(int severity,
     {"line", line},
     {"msg", str.c_str() + message_start},
   });
-  ASSERT(severity < ::base::logging::LOG_FATAL);
+  ASSERT(severity < ::logging::LOG_FATAL);
   return true;
 }
 #endif
@@ -132,7 +132,7 @@ static void lib_init(bool client) {
   g_at_exit_manager = nq_at_exit_manager(); //anchor
 #if defined(NQ_CHROMIUM_BACKEND)
   //set loghandoer for chromium codebase
-  ::base::logging::SetLogMessageHandler(nq_chromium_logger);
+  ::logging::SetLogMessageHandler(nq_chromium_logger);
 #endif
   //break some of the systems according to the env value "CHAOS"
   chaos_init();

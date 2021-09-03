@@ -296,7 +296,7 @@ class NqSimpleRPCStreamHandler : public NqStreamHandler {
     ofs = HeaderCodec::Encode(static_cast<int16_t>(type), msgid, buffer, sizeof(buffer));
     ofs += LengthCodec::Encode(len, buffer + ofs, sizeof(buffer) - ofs);
     memcpy(buffer + ofs, p, len);
-    WriteBytes(buffer, ofs + len);      
+    WriteBytes(buffer, ofs + len);
   }
 
  private:

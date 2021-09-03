@@ -18,6 +18,8 @@
 namespace nq {
 using namespace net;
 class NqSession;
+class NqDispatcher;
+class NqClientLoop;
 class NqStreamCompat : public QuicStream {
  protected:
   class AckHandler : public QuicAckListenerInterface {

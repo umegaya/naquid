@@ -73,8 +73,8 @@ class NqPacket : public QuicReceivedPacket {
     }
   } 
 };
-const char *NqQuicStrError(nq_error_t error) {
-  return QuicErrorCodeToString(static_cast<QuicErrorCode>(code));
+static inline const char *NqQuicStrError(nq_error_t error) {
+  return QuicErrorCodeToString(static_cast<QuicErrorCode>(error));
 }
 } // net
 #else
@@ -143,7 +143,7 @@ class NqPacket : public NqQuicSocketAddress {
   char *buff_;
   nq_size_t len_;
 };
-const char *NqQuicStrError(nq_error_t error) {
+static inline const char *NqQuicStrError(nq_error_t error) {
   ASSERT(false);
   return "TODO:NqQuicStrError";
 }

@@ -62,6 +62,9 @@ class NqSession : public QuicSession {
   std::unique_ptr<QuicCryptoStream> crypto_stream_;
   NqSessionDelegate *delegate_;
 };
+#define DefferedFlushStream(__session__) \
+  NqQuicConnection::ScopedPacketBundler bundler( \
+    (__session__)->connection(), NqQuicConnection::SEND_ACK_IF_QUEUED)
 } // namespace nq
 #else
 #include "core/nq_stream.h"
@@ -103,5 +106,6 @@ class NqSession {
   ClosedStreams closed_streams_;        // stream already closed
   ZombieStreamMap zombie_streams_;      // closed stream which still waiting acks
 };
+#define DefferedFlushStream(__session__)
 } // namespace nq
 #endif

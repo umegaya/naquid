@@ -250,10 +250,12 @@ void NqSimpleStreamHandler::OnRecv(const void *p, nq_size_t len) {
 	}
 }
 void NqSimpleStreamHandler::Send(const void *p, nq_size_t len) {
-  WriteBytes(reinterpret_cast<const char *>(p), len);
+  DefferedFlushStream(nq_session());
+  SendCommon(p, len, nullptr);
 }
 void NqSimpleStreamHandler::SendEx(const void *p, nq_size_t len, const nq_stream_opt_t &opt) {
-  WriteBytes(reinterpret_cast<const char *>(p), len, opt);
+  DefferedFlushStream(nq_session());
+  SendCommon(p, len, &opt);
 }
 
 
@@ -342,6 +344,7 @@ void NqSimpleRPCStreamHandler::OnRecv(const void *p, nq_size_t len) {
   } while (parse_buffer_.length() > 0);
 }
 void NqSimpleRPCStreamHandler::Notify(uint16_t type, const void *p, nq_size_t len) {
+  DefferedFlushStream(nq_session());
   ASSERT(type > 0);
   //pack and send buffer
   char buffer[header_buff_len + len_buff_len + len];
